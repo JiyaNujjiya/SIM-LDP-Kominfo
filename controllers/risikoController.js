@@ -3,8 +3,14 @@ const db = require('../config/db');
 // 1. Tambah Data Risiko (Form 1.0)
 exports.createRisiko = async (req, res) => {
     const { 
-        kode_risiko, peristiwa_risiko, penyebab, dampak, 
-        kemungkinan, nilai_dampak, keputusan_perlakuan, is_layanan_prioritas 
+        kode_risiko,
+        kategori_risiko, 
+        peristiwa_risiko, 
+        penyebab, 
+        dampak, 
+        kemungkinan, 
+        nilai_dampak, 
+        keputusan_perlakuan,  
     } = req.body;
     
     const created_by = req.user ? req.user.id : null; 
@@ -12,26 +18,39 @@ exports.createRisiko = async (req, res) => {
     try {
         const query = `
             INSERT INTO mr_risiko 
-            (kode_risiko, peristiwa_risiko, penyebab, dampak, kemungkinan, nilai_dampak, keputusan_perlakuan, is_layanan_prioritas, created_by) 
+            (
+            kode_risiko, 
+            kategori_risiko,
+            peristiwa_risiko, 
+            penyebab, 
+            dampak, 
+            kemungkinan, 
+            nilai_dampak, 
+            keputusan_perlakuan, 
+            created_by) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         await db.query(query, [
-            kode_risiko || 'RSK-001', 
-            peristiwa_risiko || 'Kosong', 
-            penyebab || 'Kosong', 
-            dampak || 'Kosong', 
-            kemungkinan || 1, 
-            nilai_dampak || 1, 
-            keputusan_perlakuan || 'Mengurangi Risiko', 
-            is_layanan_prioritas ? 1 : 0, 
+            kode_risiko ||  
+            peristiwa_risiko || null, 
+            penyebab || null, 
+            dampak || null, 
+            kemungkinan || null, 
+            nilai_dampak || null, 
+            keputusan_perlakuan || null,  
             created_by
         ]);
 
-        res.status(201).json({ message: 'Data Risiko berhasil ditambahkan!' });
+        res.status(201).json({ 
+            message: 'Data Risiko berhasil ditambahkan!' 
+        });
+
     } catch (error) {
-        console.error('ERROR DATABASE:', error); // Mencetak detail error ke Terminal VS Code
-        res.status(500).json({ error: error.message });
+        console.error('ERROR DATABASE:', error); 
+        
+        res.status(500).json({ 
+            error: error.message });
     }
 };
 

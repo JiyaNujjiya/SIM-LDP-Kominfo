@@ -1,30 +1,57 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import RequirePermission from './requirePermission';
+
 import Login from './Login';
 import Dashboard from './Dashboard';
+import RisikoPage from './pages/RisikoPage';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
+
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-  };
-
   return (
-    <div>
+    <BrowserRouter>
       {!user ? (
-        <Login onLoginSuccess={(userData: any) => setUser(userData)} />
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <Login
+                onLoginSuccess={(userData: any) => setUser(userData)}
+              />
+            }
+          />
+        </Routes>
       ) : (
-        <Dashboard user={user} onLogout={handleLogout} />
+        <Routes>
+          <Route
+            path="/dashboard"
+            element={<Dashboard />}
+          />
+
+          <Route
+            path="/risiko"
+            element={
+              <RequirePermission permission="risk.view">
+                <RisikoPage />
+              </RequirePermission>
+            }
+          />
+
+          <Route
+            path="*"
+            element={<Navigate to="/dashboard" replace />}
+          />
+        </Routes>
       )}
-    </div>
+    </BrowserRouter>
   );
 }
