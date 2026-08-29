@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { data } from 'react-router-dom';
 
 interface RisikoItem {
   id: number;
@@ -67,6 +68,73 @@ export default function RisikoPage() {
   const permissions: string[] = user?.permissions || [];
   const canCreate = permissions.includes('risk.create');
 
+  const [penanggungJawabOptions, setpenanggungJawabOptions] = useState<
+  {
+    id: number,
+    nama: string,
+    upr_instansi?: string | null,
+    nama_role?: string | null,
+  }[]
+  >([]);
+
+  const [layananOptions, setLayananOptions] = useState<
+    {
+      id: number,
+      kode_layanan: string,
+      nama_layanan: string,
+    }[]
+  >([]);
+
+  const [layananPrioritasOptions, setLayananPrioritasOptions] = useState <
+      {
+        id: number,
+        kode_prioritas: string,
+        nama_layanan: string;
+      }[]
+  >([]); 
+  
+  const [ippdOptions, setIppdOptions] = useState<
+      {
+        id: number;
+        kode_instansi: string;
+        nama_instansi: string;
+        jenis_instansi?: string | null;
+      }[]
+  >([]);
+
+  const [selectedIppdIds, setSelectedIppdIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+
+    fetch('http://localhost:5000/api/risiko/penanggung-jawab-options', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(async (res) => {
+        if(!res.ok) {
+          const errorData = await res.json();
+
+          throw new Error(
+            errorData.message ||
+              errorData.error ||
+              'Gagal mengambil daftar penangungg jawab'
+          ); 
+        }
+
+        return res.json();
+      })
+      .then((data) => {
+        setpenanggungJawabOptions(data);
+      })
+      .catch((err) => {
+        console.error('Error fetching penanggung jawab:', err);
+      });
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
 
@@ -96,6 +164,68 @@ export default function RisikoPage() {
         console.error('Error fetching risiko:', err);
         setLoading(false);
       });
+  }, []);
+
+  useEffect (() => {
+    const token = localStorage.getItem('token');
+
+    fetch('http://localhost:5000/api/risiko/layanan-prioritas-options', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json();
+
+          throw new Error(
+            errorData.message ||
+              errorData.error ||
+              'Gagal mengambil daftar layanan prioritas'
+          );
+        }
+
+        return res.json();
+      })
+      .then((data) => {
+        setLayananPrioritasOptions(data);
+      })
+      .catch((err) => {
+        console.error('Error fetching layanan prioritas:', err);
+      });
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+
+    fetch('http://localhost:5000/api/risiko/ippd-options', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-type': 'application/json',
+      },
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json();
+
+          throw new Error(
+            errorData.message || 
+              errorData.error ||
+              'Gagal mengambil daftar IPPD'
+          );
+        }
+        
+        return res.json();
+      })
+      .then((data) => {
+        setIppdOptions(data);
+      })
+      .catch((err) => {
+        console.error('Error fetching IPPD:', err)
+      })
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -154,6 +284,7 @@ export default function RisikoPage() {
             strategis_operasional: formData.strategis_operasional,
             lintas_sektor: formData.lintas_sektor,
             membutuhkan_perubahan: formData.membutuhkan_perubahan,
+            ippd_ids: selectedIppdIds,
           }),
         }
       );
@@ -195,9 +326,10 @@ export default function RisikoPage() {
         pemilik_layanan: '',
         strategis_operasional: '',
         lintas_sektor: false,
-        membutuhkan_perubahan: false,
+        membutuhkan_perubahan: false, 
       });
-
+      
+      setSelectedIppdIds([]);
       setCurrentStep(1);
       setShowForm(false);
 
@@ -234,6 +366,39 @@ export default function RisikoPage() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+
+    fetch('http://localhost:5000/api/risiko/layanan-options', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json();
+
+          throw new Error(
+            errorData.message ||
+              errorData.error ||
+              'Gagal mengambil daftar layanan'
+          );
+        }
+
+        return res.json();
+      })
+      .then((data) => {
+        setLayananOptions(data);
+      })
+      .catch((err) => {
+        console.log('Error fetching layanan:', err)
+      });
+  }, []);
+
+  
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -651,12 +816,21 @@ export default function RisikoPage() {
 
                   <select
                     value={formData.penanggung_jawab_id}
-                    disabled
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500"
+                    onChange={(e) => 
+                      setFormData({
+                        ...formData,
+                        penanggung_jawab_id: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   >
-                    <option value="">
-                      Data pengguna belum dimuat
-                    </option>
+                    <option value="">Pilih Penanggung Jawab</option>
+                    {penanggungJawabOptions.map((item) =>(
+                      <option key={item.id} value={item.id}>
+                        {item.nama},
+                        {item.nama_role? ` - ${item.nama_role}` : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -737,12 +911,21 @@ export default function RisikoPage() {
 
                   <select
                     value={formData.layanan_id}
-                    disabled
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500"
+                    onChange={(e) => 
+                      setFormData({
+                        ...formData,
+                        layanan_id: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   >
-                    <option value="">
-                      Data layanan belum dimuat
-                    </option>
+                    <option value="">Pilih layanan pendukung</option>
+
+                    {layananOptions.map((item) => (
+                      <option key={item.id} value={item.id} >
+                        {item.kode_layanan} - {item.nama_layanan}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -752,12 +935,20 @@ export default function RisikoPage() {
 
                   <select
                     value={formData.layanan_prioritas_id}
-                    disabled
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        layanan_prioritas_id: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
                   >
-                    <option value="">
-                      Data layanan prioritas belum dimuat
-                    </option>
+                    <option value="">Pilih layanan prioritas</option>
+                    {layananPrioritasOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.kode_prioritas} - {item.nama_layanan}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -841,8 +1032,41 @@ export default function RisikoPage() {
                     IPPD Terkait
                   </label>
 
-                  <div className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500">
-                    Relasi IPPD belum dimuat
+                  <div className="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    {ippdOptions.length > 0 ? (
+                      ippdOptions.map((item) => (
+                        <label
+                          key={item.id}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIppdIds.includes(item.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIppdIds([
+                                  ...selectedIppdIds,
+                                  item.id,
+                                ]);
+                              } else {
+                                setSelectedIppdIds(
+                                  selectedIppdIds.filter(
+                                    (id) => id !== item.id
+                                  )
+                                );
+                              }
+                            }}
+                          />
+                        <span className="text-sm text-gray-700">
+                          {item.kode_instansi} - {item.nama_instansi}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-500">
+                      Tidak ada data IPPD aktif
+                    </span>
+                  )}
                   </div>
                 </div>
               </div>

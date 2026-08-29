@@ -38,6 +38,8 @@ exports.createRisiko = async (req, res) => {
         lintas_sektor,
         membutuhkan_perubahan,
 
+        ippd_ids
+
     } = req.body;
     
     const created_by = req.user ? req.user.id : null; 
@@ -80,7 +82,7 @@ exports.createRisiko = async (req, res) => {
                 ?)
         `;
         
-        await db.query(query, [
+        const [result] = await db.query(query, [
             // a. identifikasi risiko
             sasaran_pembangunan_nasional || null,
             sasaran_upr || null,
@@ -114,6 +116,7 @@ exports.createRisiko = async (req, res) => {
             strategis_operasional || null,
             lintas_sektor ? 1 : 0,
             membutuhkan_perubahan ? 1 : 0, 
+
             
             created_by
         ]);
@@ -121,6 +124,26 @@ exports.createRisiko = async (req, res) => {
         res.status(201).json({ 
             message: 'Data Risiko berhasil ditambahkan!' 
         });
+
+        const risikoId = result.insertId;
+
+        if (Array.isArray(ippd_ids) && ippd_ids.length > 0) {
+            const values = ippd_ids.map((instansiId) => [
+                risikoId,
+                instansiId
+            ]);
+
+            await db.query(
+                `
+                INSERT INTO mr_risiko_IPPD (
+                    risiko_id,
+                    instansi_id
+                )
+                VALUES ?
+                `,
+                [values]
+            );
+        }
 
     } catch (error) {
         console.error('ERROR DATABASE:', error); 
@@ -143,5 +166,101 @@ exports.getAllRisiko = async (req, res) => {
     } catch (error) {
         console.error('ERROR DATABASE:', error);
         res.status(500).json({ error: error.message });
+    }
+};
+
+// 3. ambil penanggung jawab di step 3
+exports.getPenanggungJawabOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query (`
+            SELECT 
+                u.id,
+                u.nama,
+                u.upr_instansi,
+                r.nama_role
+            FROM users u
+            LEFT JOIN roles r ON r.id = u.role_id
+            ORDER BY u.nama ASC
+        `);
+        
+        res.json(rows);
+    } catch (error) {
+        console.error('ERROR DATABASE:', error);
+
+        res.status(500).json({
+            error : error.message
+        });
+    }
+}
+
+// 4. mengambil daftar layanan pendukung
+exports.getLayananOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT 
+                id,
+                kode_layanan,
+                nama_layanan
+            FROM layanan_digital
+            WHERE status = 'Aktif'
+            ORDER BY nama_layanan ASC
+        `);
+
+        res.json(rows);
+    } catch (error) {
+        console.error('ERROR DATABASE:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
+}
+
+// 5. mengambil daftar layanan prioritas
+exports.getLayananPrioritasOptions = async (req, res) => {
+    try {
+        const [rows] =await db.query(`
+            SELECT 
+                lp.id,
+                lp.kode_prioritas,
+                ld.nama_layanan
+            FROM layanan_prioritas lp
+            JOIN layanan_digital ld
+                ON ld.id = lp.layanan_id
+            ORDER BY lp.kode_prioritas ASC
+        `);
+
+        res.json(rows);
+    
+    } catch (error) {
+        console.error('ERROR DATABASE:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
+};
+
+// 6. mengambil daftar ippd/instansi terkait
+exports.getIppdOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT 
+                id,
+                kode_instansi,
+                nama_instansi,
+                jenis_instansi
+            FROM instansi
+            WHERE status = 'Aktif'
+            ORDER BY nama_instansi ASC
+        `);
+        
+        res.json(rows);
+    } catch (error) {
+        console.error('ERROR DATABASE:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
     }
 };

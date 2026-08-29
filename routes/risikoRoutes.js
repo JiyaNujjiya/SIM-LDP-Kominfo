@@ -19,4 +19,32 @@ router.get(
     risikoController.getAllRisiko
 );
 
+router.get(
+    '/Penanggung-jawab-options',
+    authMiddleware,
+    requirePermission('risk.create'),
+    risikoController.getPenanggungJawabOptions
+);
+
+router.get(
+    '/layanan-options',
+    authMiddleware,
+    requirePermission('risk.create'),
+    risikoController.getLayananOptions
+)
+
+router.get(
+    '/layanan-prioritas-options',
+    authMiddleware,
+    requirePermission('risk.create'),
+    risikoController.getLayananPrioritasOptions
+);
+
+router.get(
+    '/ippd-options',
+    authMiddleware,
+    requirePermission('risk.create'),
+    risikoController.getIppdOptions
+)
+
 module.exports = router;
