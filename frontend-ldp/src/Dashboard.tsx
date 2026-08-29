@@ -256,7 +256,13 @@ function RiskBadge({ level, color, bg }) {
    MAIN DASHBOARD
    ═══════════════════════════════════════════ */
 
-export default function SimLdpDashboard() {
+type DashboardProps = {
+  onLogout: () => void;
+};
+     
+export default function SimLdpDashboard({
+  onLogout,
+}: DashboardProps) {
   const [active, setActive] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
@@ -474,12 +480,17 @@ export default function SimLdpDashboard() {
                   fontWeight: 700, fontSize: 14, color: C.title,
                 }}
               >
-                AW
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontWeight: 600, fontSize: 13, color: C.title }}>Dr. Andi Wijaya, M.Si</span>
                 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>Administrator</span>
               </div>
+              <button
+                onClick={onLogout}
+                className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </header>

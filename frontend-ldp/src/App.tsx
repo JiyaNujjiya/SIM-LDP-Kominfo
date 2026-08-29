@@ -9,13 +9,20 @@ import RisikoPage from './pages/RisikoPage';
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {
+  useEffect(() => {;
     const savedUser = localStorage.getItem('user');
 
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('rememberMe');
+    setUser(null);
+  }
 
   return (
     <BrowserRouter>
@@ -34,7 +41,7 @@ export default function App() {
         <Routes>
           <Route
             path="/dashboard"
-            element={<Dashboard />}
+            element={<Dashboard onLogout={handleLogout} />}
           />
 
           <Route
