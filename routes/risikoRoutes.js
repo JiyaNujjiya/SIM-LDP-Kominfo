@@ -47,4 +47,46 @@ router.get(
     risikoController.getIppdOptions
 )
 
+router.get(
+    '/:id',
+    authMiddleware,
+    requirePermission('risk.view'),
+    risikoController.getRisikoById
+);
+
+router.post(
+  '/:id/submit',
+  authMiddleware,
+  requirePermission('risk.submit'),
+  risikoController.submitRisiko
+);
+
+router.post(
+  '/:id/approve',
+  authMiddleware,
+  requirePermission('risk.approve'),
+  risikoController.approveRisiko
+);
+
+router.post(
+  '/:id/reject',
+  authMiddleware,
+  requirePermission('risk.reject'),
+  risikoController.rejectRisiko
+);
+
+router.put(
+  '/:id',
+  authMiddleware,
+  requirePermission('risk.update'),
+  risikoController.updateRisiko
+);
+
+router.delete(
+  '/:id',
+  authMiddleware,
+  requirePermission('risk.delete'),
+  risikoController.deleteRisiko
+);
+
 module.exports = router;

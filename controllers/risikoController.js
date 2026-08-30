@@ -264,3 +264,436 @@ exports.getIppdOptions = async (req, res) => {
         });
     }
 };
+
+// 7. mengambil detail risiko berdasarkan id
+exports.getRisikoById = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const [rows] = await db.query(`
+            SELECT 
+                r.*,
+                pembuat.nama AS nama_pembuat,
+                pj.nama AS nama_penanggung_jawab,
+                ld.kode_layanan,
+                ld.nama_layanan,
+                lp.kode_prioritas
+            FROM mr_risiko r
+
+            LEFT JOIN users pembuat
+                ON pembuat.id = r.created_by
+                
+            LEFT JOIN users pj
+                ON pj.id = r.penanggung_jawab_id
+
+            LEFT JOIN layanan_digital ld
+                ON ld.id = r.layanan_id
+                
+            LEFT JOIN layanan_prioritas lp
+                ON lp.id = r.layanan_prioritas_id
+
+            WHERE r.id = ?
+            LIMIT 1
+        `, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                message: 'Data risiko tidak ditemukan'
+            });
+        }
+
+        const risiko = rows[0];
+        const [ippdRows] = await db.query(`
+            SELECT 
+                i.id,
+                i.kode_instansi,
+                i.nama_instansi
+            FROM mr_risiko_ippd mri
+            JOIN instansi i
+                ON i.id = mri.instansi_id
+            WHERE mri.risiko_id = ?
+            ORDER BY i.nama_instansi ASC
+        `, [id]);
+
+        risiko.ippd_terkait = ippdRows;
+
+        res.json(risiko);
+    
+    } catch (error) {
+        console.error('ERROR DATABASE:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
+};
+
+// 8. Mengupdate tabel risiko
+exports.updateRisiko = async (req, res) => {
+  const { id } = req.params;
+
+  const {
+    sasaran_pembangunan_nasional,
+    sasaran_upr,
+    indikator_kinerja,
+    kode_risiko,
+    peristiwa_risiko,
+
+    kategori_risiko,
+    penyebab,
+    dampak,
+    area_dampak,
+    kemungkinan,
+    nilai_dampak,
+    prioritas_risiko,
+
+    keputusan_perlakuan,
+    deskripsi_detail_perlakuan,
+    waktu_rencana_perlakuan,
+    penanggung_jawab_id,
+
+    level_kemungkinan_residual,
+    level_dampak_residual,
+
+    layanan_id,
+    layanan_prioritas_id,
+    pemilik_layanan,
+    strategis_operasional,
+    lintas_sektor,
+    membutuhkan_perubahan,
+
+    ippd_ids,
+  } = req.body;
+
+  try {
+    const [existing] = await db.query(
+      `
+       SELECT id, status_risiko
+       FROM mr_risiko 
+       WHERE id = ?
+       `,
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan.',
+      });
+    }
+
+    if (String (existing[0].status_risiko).trim().toLowerCase() !== 'draft') {
+      return res.status(400).json({
+        message: 'Hanya risiko berstatus Draft yang dapat diedit',
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mr_risiko
+      SET
+        sasaran_pembangunan_nasional = ?,
+        sasaran_upr = ?,
+        indikator_kinerja = ?,
+        kode_risiko = ?,
+        peristiwa_risiko = ?,
+
+        kategori_risiko = ?,
+        penyebab = ?,
+        dampak = ?,
+        area_dampak = ?,
+        kemungkinan = ?,
+        nilai_dampak = ?,
+        prioritas_risiko = ?,
+
+        keputusan_perlakuan = ?,
+        deskripsi_detail_perlakuan = ?,
+        waktu_rencana_perlakuan = ?,
+        penanggung_jawab_id = ?,
+
+        level_kemungkinan_residual = ?,
+        level_dampak_residual = ?,
+
+        layanan_id = ?,
+        layanan_prioritas_id = ?,
+        pemilik_layanan = ?,
+        strategis_operasional = ?,
+        lintas_sektor = ?,
+        membutuhkan_perubahan = ?
+
+      WHERE id = ?
+      `,
+      [
+        sasaran_pembangunan_nasional,
+        sasaran_upr,
+        indikator_kinerja,
+        kode_risiko,
+        peristiwa_risiko,
+
+        kategori_risiko,
+        penyebab,
+        dampak,
+        area_dampak,
+        kemungkinan,
+        nilai_dampak,
+        prioritas_risiko,
+
+        keputusan_perlakuan,
+        deskripsi_detail_perlakuan,
+        waktu_rencana_perlakuan,
+        penanggung_jawab_id,
+
+        level_kemungkinan_residual,
+        level_dampak_residual,
+
+        layanan_id,
+        layanan_prioritas_id,
+        pemilik_layanan,
+        strategis_operasional,
+        lintas_sektor,
+        membutuhkan_perubahan,
+
+        id,
+      ]
+    );
+
+    // Hapus relasi IPPD lama
+    await db.query(
+      'DELETE FROM mr_risiko_ippd WHERE risiko_id = ?',
+      [id]
+    );
+
+    // Simpan kembali IPPD hasil edit
+    if (Array.isArray(ippd_ids) && ippd_ids.length > 0) {
+      const values = ippd_ids.map((instansiId) => [
+        id,
+        instansiId,
+      ]);
+
+      await db.query(
+        `
+        INSERT INTO mr_risiko_ippd
+          (risiko_id, instansi_id)
+        VALUES ?
+        `,
+        [values]
+      );
+    }
+
+    res.json({
+      message: 'Data risiko berhasil diperbarui.',
+    });
+
+  } catch (error) {
+    console.error('ERROR UPDATE RISIKO:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        message: 'Kode risiko sudah digunakan.',
+      });
+    }
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+// 9. Menghapus data form 1.0
+exports.deleteRisiko = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [existing] = await db.query(
+      `SELECT id, status_risiko
+       FROM mr_risiko 
+       WHERE id = ?`,
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan.',
+      });
+    }
+
+    if (String(existing[0].status_risiko).trim().toLowerCase() !== 'draft') {
+      return res.status(400).json({
+        message: 'Hanya risiko berstatus Draft yang dapat diedit',
+      });
+    }
+
+    await db.query(
+      'DELETE FROM mr_risiko_ippd WHERE risiko_id = ?',
+      [id]
+    );
+
+    await db.query(
+      'DELETE FROM mr_risiko WHERE id = ?',
+      [id]
+    );
+
+    res.json({
+      message: 'Data risiko berhasil dihapus.',
+    });
+
+  } catch (error) {
+    console.error('ERROR DELETE RISIKO:', error);
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.submitRisiko = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT id, status_risiko
+      FROM mr_risiko
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan.',
+      });
+    }
+
+    const risiko = rows[0];
+
+    if (risiko.status_risiko !== 'Draft') {
+      return res.status(400).json({
+        message: 'Hanya risiko berstatus Draft yang dapat diajukan.',
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mr_risiko
+      SET status_risiko = 'Diajukan'
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    res.json({
+      message: 'Risiko berhasil diajukan.',
+      status_risiko: 'Diajukan',
+    });
+
+  } catch (error) {
+    console.error('ERROR SUBMIT RISIKO:', error);
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.approveRisiko = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT id, status_risiko
+      FROM mr_risiko
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan.',
+      });
+    }
+
+    const risiko = rows[0];
+
+    if (risiko.status_risiko !== 'Diajukan') {
+      return res.status(400).json({
+        message: 'Hanya risiko berstatus Diajukan yang dapat disetujui.',
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mr_risiko
+      SET status_risiko = 'Disetujui'
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    res.json({
+      message: 'Risiko berhasil disetujui.',
+      status_risiko: 'Disetujui',
+    });
+
+  } catch (error) {
+    console.error('ERROR APPROVE RISIKO:', error);
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.rejectRisiko = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT id, status_risiko
+      FROM mr_risiko
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan.',
+      });
+    }
+
+    const risiko = rows[0];
+
+    if (risiko.status_risiko !== 'Diajukan') {
+      return res.status(400).json({
+        message: 'Hanya risiko berstatus Diajukan yang dapat ditolak.',
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mr_risiko
+      SET status_risiko = 'Ditolak'
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    res.json({
+      message: 'Risiko berhasil ditolak.',
+      status_risiko: 'Ditolak',
+    });
+
+  } catch (error) {
+    console.error('ERROR REJECT RISIKO:', error);
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};

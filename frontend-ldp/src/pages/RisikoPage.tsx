@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import { data } from 'react-router-dom';
 
 interface RisikoItem {
   id: number;
+  sasaran_pembangunan_nasional?: string | null;
+  sasaran_upr?: string | null;
+  indikator_kinerja?: string | null;
+
   layanan_id?: number | null;
   layanan_prioritas_id?: number | null;
   pemilik_layanan?: string | null;
@@ -18,13 +22,36 @@ interface RisikoItem {
 
   keputusan_perlakuan?: string | null;
   kategori_risiko?: string | null;
+  area_dampak?: string| null;
   prioritas_risiko?: string | null;
 
   deskripsi_detail_perlakuan?: string | null;
   waktu_rencana_perlakuan?: string | null;
-
   pembuat?: string | null;
+  nama_penanggung_jawab?: string | null;
+
+  level_kemungkinan_residual?: number | null;
+  level_dampak_residual?: number | null;
+  besaran_risiko_residual?: number | null;
+
+  kode_layanan?: string | null;
+  nama_layanan?: string | null;
+  kode_prioritas?: string | null;
+
+  strategis_operasional?: string | null;
+  lintas_sektor?: boolean | number | null;
+  membutuhkan_perubahan?: boolean | number | null;
+  status_risiko?: 'Draft' | 'Diajukan' | 'Disetujui' | 'Ditolak' | null;
+  
+  ippd_terkait?: {
+  id: number;
+  kode_instansi: string;
+  nama_instansi: string;
+
+  
+}[];
 }
+
 
 export default function RisikoPage() {
   const [dataRisiko, setDataRisiko] = useState<RisikoItem[]>([]);
@@ -65,9 +92,16 @@ export default function RisikoPage() {
   const savedUser = localStorage.getItem('user');
   const user = savedUser ? JSON.parse(savedUser) : null;
 
+  // permission user
   const permissions: string[] = user?.permissions || [];
   const canCreate = permissions.includes('risk.create');
+  const canSubmit = permissions.includes('risk.submit');
+  const canApprove = permissions.includes('risk.approve');
+  const canReject = permissions.includes('risk.reject');
+  const canUpdate = permissions.includes('risk.update');
+  const canDelete = permissions.includes('risk.delete');
 
+  
   const [penanggungJawabOptions, setpenanggungJawabOptions] = useState<
   {
     id: number,
@@ -103,6 +137,10 @@ export default function RisikoPage() {
   >([]);
 
   const [selectedIppdIds, setSelectedIppdIds] = useState<number[]>([]);
+  const [selectedRisiko, setSelectedRisiko] = useState<RisikoItem | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -228,6 +266,252 @@ export default function RisikoPage() {
       })
   }, []);
 
+  const handleDetail = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    try {
+      setLoadingDetail(true);
+      setMessage('');
+
+      const response = await fetch(
+        `http://localhost:5000/api/risiko/${id}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if(!response.ok) {
+        throw new Error(
+          result.message || 
+            result.error ||
+            'Gagal mengambil detail risiko'
+        );
+      }
+
+      console.log('DETAIL RISIKO:', result);
+      setSelectedRisiko(result);
+
+    } catch (err) {
+      const error = err as Error;
+      
+      console.error('Error detail risiko:', err);
+      setMessage(error.message)
+      
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleEdit = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    try {
+      setLoadingDetail(true);
+      setMessage('');
+
+      const response = await fetch(
+        `http://localhost:5000/api/risiko/${id}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            'Gagal mengambil data risiko'
+        );
+      }
+
+      setEditingId(id);
+
+      setFormData({
+        sasaran_pembangunan_nasional:
+          result.sasaran_pembangunan_nasional || '',
+        sasaran_upr: result.sasaran_upr || '',
+        indikator_kinerja: result.indikator_kinerja || '',
+        kode_risiko: result.kode_risiko || '',
+        kategori_risiko: result.kategori_risiko || '',
+        peristiwa_risiko: result.peristiwa_risiko || '',
+        penyebab: result.penyebab || '',
+        dampak: result.dampak || '',
+        kemungkinan: String(result.kemungkinan ?? 1),
+        nilai_dampak: String(result.nilai_dampak ?? 1),
+        keputusan_perlakuan:
+          result.keputusan_perlakuan || 'Mengurangi Risiko',
+        area_dampak: result.area_dampak || '',
+        prioritas_risiko: result.prioritas_risiko || '',
+        deskripsi_detail_perlakuan:
+          result.deskripsi_detail_perlakuan || '',
+        waktu_rencana_perlakuan:
+          result.waktu_rencana_perlakuan
+            ? result.waktu_rencana_perlakuan.slice(0, 10)
+            : '',
+        penanggung_jawab_id: result.penanggung_jawab_id
+          ? String(result.penanggung_jawab_id)
+          : '',
+        level_kemungkinan_residual: String(
+          result.level_kemungkinan_residual ?? 1
+        ),
+        level_dampak_residual: String(
+          result.level_dampak_residual ?? 1
+        ),
+        layanan_id: result.layanan_id
+          ? String(result.layanan_id)
+          : '',
+        layanan_prioritas_id: result.layanan_prioritas_id
+          ? String(result.layanan_prioritas_id)
+          : '',
+        pemilik_layanan: result.pemilik_layanan || '',
+        strategis_operasional:
+          result.strategis_operasional || '',
+        lintas_sektor: Boolean(result.lintas_sektor),
+        membutuhkan_perubahan: Boolean(
+          result.membutuhkan_perubahan
+        ),
+    });
+
+    setSelectedIppdIds(
+      Array.isArray(result.ippd_terkait)
+        ? result.ippd_terkait.map(
+            (item: { id: number }) => item.id
+          )
+        : []
+    );
+
+    setCurrentStep(1);
+    setShowForm(true);
+    setSelectedRisiko(null);
+
+  } catch (err) {
+    const error = err as Error;
+
+    console.error('Error edit risiko:', error);
+    setMessage(error.message);
+
+  } finally {
+    setLoadingDetail(false);
+  }
+};
+
+  const handleDelete = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    const confirmDelete = window.confirm(
+      'Yakin ingin menghapus data risiko ini?'
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      setMessage('');
+
+      const response = await fetch(
+        `http://localhost:5000/api/risiko/${id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            'Gagal menghapus data risiko'
+        );
+      }
+
+      setMessage('Data risiko berhasil dihapus.');
+
+      setDataRisiko((prev) =>
+        prev.filter((item) => item.id !== id)
+      );
+
+      if (selectedRisiko?.id === id) {
+        setSelectedRisiko(null);
+      }
+
+    } catch (err) {
+      const error = err as Error;
+
+      console.error('Error delete risiko:', error);
+      setMessage(error.message);
+    }
+  };
+
+  const handleSubmitRisiko = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    const confirmSubmit = window.confirm(
+      'Yakin ingin mengajukan risiko ini? Setelah diajukan, risiko akan menunggu persetujuan.'
+    );
+
+    if (!confirmSubmit) return;
+
+    try {
+      setMessage('');
+
+      const response = await fetch(
+        `http://localhost:5000/api/risiko/${id}/submit`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            'Gagal mengajukan risiko'
+        );
+      }
+
+      setMessage('Risiko berhasil diajukan.');
+
+      setDataRisiko((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status_risiko: 'Diajukan',
+              }
+            : item
+        )
+      );
+
+    } catch (err) {
+      const error = err as Error;
+
+      console.error('Error submit risiko:', error);
+      setMessage(error.message);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -241,10 +525,14 @@ export default function RisikoPage() {
       setSaving(true);
       setMessage('');
 
+      const isEdit = editingId !== null;
+
       const response = await fetch(
-        'http://localhost:5000/api/risiko',
+        isEdit
+          ? `http://localhost:5000/api/risiko/${editingId}`
+          :  'http://localhost:5000/api/risiko',
         {
-          method: 'POST',
+          method: isEdit ? 'PUT' : 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -328,10 +616,11 @@ export default function RisikoPage() {
         lintas_sektor: false,
         membutuhkan_perubahan: false, 
       });
-      
+
       setSelectedIppdIds([]);
       setCurrentStep(1);
       setShowForm(false);
+      setEditingId(null);
 
       // Refresh daftar risiko setelah berhasil simpan
       const refreshResponse = await fetch(
@@ -364,6 +653,114 @@ export default function RisikoPage() {
 
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleApproveRisiko = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    const confirmApprove = window.confirm(
+      'Yakin ingin menyetujui risiko ini?'
+    );
+
+    if (!confirmApprove) return;
+
+    try {
+      setMessage('');
+
+      const response = await fetch(
+        `http://localhost:5000/api/risiko/${id}/approve`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            'Gagal menyetujui risiko'
+        );
+      }
+
+      setMessage('Risiko berhasil disetujui.');
+
+      setDataRisiko((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status_risiko: 'Disetujui',
+              }
+            : item
+        )
+      );
+
+    } catch (err) {
+      const error = err as Error;
+
+      console.error('Error approve risiko:', error);
+      setMessage(error.message);
+    }
+  };
+
+  const handleRejectRisiko = async (id: number) => {
+    const token = localStorage.getItem('token');
+
+    const confirmReject = window.confirm(
+      'Yakin ingin menolak risiko ini?'
+    );
+
+    if (!confirmReject) return;
+
+    try {
+      setMessage('');
+
+      const response = await fetch(
+        `http://localhost:5000/api/risiko/${id}/reject`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.error ||
+            'Gagal menolak risiko'
+        );
+      }
+
+      setMessage('Risiko berhasil ditolak.');
+
+      setDataRisiko((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status_risiko: 'Ditolak',
+              }
+            : item
+        )
+      );
+
+    } catch (err) {
+      const error = err as Error;
+
+      console.error('Error reject risiko:', error);
+      setMessage(error.message);
     }
   };
 
@@ -426,11 +823,11 @@ export default function RisikoPage() {
 
           <div className="text-right">
             <span className="text-sm text-gray-600 block font-medium">
-              Operator LDP
+              {user?.nama || '-'}
             </span>
 
             <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
-              Operator
+              {user?.role || '-'}
             </span>
           </div>
         </div>
@@ -1110,6 +1507,328 @@ export default function RisikoPage() {
         </div>
       )}
 
+      {selectedRisiko && (
+        <div className="mb-6 p-5 border border-gray-200 rounded-lg bg-white shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <div> 
+              <h3 className="text-lg font-bold text-gray-800">
+                Detail Risiko
+              </h3>
+              <p className="text-sm text-gray-500">
+                {selectedRisiko.kode_risiko}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedRisiko(null)}
+              className="text-gray-500 hover:text-gray-800 font-semibold"
+            >
+              Tutup
+            </button>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <h4 className="text-base font-bold text-gray-800 mb-4">
+              A. Identifikasi Risiko
+            </h4>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                 <p className="text-xs text-gray-500 mb-1">
+                  Sasaran Pembangunan Nasional
+                 </p>
+                 <p className="text-sm text-gray-800">
+                  {selectedRisiko.sasaran_pembangunan_nasional || '-'}
+                 </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  Sasaran UPR
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.sasaran_upr || '-'}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  Indikator Kinerja
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Kode Risiko
+                </p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {selectedRisiko.kode_risiko || '-'}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  Peristiwa Risiko
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.peristiwa_risiko || '-'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4 mt-6">
+            <h4 className="text-base font-bold text-gray-800 mb-4">
+              B. Analisis dan Evaluasi Risiko
+            </h4>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Kategori Risiko
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.kategori_risiko || '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Area Dampak
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.area_dampak || '-'}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  Penyebab
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.penyebab || '-'}
+                </p>
+              </div>
+
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  Dampak
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.dampak || '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Level Kemungkinan
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.kemungkinan ?? '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Level Dampak
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.nilai_dampak ?? '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Besaran Risiko
+                </p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {selectedRisiko.besaran_risiko ?? '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Prioritas Risiko
+                </p>
+                <p className="text-sm text-gray-800">
+                  {selectedRisiko.prioritas_risiko || '-'}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-4 mt-6">
+              <h4 className="text-base font-bold text-gray-800 mb-4">
+                C. Perlakuan Risiko
+              </h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Keputusan Perlakuan
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.keputusan_perlakuan || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Penanggung Jawab
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.nama_penanggung_jawab || '-'}
+                  </p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 mb-1">
+                    Deskripsi Detail Perlakuan
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.deskripsi_detail_perlakuan || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Waktu Rencana Perlakuan
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.waktu_rencana_perlakuan
+                      ? new Date(
+                          selectedRisiko.waktu_rencana_perlakuan
+                        ).toLocaleDateString('id-ID')
+                      : '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-t border-gray-200 pt-4 mt-6">
+              <h4 className="text-base font-bold text-gray-800 mb-4">
+                D. Risiko Residual
+              </h4>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Level Kemungkinan Residual
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.level_kemungkinan_residual ?? '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Level Dampak Residual
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.level_dampak_residual ?? '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Besaran Risiko Residual
+                  </p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {selectedRisiko.besaran_risiko_residual ?? '-'}
+                  </p>
+                </div>
+              </div>
+            </div>            
+
+            <div className="border-t border-gray-200 pt-4 mt-6">
+              <h4 className="text-base font-bold text-gray-800 mb-4">
+                E. Kolom Tambahan
+              </h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Layanan Pendukung
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.kode_layanan && selectedRisiko.nama_layanan
+                      ? `${selectedRisiko.kode_layanan} - ${selectedRisiko.nama_layanan}`
+                      : '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Layanan Prioritas
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.kode_prioritas || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Pemilik Layanan
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.pemilik_layanan || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Strategis / Operasional
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.strategis_operasional || '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Lintas Sektor
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.lintas_sektor ? 'Ya' : 'Tidak'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Membutuhkan Perubahan
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {selectedRisiko.membutuhkan_perubahan ? 'Ya' : 'Tidak'}
+                  </p>
+                </div>
+
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 mb-1">
+                    IPPD Terkait
+                  </p>
+
+                  {selectedRisiko.ippd_terkait &&
+                  selectedRisiko.ippd_terkait.length > 0 ? (
+                    <div className="space-y-1">
+                      {selectedRisiko.ippd_terkait.map((item) => (
+                        <p
+                          key={item.id}
+                          className="text-sm text-gray-800"
+                        >
+                          {item.kode_instansi} - {item.nama_instansi}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-800">-</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>  
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-8 text-gray-500">
           Memuat data risiko...
@@ -1129,6 +1848,8 @@ export default function RisikoPage() {
                 <th className="p-3">Besaran Risiko</th>
                 <th className="p-3">Pembuat</th>
                 <th className="p-3">Keputusan Perlakuan</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Aksi</th>
               </tr>
             </thead>
 
@@ -1178,12 +1899,77 @@ export default function RisikoPage() {
                     <td className="p-3">
                       {item.keputusan_perlakuan || '-'}
                     </td>
+
+                    <td className="p-3">
+                      <span className="font-semibold">
+                        {item.status_risiko || 'Draft'}
+                      </span>
+                    </td>
+
+                    <td className="p-3">
+                      <button
+                        type="button"
+                        onClick={() => handleDetail(item.id)}
+                        disabled={loadingDetail}
+                        className="text-blue-600 hover:text-blue-800 font-semibold"
+                      >
+                        Detail
+                      </button>
+
+                      {item.status_risiko === 'Draft' && (
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(item.id)}
+                          className="text-amber-600 hover:text-amber-800 font-semibold"
+                          >
+                        Edit
+                      </button>
+                      )}
+                      
+                      {item.status_risiko === 'Draft' && (
+                        <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-600 hover:text-red-800 font-semibold"
+                      >
+                        Hapus
+                      </button>
+                      )}
+                      
+                      {canSubmit && item.status_risiko === 'Draft' && (
+                          <button
+                            type="button"
+                            onClick={() => handleSubmitRisiko(item.id)}
+                            className="text-green-600 hover:text-green-800 font-semibold"
+                          >
+                            Submit
+                          </button>
+                      )}
+                      {canApprove && item.status_risiko === 'Diajukan' && (
+                          <button
+                            type="button"
+                            onClick={() => handleApproveRisiko(item.id)}
+                            className="text-purple-600 hover:text-purple-800 font-semibold"
+                          >
+                           Approve
+                        </button>
+                      )}
+                      {canReject && item.status_risiko === 'Diajukan' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRejectRisiko(item.id)}
+                            className="text-red-700 hover:text-red-900 font-semibold"
+                          >
+                            Reject
+                          </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={12}
                     className="p-4 text-center text-gray-400"
                   >
                     Belum ada data risiko.
