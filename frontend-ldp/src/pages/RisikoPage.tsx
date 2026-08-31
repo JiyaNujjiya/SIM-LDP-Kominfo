@@ -3,6 +3,11 @@ import { data } from 'react-router-dom';
 
 interface RisikoItem {
   id: number;
+
+  konteks_id?: number | null;
+  konteks_nama_upr?: string | null;
+  konteks_tahun?: number | string | null;
+
   sasaran_pembangunan_nasional?: string | null;
   sasaran_upr?: string | null;
   indikator_kinerja?: string | null;
@@ -47,8 +52,6 @@ interface RisikoItem {
   id: number;
   kode_instansi: string;
   nama_instansi: string;
-
-  
 }[];
 }
 
@@ -62,7 +65,10 @@ export default function RisikoPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
+  const [konteksOptions, setKonteksOptions] = useState<any[]>([]);
+
   const [formData, setFormData] = useState({
+    konteks_id: '',
     sasaran_pembangunan_nasional: '',
     sasaran_upr: '',
     indikator_kinerja: '',
@@ -339,6 +345,10 @@ export default function RisikoPage() {
       setEditingId(id);
 
       setFormData({
+        konteks_id:
+          result.konteks_id !== null && result.konteks_id !== undefined
+            ? String(result.konteks_id)
+            : '',
         sasaran_pembangunan_nasional:
           result.sasaran_pembangunan_nasional || '',
         sasaran_upr: result.sasaran_upr || '',
@@ -538,6 +548,10 @@ export default function RisikoPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            konteks_id:
+              formData.konteks_id === ''
+                ? null
+                : Number(formData.konteks_id),
 
             // a. identifikasi risiko
             sasaran_pembangunan_nasional: formData.sasaran_pembangunan_nasional,
@@ -591,6 +605,7 @@ export default function RisikoPage() {
 
       // Reset form HANYA jika penyimpanan berhasil
       setFormData({
+        konteks_id: '',
         sasaran_pembangunan_nasional: '',
         sasaran_upr: '',
         indikator_kinerja: '',
@@ -764,6 +779,35 @@ export default function RisikoPage() {
     }
   };
 
+  const fetchKonteksOptions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+
+      const response = await fetch(
+        'http://localhost:5000/api/risiko/konteks',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      
+      console.log("DATA KONTEKS:", data);
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || data.message || 'Gagal mengambil konteks.'
+        );
+      }
+
+      setKonteksOptions(data);
+    } catch (error) {
+      console.error('ERROR GET KONTEKS OPTIONS:', error);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
 
@@ -793,6 +837,10 @@ export default function RisikoPage() {
       .catch((err) => {
         console.log('Error fetching layanan:', err)
       });
+  }, []);
+
+  useEffect(() => {
+    fetchKonteksOptions();
   }, []);
 
   
@@ -879,6 +927,49 @@ export default function RisikoPage() {
               Tutup
             </button>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Konteks Risiko
+            </label>
+
+            <select
+              name="konteks_id"
+              value={formData.konteks_id}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  konteks_id: e.target.value,
+                }))
+              }
+              className="w-full h-12 border border-gray-300 rounded-lg px-3"
+              required
+            >
+              <option value="">
+                Pilih Konteks Risiko
+              </option>
+
+              {konteksOptions.map((item) => (
+                <option key={item.id} value={item.id} >
+                  {item.nama_upr} - {item.tahun_pelaksanaan}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedRisiko && (
+            <div>
+              <p className="font-semibold text-gray-700">
+                Konteks Risiko
+              </p>
+
+              <p>
+                {selectedRisiko.konteks_nama_upr
+                ? `${selectedRisiko.konteks_nama_upr} - ${selectedRisiko.konteks_tahun}`
+                : '-'}
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             {currentStep === 1 && (
@@ -1532,6 +1623,20 @@ export default function RisikoPage() {
             <h4 className="text-base font-bold text-gray-800 mb-4">
               A. Identifikasi Risiko
             </h4>
+          
+          <div className="col-span-2 mb-4">
+            <p className="text-xs text-gray-500 mb-1">
+              Konteks Risiko
+            </p>
+
+            <p className="text-sm text-gray-800">
+              {selectedRisiko.konteks_nama_upr
+                ? `${selectedRisiko.konteks_nama_upr} - ${
+                    selectedRisiko.konteks_tahun ?? '-'
+                  }`
+                : '-'}
+            </p>
+          </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
@@ -1808,7 +1913,7 @@ export default function RisikoPage() {
                   </p>
 
                   {selectedRisiko.ippd_terkait &&
-                  selectedRisiko.ippd_terkait.length > 0 ? (
+                    selectedRisiko.ippd_terkait.length > 0 ? (
                     <div className="space-y-1">
                       {selectedRisiko.ippd_terkait.map((item) => (
                         <p

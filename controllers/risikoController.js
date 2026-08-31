@@ -3,6 +3,7 @@ const db = require('../config/db');
 // 1. Tambah Data Risiko (Form 1.0)
 exports.createRisiko = async (req, res) => {
     const { 
+        konteks_id,
 
         // a. identifikasi risiko
         sasaran_pembangunan_nasional,
@@ -47,6 +48,7 @@ exports.createRisiko = async (req, res) => {
     try {
         const query = `
             INSERT INTO mr_risiko (
+            konteks_id,
             sasaran_pembangunan_nasional,
             sasaran_upr,
             indikator_kinerja,
@@ -74,7 +76,7 @@ exports.createRisiko = async (req, res) => {
 
             created_by
         ) 
-            VALUES (?, ?, ?, ?, ?,
+            VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?,
@@ -83,6 +85,8 @@ exports.createRisiko = async (req, res) => {
         `;
         
         const [result] = await db.query(query, [
+            konteks_id || null,
+
             // a. identifikasi risiko
             sasaran_pembangunan_nasional || null,
             sasaran_upr || null,
@@ -157,9 +161,14 @@ exports.createRisiko = async (req, res) => {
 exports.getAllRisiko = async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT r.*, u.nama AS pembuat 
+            SELECT r.*, u.nama AS pembuat,
+            k.nama_upr AS konteks_nama_upr,
+            k.tahun_pelaksanaan AS konteks_tahun
             FROM mr_risiko r 
-            LEFT JOIN users u ON r.created_by = u.id 
+            LEFT JOIN users u 
+              ON r.created_by = u.id 
+            LEFT JOIN mr_konteks k
+              ON r.konteks_id = k.id
             ORDER BY r.created_at DESC
         `);
         res.json(rows);
@@ -277,7 +286,9 @@ exports.getRisikoById = async (req, res) => {
                 pj.nama AS nama_penanggung_jawab,
                 ld.kode_layanan,
                 ld.nama_layanan,
-                lp.kode_prioritas
+                lp.kode_prioritas,
+                k.nama_upr AS konteks_nama_upr,
+                k.tahun_pelaksanaan AS konteks_tahun
             FROM mr_risiko r
 
             LEFT JOIN users pembuat
@@ -291,6 +302,9 @@ exports.getRisikoById = async (req, res) => {
                 
             LEFT JOIN layanan_prioritas lp
                 ON lp.id = r.layanan_prioritas_id
+
+            LEFT JOIN mr_konteks k
+                ON k.id = r.konteks_id
 
             WHERE r.id = ?
             LIMIT 1
@@ -696,4 +710,129 @@ exports.rejectRisiko = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+// Form 2.0 - Daftar Layanan Digital Prioritas
+exports.getForm2Risiko = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                r.id AS risiko_id,
+                r.kode_risiko,
+                r.besaran_risiko,
+
+                lp.id AS layanan_prioritas_id,
+                lp.kode_prioritas,
+                ld.nama_layanan AS layanan_prioritas,
+
+                f2.membutuhkan_mkb,
+                f2.pic_id,
+                pic.nama AS nama_pic,
+                f2.target_penyusunan
+
+            FROM mr_risiko r
+
+            INNER JOIN layanan_prioritas lp
+                ON lp.id = r.layanan_prioritas_id
+
+            LEFT JOIN layanan_digital ld
+                ON ld.id = lp.layanan_id
+
+            LEFT JOIN mr_form2_prioritas f2
+                ON f2.risiko_id = r.id
+
+            LEFT JOIN users pic
+                ON pic.id = f2.pic_id
+
+            WHERE r.keputusan_perlakuan IN (
+                'Mengurangi Risiko',
+                'Membagi Risiko'
+            )
+
+            ORDER BY r.created_at DESC
+        `);
+
+        res.json(rows);
+
+    } catch (error) {
+        console.error('ERROR GET FORM 2.0:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
+};
+
+// Form 2.0 - Simpan / Update data manual
+exports.saveForm2Risiko = async (req, res) => {
+    const { risiko_id } = req.params;
+
+    console.log('PARAM FORM2:', req.params);
+    console.log('RISIKO_ID:', risiko_id);
+
+    const {
+        membutuhkan_mkb,
+        pic_id,
+        target_penyusunan
+    } = req.body;
+
+    const created_by = req.user ? req.user.id : null;
+
+    try {
+        const [risikoRows] = await db.query(
+            `
+            SELECT id
+            FROM mr_risiko
+            WHERE id = ?
+            `,
+            [risiko_id]
+        );
+
+        if (risikoRows.length === 0) {
+            return res.status(404).json({
+                message: 'Data risiko tidak ditemukan'
+            });
+        }
+
+        await db.query(
+            `
+            INSERT INTO mr_form2_prioritas (
+                risiko_id,
+                membutuhkan_mkb,
+                pic_id,
+                target_penyusunan,
+                created_by
+            )
+            VALUES (?, ?, ?, ?, ?)
+
+            ON DUPLICATE KEY UPDATE
+                membutuhkan_mkb = VALUES(membutuhkan_mkb),
+                pic_id = VALUES(pic_id),
+                target_penyusunan = VALUES(target_penyusunan),
+                updated_at = CURRENT_TIMESTAMP
+            `,
+            [
+                risiko_id,
+                membutuhkan_mkb === null
+                    ? null
+                    : membutuhkan_mkb
+                        ? 1
+                        : 0,
+                pic_id || null,
+                target_penyusunan || null,
+                created_by
+            ]
+        );
+
+        res.json({
+            message: 'Data Form 2.0 berhasil disimpan.'
+        });
+
+    } catch (error) {
+        console.error('ERROR SAVE FORM 2.0:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
+    }
 };

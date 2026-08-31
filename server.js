@@ -7,6 +7,7 @@ const risikoRoutes = require('./routes/risikoRoutes');
 const bcpRoutes = require('./routes/bcpRoutes');             
 const perubahanRoutes = require('./routes/perubahanRoutes'); 
 const tiketingRoutes = require('./routes/tiketingRoutes');
+const konteksRoutes = require('./routes/konteksRoutes');
 
 const app = express();
 
@@ -20,10 +21,15 @@ app.get('/', (req, res) => {
 
 // Routing Auth
 app.use('/api/auth', authRoutes);
+
+app.use('/api/risiko/konteks', konteksRoutes) ;
 app.use('/api/risiko', risikoRoutes);
-app.use('/api/bcp', bcpRoutes);             
+
+app.use('/api/bcp', bcpRoutes);   
 app.use('/api/perubahan', perubahanRoutes); 
-app.use('/api/tiketing', tiketingRoutes);   
+app.use('/api/tiketing', tiketingRoutes); 
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

@@ -5,6 +5,8 @@ import RequirePermission from './requirePermission';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import RisikoPage from './pages/RisikoPage';
+import KonteksRisikoPage from './pages/KonteksRisikoPage';
+import LayananPrioritasPage from './pages/LayananPrioritasRisikoPage';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -56,6 +58,24 @@ export default function App() {
           <Route
             path="*"
             element={<Navigate to="/dashboard" replace />}
+          />
+
+          <Route
+            path="/risiko/konteks"
+            element={
+              <RequirePermission permission="risk.view">
+                <KonteksRisikoPage />
+              </RequirePermission>
+              }
+          />
+
+          <Route
+            path="/risiko/layanan-prioritas"
+            element={
+              <RequirePermission permission="risk.view">
+                <LayananPrioritasPage />
+              </RequirePermission>
+            }
           />
         </Routes>
       )}

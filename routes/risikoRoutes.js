@@ -48,6 +48,20 @@ router.get(
 )
 
 router.get(
+  '/form2',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getForm2Risiko
+);
+
+router.put(
+  '/form2/:risiko_id',
+  authMiddleware,
+  requirePermission('risk.update'),
+  risikoController.saveForm2Risiko
+);
+
+router.get(
     '/:id',
     authMiddleware,
     requirePermission('risk.view'),

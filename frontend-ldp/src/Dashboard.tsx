@@ -19,7 +19,10 @@ import {
   Layers,
   XCircle,
   CalendarCheck,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+
 /* ── colour tokens (from Figma) ── */
 const C = {
   sidebar: "#1B2A4A",
@@ -259,12 +262,30 @@ function RiskBadge({ level, color, bg }) {
 type DashboardProps = {
   onLogout: () => void;
 };
+
+const subMenuStyle = (active: boolean) => ({
+  width: "100%",
+  border: "none",
+  background: active
+    ? "rgba(255,255,255,0.12)"
+    : "transparent",
+  color: "#E8F0FE",
+  padding: "9px 12px",
+  borderRadius: 6,
+  textAlign: "left" as const,
+  fontSize: 11,
+  lineHeight: "15px",
+  cursor: "pointer",
+  fontWeight: active ? 600 : 400,
+});
      
 export default function SimLdpDashboard({
   onLogout,
 }: DashboardProps) {
   const [active, setActive] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
+
+  const[riskOpen, setRiskOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -282,14 +303,25 @@ export default function SimLdpDashboard({
   const handleMenuClick = (id: string) => {
     setActive(id);
 
-    if (id == "dasboard") {
+    if (id == "dashboard") {
       navigate("/dashboard");
     }
 
     if (id == "risiko") {
-      navigate("/risiko");
+      setRiskOpen((prev) => !prev);
     }
-      
+
+    if (id == "bcp") {
+      navigate("/bcp");
+    }
+
+    if (id == "pengetahuan") {
+      navigate("/pengetahuan");
+    }
+
+    if (id == "relasi") {
+      navigate("/relasi-pengguna");
+    }
   };
 
   const sidebarW = collapsed ? 64 : 220;
@@ -354,34 +386,202 @@ export default function SimLdpDashboard({
         </div>
 
         {/* menu */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
-          {menuItems
-            .filter((m) => can(m.permission))
-            .map((m) => 
-            collapsed ? (
-              <button
-                key={m.id}
-                onClick={() => handleMenuClick(m.id)}
-                title={m.label}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 32, height: 42, border: "none", borderRadius: 6, cursor: "pointer",
-                  background: active === m.id ? C.sidebarActive : "transparent",
-                }}
-              >
-                <m.Icon size={18} color={active === m.id ? "#FFF" : C.sidebarText} strokeWidth={2} />
-              </button>
-            ) : (
-              <SidebarItem
-                key={m.id}
-                Icon={m.Icon}
-                label={m.label}
-                active={active === m.id}
-                onClick={() => handleMenuClick(m.id)}
-              />
-            )
-          )}
-        </nav>
+          <nav
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              flex: 1,
+            }}
+          >
+            {menuItems
+              .filter((m) => can(m.permission))
+              .map((m) => {
+                if (collapsed) {
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => handleMenuClick(m.id)}
+                      title={m.label}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 32,
+                        height: 42,
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        background:
+                          active === m.id
+                            ? C.sidebarActive
+                            : "transparent",
+                      }}
+                    >
+                      <m.Icon
+                        size={18}
+                        color={
+                          active === m.id
+                            ? "#FFF"
+                            : C.sidebarText
+                        }
+                        strokeWidth={2}
+                      />
+                    </button>
+                  );
+                }
+
+                if (m.id === "risiko") {
+                  return (
+                    <div key={m.id}>
+                      <button
+                        onClick={() =>
+                          handleMenuClick("risiko")
+                        }
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "12px 16px",
+                          width: "100%",
+                          border: "none",
+                          borderRadius: 6,
+                          background:
+                            active.startsWith("risiko")
+                              ? C.sidebarActive
+                              : "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <ShieldAlert
+                          size={18}
+                          color={C.sidebarText}
+                          strokeWidth={2}
+                        />
+
+                        <span
+                          style={{
+                            flex: 1,
+                            textAlign: "left",
+                            fontWeight: 500,
+                            fontSize: 13,
+                            color: C.sidebarText,
+                          }}
+                        >
+                          Manajemen Risiko
+                        </span>
+
+                        {riskOpen ? (
+                          <ChevronDown
+                            size={16}
+                            color={C.sidebarText}
+                          />
+                        ) : (
+                          <ChevronRight
+                            size={16}
+                            color={C.sidebarText}
+                          />
+                        )}
+                      </button>
+
+                      {riskOpen && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            marginLeft: 28,
+                            marginTop: 4,
+                            gap: 2,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActive(
+                                "risiko-form-0"
+                              );
+                              navigate(
+                                "/risiko/konteks"
+                              );
+                            }}
+                            style={subMenuStyle(
+                              active ===
+                                "risiko-form-0"
+                            )}
+                          >
+                            Form 0.0 Penetapan Konteks
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActive(
+                                "risiko-form-1"
+                              );
+                              navigate("/risiko");
+                            }}
+                            style={subMenuStyle(
+                              active ===
+                                "risiko-form-1"
+                            )}
+                          >
+                            Form 1.0 Profil & Penilaian
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActive(
+                                "risiko-form-2"
+                              );
+                              navigate(
+                                "/risiko/layanan-prioritas"
+                              );
+                            }}
+                            style={subMenuStyle(
+                              active ===
+                                "risiko-form-2"
+                            )}
+                          >
+                            Form 2.0 Layanan Prioritas
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActive(
+                                "risiko-form-3"
+                              );
+                              navigate(
+                                "/risiko/monitoring"
+                              );
+                            }}
+                            style={subMenuStyle(
+                              active ===
+                                "risiko-form-3"
+                            )}
+                          >
+                            Form 3.0 Monitoring
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <SidebarItem
+                    key={m.id}
+                    Icon={m.Icon}
+                    label={m.label}
+                    active={active === m.id}
+                    onClick={() =>
+                      handleMenuClick(m.id)
+                    }
+                  />
+                );
+              })}
+          </nav>
 
         {/* collapse toggle */}
         <button
