@@ -545,24 +545,6 @@ export default function SimLdpDashboard({
                           >
                             Form 2.0 Layanan Prioritas
                           </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActive(
-                                "risiko-form-3"
-                              );
-                              navigate(
-                                "/risiko/monitoring"
-                              );
-                            }}
-                            style={subMenuStyle(
-                              active ===
-                                "risiko-form-3"
-                            )}
-                          >
-                            Form 3.0 Monitoring
-                          </button>
                         </div>
                       )}
                     </div>
