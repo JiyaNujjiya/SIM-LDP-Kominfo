@@ -1,5 +1,8 @@
 const db = require('../config/db');
 
+const fs = require('fs');
+const path = require('path');
+
 // 1. Tambah Data Risiko (Form 1.0)
 exports.createRisiko = async (req, res) => {
     const { 
@@ -835,4 +838,375 @@ exports.saveForm2Risiko = async (req, res) => {
             error: error.message
         });
     }
+};
+
+// Form 3.0 peta risiko
+exports.getPetaRisiko = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        kode_risiko,
+        peristiwa_risiko,
+        kemungkinan,
+        nilai_dampak,
+        besaran_risiko,
+        status_risiko
+      FROM mr_risiko
+      WHERE kemungkinan IS NOT NULL
+        AND nilai_dampak IS NOT NULL
+      ORDER BY kode_risiko ASC
+    `);
+
+    res.json(rows);
+  } catch (error) {
+    console.error('ERROR GET PETA RISIKO', error);
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
+};
+
+exports.getMonitoringSemester1 = async (req, res) => {
+  try {
+    const tahun =
+      req.query.tahun || new Date().getFullYear();
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        r.id AS risiko_id,
+        r.kode_risiko,
+        r.peristiwa_risiko,
+        r.besaran_risiko,
+
+        m.id AS monitoring_id,
+        m.tahun,
+        m.periode,
+        m.risiko_saat_ini,
+        m.proyeksi_risiko,
+        m.perlakuan_risiko,
+        m.rencana_penanganan,
+        m.penanggung_jawab_id,
+        u.nama AS nama_penanggung_jawab,
+        m.waktu_pelaksanaan,
+        m.hasil_pelaksanaan
+
+      FROM mr_risiko r
+
+      LEFT JOIN mr_monitoring m
+        ON m.risiko_id = r.id
+        AND m.tahun = ?
+        AND m.periode = 'Semester I'
+
+      LEFT JOIN users u
+        ON u.id = m.penanggung_jawab_id
+
+      ORDER BY r.kode_risiko ASC
+      `,
+      [tahun]
+    );
+
+    for (const item of rows) {
+      if (!item.monitoring_id) {
+        item.dokumen = [];
+        continue;
+      }
+
+      const [dokumen] = await db.query(
+        `
+        SELECT
+          id,
+          monitoring_id,
+          nama_file,
+          path_file,
+          tipe_file,
+          ukuran_file,
+          uploaded_at
+        FROM mr_monitoring_dokumen
+        WHERE monitoring_id = ?
+        ORDER BY uploaded_at DESC
+        `,
+        [item.monitoring_id]
+      );
+
+      item.dokumen = dokumen;
+    }
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error(
+      'ERROR GET MONITORING SEMESTER I:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.saveMonitoringSemester1 = async (req, res) => {
+  const {risiko_id} = req.params;
+
+  const {
+    tahun,
+    risiko_saat_ini,
+    proyeksi_risiko,
+    perlakuan_risiko,
+    rencana_penanganan,
+    penanggung_jawab_id,
+    waktu_pelaksanaan,
+    hasil_pelaksanaan,
+  } = req.body;
+
+  try {
+    const [risikoRows] = await db.query(
+      `
+      SELECT id
+      FROM mr_risiko
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [risiko_id]
+    );
+
+    if (risikoRows.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan',
+      });
+    }
+
+    await db.query(
+      `
+      INSERT INTO mr_monitoring (
+        risiko_id,
+        tahun,
+        periode,
+        risiko_saat_ini,
+        proyeksi_risiko,
+        perlakuan_risiko,
+        rencana_penanganan,
+        penanggung_jawab_id,
+        waktu_pelaksanaan,
+        hasil_pelaksanaan,
+        created_by
+      )
+      VALUES (?, ?, 'Semester I', ?, ?, ?, ?, ?, ?, ?, ?)
+
+      ON DUPLICATE KEY UPDATE
+        risiko_saat_ini = VALUES(risiko_saat_ini),
+        proyeksi_risiko = VALUES(proyeksi_risiko),
+        perlakuan_risiko = VALUES(perlakuan_risiko),
+        rencana_penanganan = VALUES(rencana_penanganan),
+        penanggung_jawab_id = VALUES(penanggung_jawab_id),
+        waktu_pelaksanaan = VALUES(waktu_pelaksanaan),
+        hasil_pelaksanaan = VALUES(hasil_pelaksanaan)
+      `,
+      [
+        risiko_id,
+        tahun,
+        risiko_saat_ini || null,
+        proyeksi_risiko || null,
+        perlakuan_risiko || null,
+        rencana_penanganan || null,
+        penanggung_jawab_id || null,
+        waktu_pelaksanaan || null,
+        hasil_pelaksanaan || null,
+        req.user.id,
+      ]
+    );
+
+    res.json({
+      message: 'Monitoring Semester I berhasil disimpan',
+    });
+  } catch (error) {
+    console.error('ERROR SAVE MONITORING SEMESTER I:', error);
+  
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.uploadMonitoringDokumen = async (req, res) => {
+  const { monitoring_id } = req.params;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        message: 'File Data Dukung belum dipilih.',
+      });
+    }
+
+    const [monitoringRows] =
+      await db.query(
+        `
+        SELECT id
+        FROM mr_monitoring
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [monitoring_id]
+      );
+
+    if (monitoringRows.length === 0) {
+      return res.status(404).json({
+        message:
+          'Data monitoring tidak ditemukan.',
+      });
+    }
+
+    const pathFile =
+      `uploads/monitoring/${req.file.filename}`;
+
+    const [result] = await db.query(
+      `
+      INSERT INTO mr_monitoring_dokumen (
+        monitoring_id,
+        nama_file,
+        path_file,
+        tipe_file,
+        ukuran_file,
+        uploaded_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [
+        monitoring_id,
+        req.file.originalname,
+        pathFile,
+        req.file.mimetype,
+        req.file.size,
+        req.user.id,
+      ]
+    );
+
+    res.status(201).json({
+      message:
+        'Data Dukung berhasil diunggah.',
+      dokumen: {
+        id: result.insertId,
+        monitoring_id:
+          Number(monitoring_id),
+        nama_file:
+          req.file.originalname,
+        tipe_file:
+          req.file.mimetype,
+        ukuran_file:
+          req.file.size,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR UPLOAD DATA DUKUNG:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.getMonitoringDokumen = async (req, res) => {
+  const { monitoring_id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        id,
+        monitoring_id,
+        nama_file,
+        path_file,
+        tipe_file,
+        ukuran_file,
+        uploaded_at
+      FROM mr_monitoring_dokumen
+      WHERE monitoring_id = ?
+      ORDER BY uploaded_at DESC
+      `,
+      [monitoring_id]
+    );
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error(
+      'ERROR GET DATA DUKUNG:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.downloadMonitoringDokumen = async (req, res) => {
+  const { dokumen_id } = req.params;
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        id,
+        nama_file,
+        path_file,
+        tipe_file
+      FROM mr_monitoring_dokumen
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [dokumen_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Dokumen tidak ditemukan.',
+      });
+    }
+
+    const dokumen = rows[0];
+
+    const filePath = path.join(
+      __dirname,
+      '..',
+      dokumen.path_file
+    );
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        message: 'File fisik tidak ditemukan.',
+      });
+    }
+
+    res.setHeader(
+      'Content-Type',
+      dokumen.tipe_file || 'application/octet-stream'
+    );
+
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(
+        dokumen.nama_file
+      )}"`
+    );
+
+    return res.sendFile(filePath);
+
+  } catch (error) {
+    console.error(
+      'ERROR DOWNLOAD DATA DUKUNG:',
+      error
+    );
+
+    return res.status(500).json({
+      error: error.message,
+    });
+  }
 };

@@ -255,9 +255,7 @@ function RiskBadge({ level, color, bg }) {
   );
 }
 
-/* ═══════════════════════════════════════════
-   MAIN DASHBOARD
-   ═══════════════════════════════════════════ */
+/* MAIN DASHBOARD */
 
 type DashboardProps = {
   onLogout: () => void;
@@ -278,6 +276,8 @@ const subMenuStyle = (active: boolean) => ({
   cursor: "pointer",
   fontWeight: active ? 600 : 400,
 });
+
+
      
 export default function SimLdpDashboard({
   onLogout,
@@ -286,6 +286,7 @@ export default function SimLdpDashboard({
   const [collapsed, setCollapsed] = useState(false);
 
   const[riskOpen, setRiskOpen] = useState(false);
+  const [riskForm3Open, setRiskForm3Open] = useState(false);
 
   const navigate = useNavigate();
 
@@ -293,6 +294,7 @@ export default function SimLdpDashboard({
   const user = savedUser ? JSON.parse(savedUser) : null;
 
   const permissions: string[] = user?.permissions || [];
+  
 
   const can = (permission?: string) => {
     if (!permission) return true;
@@ -545,12 +547,101 @@ export default function SimLdpDashboard({
                           >
                             Form 2.0 Layanan Prioritas
                           </button>
+
+                          <div>
+                          <button
+                            type="button"
+                            onClick={() => setRiskForm3Open(!riskForm3Open)}
+                            style={{
+                              ...subMenuStyle(
+                                active.startsWith("risiko-form-3")
+                              ),
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              width: "100%",
+                            }}
+                          >
+                            <span>
+                              Form 3.0 Peta Risiko dan Monitoring
+                            </span>
+
+                            {riskForm3Open ? (
+                              <ChevronDown size={14} />
+                            ) : (
+                              <ChevronRight size={14} />
+                            )}
+                          </button>
+
+                          {riskForm3Open && (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                marginLeft: 18,
+                                marginTop: 2,
+                                gap: 2,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActive("risiko-form-3-peta");
+                                  navigate("/risiko/peta-risiko");
+                                }}
+                                style={subMenuStyle(
+                                  active === "risiko-form-3-peta"
+                                )}
+                              >
+                                Peta Risiko
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActive("risiko-form-3-semester-1");
+                                  navigate("/risiko/monitoring/semester-1");
+                                }}
+                                style={subMenuStyle(
+                                  active === "risiko-form-3-semester-1"
+                                )}
+                              >
+                                Monitoring Semester I
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActive("risiko-form-3-semester-2");
+                                  navigate("/risiko/monitoring/semester-2");
+                                }}
+                                style={subMenuStyle(
+                                  active === "risiko-form-3-semester-2"
+                                )}
+                              >
+                                Monitoring Semester II
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActive("risiko-form-3-tahunan");
+                                  navigate("/risiko/monitoring/tahunan");
+                                }}
+                                style={subMenuStyle(
+                                  active === "risiko-form-3-tahunan"
+                                )}
+                              >
+                                Monitoring Tahunan
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         </div>
                       )}
                     </div>
                   );
                 }
-
                 return (
                   <SidebarItem
                     key={m.id}

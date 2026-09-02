@@ -3,50 +3,49 @@ const router = express.Router();
 const risikoController = require('../controllers/risikoController');
 const authMiddleware = require('../middleware/auth');
 const requirePermission = require('../middleware/permissionMiddleware');
+const auth = require('../middleware/auth');
+const uploadMonitoring = require('../middleware/uploadMonitoring');
 
-// Semua endpoint membutuhkan Token JWT
+// CREATE RISIKO
 router.post(
-    '/',
-    authMiddleware,
-    requirePermission('risk.create'),
-    risikoController.createRisiko
+  '/',
+  authMiddleware,
+  requirePermission('risk.create'),
+  risikoController.createRisiko
+);
+
+
+// OPTIONS / MASTER DATA
+router.get(
+  '/penanggung-jawab-options',
+  authMiddleware,
+  requirePermission('risk.create'),
+  risikoController.getPenanggungJawabOptions
 );
 
 router.get(
-    '/',
-    authMiddleware,
-    requirePermission('risk.view'),
-    risikoController.getAllRisiko
+  '/layanan-options',
+  authMiddleware,
+  requirePermission('risk.create'),
+  risikoController.getLayananOptions
 );
 
 router.get(
-    '/Penanggung-jawab-options',
-    authMiddleware,
-    requirePermission('risk.create'),
-    risikoController.getPenanggungJawabOptions
+  '/layanan-prioritas-options',
+  authMiddleware,
+  requirePermission('risk.create'),
+  risikoController.getLayananPrioritasOptions
 );
 
 router.get(
-    '/layanan-options',
-    authMiddleware,
-    requirePermission('risk.create'),
-    risikoController.getLayananOptions
-)
-
-router.get(
-    '/layanan-prioritas-options',
-    authMiddleware,
-    requirePermission('risk.create'),
-    risikoController.getLayananPrioritasOptions
+  '/ippd-options',
+  authMiddleware,
+  requirePermission('risk.create'),
+  risikoController.getIppdOptions
 );
 
-router.get(
-    '/ippd-options',
-    authMiddleware,
-    requirePermission('risk.create'),
-    risikoController.getIppdOptions
-)
 
+// FORM 2.0
 router.get(
   '/form2',
   authMiddleware,
@@ -61,13 +60,15 @@ router.put(
   risikoController.saveForm2Risiko
 );
 
+// FORM 3.0 - PETA RISIKO
 router.get(
-    '/:id',
-    authMiddleware,
-    requirePermission('risk.view'),
-    risikoController.getRisikoById
+  '/peta-risiko',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getPetaRisiko
 );
 
+// WORKFLOW RISIKO
 router.post(
   '/:id/submit',
   authMiddleware,
@@ -89,6 +90,59 @@ router.post(
   risikoController.rejectRisiko
 );
 
+// GET ALL RISIKO
+router.get(
+  '/',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getAllRisiko
+);
+
+// Form 3.0 semester I
+router.get(
+  '/monitoring/semester-1',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getMonitoringSemester1,
+);
+
+router.put(
+  '/monitoring/semester-1/:risiko_id',
+  authMiddleware,
+  requirePermission('risk.update'),
+  risikoController.saveMonitoringSemester1
+);
+
+router.post(
+  '/monitoring/:monitoring_id/dokumen',
+  authMiddleware,
+  requirePermission('risk.update'),
+  uploadMonitoring.single('file'),
+  risikoController.uploadMonitoringDokumen
+);
+
+router.get(
+  '/monitoring/:monitoring_id/dokumen',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getMonitoringDokumen
+);
+
+router.get(
+  '/monitoring/dokumen/:dokumen_id/download',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.downloadMonitoringDokumen
+);
+
+// ROUTE BERDASARKAN ID
+router.get(
+  '/:id',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getRisikoById
+);
+
 router.put(
   '/:id',
   authMiddleware,
@@ -102,5 +156,6 @@ router.delete(
   requirePermission('risk.delete'),
   risikoController.deleteRisiko
 );
+
 
 module.exports = router;
