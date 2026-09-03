@@ -1210,3 +1210,287 @@ exports.downloadMonitoringDokumen = async (req, res) => {
     });
   }
 };
+
+exports.getMonitoringSemester2 = async (req, res) => {
+  try {
+    const tahun =
+      req.query.tahun || new Date().getFullYear();
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        r.id AS risiko_id,
+        r.kode_risiko,
+        r.peristiwa_risiko,
+        r.besaran_risiko,
+
+        m.id AS monitoring_id,
+        m.tahun,
+        m.periode,
+        m.risiko_saat_ini,
+        m.proyeksi_risiko,
+        m.perlakuan_risiko,
+        m.rencana_penanganan,
+        m.penanggung_jawab_id,
+        u.nama AS nama_penanggung_jawab,
+        m.waktu_pelaksanaan,
+        m.hasil_pelaksanaan
+
+      FROM mr_risiko r
+
+      LEFT JOIN mr_monitoring m
+        ON m.risiko_id = r.id
+        AND m.tahun = ?
+        AND m.periode = 'Semester II'
+
+      LEFT JOIN users u
+        ON u.id = m.penanggung_jawab_id
+
+      ORDER BY r.kode_risiko ASC
+      `,
+      [tahun]
+    );
+
+    for (const item of rows) {
+      if (!item.monitoring_id) {
+        item.dokumen = [];
+        continue;
+      }
+
+      const [dokumen] = await db.query(
+        `
+        SELECT
+          id,
+          monitoring_id,
+          nama_file,
+          path_file,
+          tipe_file,
+          ukuran_file,
+          uploaded_at
+        FROM mr_monitoring_dokumen
+        WHERE monitoring_id = ?
+        ORDER BY uploaded_at DESC
+        `,
+        [item.monitoring_id]
+      );
+
+      item.dokumen = dokumen;
+    }
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error(
+      'ERROR GET MONITORING SEMESTER I:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.saveMonitoringSemester2 = async (req, res) => {
+  const {risiko_id} = req.params;
+
+  const {
+    tahun,
+    risiko_saat_ini,
+    proyeksi_risiko,
+    perlakuan_risiko,
+    rencana_penanganan,
+    penanggung_jawab_id,
+    waktu_pelaksanaan,
+    hasil_pelaksanaan,
+  } = req.body;
+
+  try {
+    const [risikoRows] = await db.query(
+      `
+      SELECT id
+      FROM mr_risiko
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [risiko_id]
+    );
+
+    if (risikoRows.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan',
+      });
+    }
+
+    await db.query(
+      `
+      INSERT INTO mr_monitoring (
+        risiko_id,
+        tahun,
+        periode,
+        risiko_saat_ini,
+        proyeksi_risiko,
+        perlakuan_risiko,
+        rencana_penanganan,
+        penanggung_jawab_id,
+        waktu_pelaksanaan,
+        hasil_pelaksanaan,
+        created_by
+      )
+      VALUES (?, ?, 'Semester II', ?, ?, ?, ?, ?, ?, ?, ?)
+
+      ON DUPLICATE KEY UPDATE
+        risiko_saat_ini = VALUES(risiko_saat_ini),
+        proyeksi_risiko = VALUES(proyeksi_risiko),
+        perlakuan_risiko = VALUES(perlakuan_risiko),
+        rencana_penanganan = VALUES(rencana_penanganan),
+        penanggung_jawab_id = VALUES(penanggung_jawab_id),
+        waktu_pelaksanaan = VALUES(waktu_pelaksanaan),
+        hasil_pelaksanaan = VALUES(hasil_pelaksanaan)
+      `,
+      [
+        risiko_id,
+        tahun,
+        risiko_saat_ini || null,
+        proyeksi_risiko || null,
+        perlakuan_risiko || null,
+        rencana_penanganan || null,
+        penanggung_jawab_id || null,
+        waktu_pelaksanaan || null,
+        hasil_pelaksanaan || null,
+        req.user.id,
+      ]
+    );
+
+    res.json({
+      message: 'Monitoring Semester II berhasil disimpan',
+    });
+  } catch (error) {
+    console.error('ERROR SAVE MONITORING SEMESTER II:', error);
+  
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+// Form 3.0 tahunan
+exports.getMonitoringTahunan = async (req, res) => {
+  try {
+    const tahun =
+      req.query.tahun || new Date().getFullYear();
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        r.id AS risiko_id,
+        r.kode_risiko,
+        r.peristiwa_risiko,
+        r.besaran_risiko,
+
+        m.id AS monitoring_id,
+        m.tahun,
+        m.periode,
+        m.risiko_saat_ini,
+        m.proyeksi_risiko,
+        m.hasil_pelaksanaan,
+        m.rekomendasi
+
+      FROM mr_risiko r
+
+      LEFT JOIN mr_monitoring m
+        ON m.risiko_id = r.id
+        AND m.tahun = ?
+        AND m.periode = 'Tahunan'
+
+      ORDER BY r.kode_risiko ASC
+      `,
+      [tahun]
+    );
+
+    res.json(rows);
+  } catch (error) {
+    console.error(
+      'ERROR GET MONITORING TAHUNAN:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+exports.saveMonitoringTahunan = async (req, res) => {
+  const { risiko_id } = req.params;
+
+  const {
+    tahun,
+    risiko_saat_ini,
+    proyeksi_risiko,
+    hasil_pelaksanaan,
+    rekomendasi,
+  } = req.body;
+
+  try {
+    const [risikoRows] = await db.query(
+      `
+      SELECT id
+      FROM mr_risiko
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [risiko_id]
+    );
+
+    if (risikoRows.length === 0) {
+      return res.status(404).json({
+        message: 'Data risiko tidak ditemukan',
+      });
+    }
+
+    await db.query(
+      `
+      INSERT INTO mr_monitoring (
+        risiko_id,
+        tahun,
+        periode,
+        risiko_saat_ini,
+        proyeksi_risiko,
+        hasil_pelaksanaan,
+        rekomendasi,
+        created_by
+      )
+      VALUES (?, ?, 'Tahunan', ?, ?, ?, ?, ?)
+
+      ON DUPLICATE KEY UPDATE
+        risiko_saat_ini = VALUES(risiko_saat_ini),
+        proyeksi_risiko = VALUES(proyeksi_risiko),
+        hasil_pelaksanaan = VALUES(hasil_pelaksanaan),
+        rekomendasi = VALUES(rekomendasi)
+      `,
+      [
+        risiko_id,
+        tahun,
+        risiko_saat_ini || null,
+        proyeksi_risiko || null,
+        hasil_pelaksanaan || null,
+        rekomendasi || null,
+        req.user.id,
+      ]
+    );
+
+    res.json({
+      message: 'Monitoring Tahunan berhasil disimpan',
+    });
+  } catch (error) {
+    console.error(
+      'ERROR SAVE MONITORING TAHUNAN:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};

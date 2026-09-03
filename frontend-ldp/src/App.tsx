@@ -9,6 +9,8 @@ import KonteksRisikoPage from './pages/KonteksRisikoPage';
 import LayananPrioritasPage from './pages/LayananPrioritasRisikoPage';
 import PetaRisikoPage from './pages/PetaRisikoPage';
 import MonitoringSemester1Page from './pages/MonitoringSemester1Page';
+import MonitoringSemester2Page from './pages/MonitoringSemester2Page';
+import MonitoringTahunanPage from './pages/MonitoringTahunanPage';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -88,6 +90,24 @@ export default function App() {
             element={
               <RequirePermission permission="risk.view">
                 <MonitoringSemester1Page />
+              </RequirePermission>
+            }
+          />
+
+          <Route
+            path="/risiko/monitoring/semester-2"
+            element={
+              <RequirePermission permission="risk.view">
+                <MonitoringSemester2Page />
+              </RequirePermission>
+            }
+          />
+
+          <Route
+            path="/risiko/monitoring/tahunan"
+            element={
+              <RequirePermission permission="risk.view">
+                <MonitoringTahunanPage />
               </RequirePermission>
             }
           />

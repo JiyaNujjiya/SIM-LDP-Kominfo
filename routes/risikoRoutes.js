@@ -106,6 +106,7 @@ router.get(
   risikoController.getMonitoringSemester1,
 );
 
+
 router.put(
   '/monitoring/semester-1/:risiko_id',
   authMiddleware,
@@ -133,6 +134,36 @@ router.get(
   authMiddleware,
   requirePermission('risk.view'),
   risikoController.downloadMonitoringDokumen
+);
+
+// Form 3.0 semester II
+router.get(
+  '/monitoring/semester-2',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getMonitoringSemester2
+);
+
+router.put(
+  '/monitoring/semester-2/:risiko_id',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.saveMonitoringSemester2
+)
+
+// Form 3.0 tahunan
+router.get(
+  '/monitoring/tahunan',
+  authMiddleware,
+  requirePermission('risk.view'),
+  risikoController.getMonitoringTahunan
+);
+
+router.put(
+  '/monitoring/tahunan/:risiko_id',
+  authMiddleware,
+  requirePermission('risk.update'),
+  risikoController.saveMonitoringTahunan
 );
 
 // ROUTE BERDASARKAN ID
