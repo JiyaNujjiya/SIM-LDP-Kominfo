@@ -3192,9 +3192,7 @@ exports.deleteDokumentasi = async (req, res) => {
 };
 
 exports.createDokumentasiFile = async (req, res) => {
-  console.log('CONTENT-TYPE:', req.headers['content-type']);
-  console.log('BODY:', req.body);
-  console.log('FILE:', req.file);
+
 
   let connection;
   let finalPath = null;
@@ -3574,6 +3572,1924 @@ exports.getFileDokumentasi = async (req, res) => {
       'ERROR GET FILE DOKUMENTASI:',
       error
     );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getAllPemanfaatan = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        pm.id,
+        pm.pengetahuan_id,
+        p.kode_pengetahuan,
+        p.nama_pengetahuan,
+
+        DATE_FORMAT(
+          pm.tanggal_pemanfaatan,
+          '%Y-%m-%d'
+        ) AS tanggal_pemanfaatan,
+
+        pm.jenis_pengguna,
+
+        pm.unit_pengguna_id,
+        uk.nama_unit AS unit_pengguna,
+
+        pm.tujuan_pemanfaatan,
+        pm.rating_pengetahuan,
+
+        pm.created_by,
+        u.nama AS pembuat,
+
+        pm.created_at,
+        pm.updated_at
+
+      FROM mpn_pemanfaatan pm
+
+      JOIN mpn_pengetahuan p
+        ON p.id = pm.pengetahuan_id
+
+      LEFT JOIN unit_kerja uk
+        ON uk.id = pm.unit_pengguna_id
+
+      JOIN users u
+        ON u.id = pm.created_by
+
+      ORDER BY pm.created_at DESC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR GET PEMANFAATAN PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.createPemanfaatan = async (req, res) => {
+  try {
+    const {
+      pengetahuan_id,
+      tanggal_pemanfaatan,
+      jenis_pengguna,
+      unit_pengguna_id = null,
+      tujuan_pemanfaatan,
+      rating_pengetahuan = null
+    } = req.body;
+
+    const created_by = req.user.id;
+
+    // =========================
+    // VALIDASI PENGETAHUAN
+    // =========================
+
+    const pengetahuanId = Number(pengetahuan_id);
+
+    if (
+      !Number.isInteger(pengetahuanId) ||
+      pengetahuanId <= 0
+    ) {
+      return res.status(400).json({
+        message: 'ID pengetahuan wajib diisi dan harus valid'
+      });
+    }
+
+    // =========================
+    // VALIDASI TANGGAL
+    // =========================
+
+    if (
+      typeof tanggal_pemanfaatan !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pemanfaatan)
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal pemanfaatan wajib menggunakan format YYYY-MM-DD'
+      });
+    }
+
+    // =========================
+    // VALIDASI JENIS PENGGUNA
+    // =========================
+
+    const jenisPenggunaValid = [
+      'Publik',
+      'Internal'
+    ];
+
+    if (!jenisPenggunaValid.includes(jenis_pengguna)) {
+      return res.status(400).json({
+        message: 'Jenis pengguna harus Publik atau Internal'
+      });
+    }
+
+    // =========================
+    // VALIDASI TUJUAN
+    // =========================
+
+    if (
+      typeof tujuan_pemanfaatan !== 'string' ||
+      tujuan_pemanfaatan.trim() === ''
+    ) {
+      return res.status(400).json({
+        message: 'Tujuan pemanfaatan wajib diisi'
+      });
+    }
+
+    // =========================
+    // CEK PENGETAHUAN
+    // =========================
+
+    const [pengetahuan] = await db.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [pengetahuanId]
+    );
+
+    if (pengetahuan.length === 0) {
+      return res.status(400).json({
+        message: 'Data pengetahuan tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // VALIDASI UNIT PENGGUNA
+    // unit boleh NULL
+    // =========================
+
+    let unitPenggunaId = null;
+
+    if (
+      unit_pengguna_id !== null &&
+      unit_pengguna_id !== ''
+    ) {
+      unitPenggunaId = Number(unit_pengguna_id);
+
+      if (
+        !Number.isInteger(unitPenggunaId) ||
+        unitPenggunaId <= 0
+      ) {
+        return res.status(400).json({
+          message: 'ID unit pengguna tidak valid'
+        });
+      }
+
+      const [unit] = await db.query(
+        `
+        SELECT id
+        FROM unit_kerja
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [unitPenggunaId]
+      );
+
+      if (unit.length === 0) {
+        return res.status(400).json({
+          message: 'Unit pengguna tidak ditemukan'
+        });
+      }
+    }
+
+    // =========================
+    // VALIDASI RATING
+    // DB: NULL atau 1-5
+    // =========================
+
+    let ratingPengetahuan = null;
+
+    if (
+      rating_pengetahuan !== null &&
+      rating_pengetahuan !== ''
+    ) {
+      ratingPengetahuan =
+        Number(rating_pengetahuan);
+
+      if (
+        !Number.isInteger(ratingPengetahuan) ||
+        ratingPengetahuan < 1 ||
+        ratingPengetahuan > 5
+      ) {
+        return res.status(400).json({
+          message: 'Rating pengetahuan harus bernilai 1 sampai 5'
+        });
+      }
+    }
+
+    // =========================
+    // INSERT
+    // =========================
+
+    const [result] = await db.query(
+      `
+      INSERT INTO mpn_pemanfaatan
+      (
+        pengetahuan_id,
+        tanggal_pemanfaatan,
+        jenis_pengguna,
+        unit_pengguna_id,
+        tujuan_pemanfaatan,
+        rating_pengetahuan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        pengetahuanId,
+        tanggal_pemanfaatan,
+        jenis_pengguna,
+        unitPenggunaId,
+        tujuan_pemanfaatan.trim(),
+        ratingPengetahuan,
+        created_by
+      ]
+    );
+
+    return res.status(201).json({
+      message: 'Data pemanfaatan pengetahuan berhasil disimpan',
+      data: {
+        id: result.insertId,
+        pengetahuan_id: pengetahuanId,
+        tanggal_pemanfaatan,
+        jenis_pengguna,
+        unit_pengguna_id: unitPenggunaId,
+        tujuan_pemanfaatan:
+          tujuan_pemanfaatan.trim(),
+        rating_pengetahuan:
+          ratingPengetahuan,
+        created_by
+      }
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR CREATE PEMANFAATAN PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getDetailPemanfaatan = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID pemanfaatan tidak valid'
+      });
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        pm.id,
+        pm.pengetahuan_id,
+        p.kode_pengetahuan,
+        p.nama_pengetahuan,
+
+        DATE_FORMAT(
+          pm.tanggal_pemanfaatan,
+          '%Y-%m-%d'
+        ) AS tanggal_pemanfaatan,
+
+        pm.jenis_pengguna,
+
+        pm.unit_pengguna_id,
+        uk.nama_unit AS unit_pengguna,
+
+        pm.tujuan_pemanfaatan,
+        pm.rating_pengetahuan,
+
+        pm.created_by,
+        u.nama AS pembuat,
+
+        pm.created_at,
+        pm.updated_at
+
+      FROM mpn_pemanfaatan pm
+
+      JOIN mpn_pengetahuan p
+        ON p.id = pm.pengetahuan_id
+
+      LEFT JOIN unit_kerja uk
+        ON uk.id = pm.unit_pengguna_id
+
+      JOIN users u
+        ON u.id = pm.created_by
+
+      WHERE pm.id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data pemanfaatan pengetahuan tidak ditemukan'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR GET DETAIL PEMANFAATAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.updatePemanfaatan = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    const {
+      pengetahuan_id,
+      tanggal_pemanfaatan,
+      jenis_pengguna,
+      unit_pengguna_id = null,
+      tujuan_pemanfaatan,
+      rating_pengetahuan = null
+    } = req.body;
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID pemanfaatan tidak valid'
+      });
+    }
+
+    // Cek data
+    const [existing] = await db.query(
+      `
+      SELECT id
+      FROM mpn_pemanfaatan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        message: 'Data pemanfaatan pengetahuan tidak ditemukan'
+      });
+    }
+
+    // Pengetahuan
+    const pengetahuanId = Number(pengetahuan_id);
+
+    if (
+      !Number.isInteger(pengetahuanId) ||
+      pengetahuanId <= 0
+    ) {
+      return res.status(400).json({
+        message: 'ID pengetahuan wajib diisi dan harus valid'
+      });
+    }
+
+    // Tanggal
+    if (
+      typeof tanggal_pemanfaatan !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pemanfaatan)
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal pemanfaatan wajib menggunakan format YYYY-MM-DD'
+      });
+    }
+
+    // Jenis pengguna
+    if (
+      !['Publik', 'Internal'].includes(jenis_pengguna)
+    ) {
+      return res.status(400).json({
+        message: 'Jenis pengguna harus Publik atau Internal'
+      });
+    }
+
+    // Tujuan
+    if (
+      typeof tujuan_pemanfaatan !== 'string' ||
+      tujuan_pemanfaatan.trim() === ''
+    ) {
+      return res.status(400).json({
+        message: 'Tujuan pemanfaatan wajib diisi'
+      });
+    }
+
+    // Cek pengetahuan
+    const [pengetahuan] = await db.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [pengetahuanId]
+    );
+
+    if (pengetahuan.length === 0) {
+      return res.status(400).json({
+        message: 'Data pengetahuan tidak ditemukan'
+      });
+    }
+
+    // Unit pengguna boleh NULL
+    let unitPenggunaId = null;
+
+    if (
+      unit_pengguna_id !== null &&
+      unit_pengguna_id !== ''
+    ) {
+      unitPenggunaId = Number(unit_pengguna_id);
+
+      if (
+        !Number.isInteger(unitPenggunaId) ||
+        unitPenggunaId <= 0
+      ) {
+        return res.status(400).json({
+          message: 'ID unit pengguna tidak valid'
+        });
+      }
+
+      const [unit] = await db.query(
+        `
+        SELECT id
+        FROM unit_kerja
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [unitPenggunaId]
+      );
+
+      if (unit.length === 0) {
+        return res.status(400).json({
+          message: 'Unit pengguna tidak ditemukan'
+        });
+      }
+    }
+
+    // Rating NULL atau 1-5
+    let ratingPengetahuan = null;
+
+    if (
+      rating_pengetahuan !== null &&
+      rating_pengetahuan !== ''
+    ) {
+      ratingPengetahuan =
+        Number(rating_pengetahuan);
+
+      if (
+        !Number.isInteger(ratingPengetahuan) ||
+        ratingPengetahuan < 1 ||
+        ratingPengetahuan > 5
+      ) {
+        return res.status(400).json({
+          message: 'Rating pengetahuan harus bernilai 1 sampai 5'
+        });
+      }
+    }
+
+    await db.query(
+      `
+      UPDATE mpn_pemanfaatan
+      SET
+        pengetahuan_id = ?,
+        tanggal_pemanfaatan = ?,
+        jenis_pengguna = ?,
+        unit_pengguna_id = ?,
+        tujuan_pemanfaatan = ?,
+        rating_pengetahuan = ?
+      WHERE id = ?
+      `,
+      [
+        pengetahuanId,
+        tanggal_pemanfaatan,
+        jenis_pengguna,
+        unitPenggunaId,
+        tujuan_pemanfaatan.trim(),
+        ratingPengetahuan,
+        id
+      ]
+    );
+
+    return res.status(200).json({
+      message: 'Data pemanfaatan pengetahuan berhasil diperbarui',
+      data: {
+        id,
+        pengetahuan_id: pengetahuanId,
+        tanggal_pemanfaatan,
+        jenis_pengguna,
+        unit_pengguna_id: unitPenggunaId,
+        tujuan_pemanfaatan:
+          tujuan_pemanfaatan.trim(),
+        rating_pengetahuan:
+          ratingPengetahuan
+      }
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR UPDATE PEMANFAATAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.deletePemanfaatan = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID pemanfaatan tidak valid'
+      });
+    }
+
+    const [data] = await db.query(
+      `
+      SELECT id
+      FROM mpn_pemanfaatan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (data.length === 0) {
+      return res.status(404).json({
+        message: 'Data pemanfaatan pengetahuan tidak ditemukan'
+      });
+    }
+
+    await db.query(
+      `
+      DELETE FROM mpn_pemanfaatan
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    return res.status(200).json({
+      message: 'Data pemanfaatan pengetahuan berhasil dihapus'
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR DELETE PEMANFAATAN:',
+      error
+    );
+
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' ||
+      error.code === 'ER_ROW_IS_REFERENCED'
+    ) {
+      return res.status(409).json({
+        message: 'Data pemanfaatan tidak dapat dihapus karena masih digunakan'
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getAllAlihPengetahuan = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        ap.id,
+        ap.pengetahuan_id,
+        p.kode_pengetahuan,
+        p.nama_pengetahuan,
+
+        DATE_FORMAT(
+          ap.tanggal_kegiatan,
+          '%Y-%m-%d'
+        ) AS tanggal_kegiatan,
+
+        ap.penerima_pengetahuan,
+        ap.lesson_learned_evaluasi,
+
+        ap.created_by,
+        u.nama AS pembuat,
+
+        ap.created_at,
+        ap.updated_at
+
+      FROM mpn_alih_pengetahuan ap
+
+      JOIN mpn_pengetahuan p
+        ON p.id = ap.pengetahuan_id
+
+      JOIN users u
+        ON u.id = ap.created_by
+
+      ORDER BY ap.created_at DESC
+    `);
+
+    // Ambil metode untuk masing-masing kegiatan alih
+    for (const row of rows) {
+      const [metode] = await db.query(
+        `
+        SELECT
+          id,
+          metode,
+          keterangan,
+          created_at
+        FROM mpn_metode_alih
+        WHERE alih_pengetahuan_id = ?
+        ORDER BY id ASC
+        `,
+        [row.id]
+      );
+
+      row.metode_alih = metode;
+    }
+
+    return res.status(200).json({
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR GET ALIH PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.createAlihPengetahuan = async (req, res) => {
+  let connection;
+
+  try {
+    const {
+      pengetahuan_id,
+      tanggal_kegiatan,
+      penerima_pengetahuan,
+      lesson_learned_evaluasi = null,
+      metode_alih = []
+    } = req.body;
+
+    const created_by = req.user.id;
+
+    // =========================
+    // VALIDASI PENGETAHUAN
+    // =========================
+
+    const pengetahuanId = Number(pengetahuan_id);
+
+    if (
+      !Number.isInteger(pengetahuanId) ||
+      pengetahuanId <= 0
+    ) {
+      return res.status(400).json({
+        message: 'ID pengetahuan wajib diisi dan harus valid'
+      });
+    }
+
+    // =========================
+    // VALIDASI TANGGAL
+    // =========================
+
+    if (
+      typeof tanggal_kegiatan !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_kegiatan)
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal kegiatan wajib menggunakan format YYYY-MM-DD'
+      });
+    }
+
+    // =========================
+    // VALIDASI PENERIMA
+    // =========================
+
+    if (
+      typeof penerima_pengetahuan !== 'string' ||
+      penerima_pengetahuan.trim() === ''
+    ) {
+      return res.status(400).json({
+        message: 'Penerima pengetahuan wajib diisi'
+      });
+    }
+
+    if (penerima_pengetahuan.trim().length > 255) {
+      return res.status(400).json({
+        message: 'Penerima pengetahuan maksimal 255 karakter'
+      });
+    }
+
+    // =========================
+    // CEK PENGETAHUAN
+    // =========================
+
+    const [pengetahuan] = await db.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [pengetahuanId]
+    );
+
+    if (pengetahuan.length === 0) {
+      return res.status(400).json({
+        message: 'Data pengetahuan tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // VALIDASI METODE ALIH
+    // =========================
+
+    if (!Array.isArray(metode_alih)) {
+      return res.status(400).json({
+        message: 'Metode alih harus berupa array'
+      });
+    }
+
+    const metodeValid = [
+      'Pelatihan',
+      'Workshop',
+      'Sosialisasi',
+      'Mentoring',
+      'Sharing',
+      'Lainnya'
+    ];
+
+    for (const item of metode_alih) {
+      if (
+        !item ||
+        typeof item !== 'object' ||
+        !metodeValid.includes(item.metode)
+      ) {
+        return res.status(400).json({
+          message: 'Metode alih tidak valid'
+        });
+      }
+    }
+
+    // =========================
+    // TRANSACTION
+    // =========================
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    const [result] = await connection.query(
+      `
+      INSERT INTO mpn_alih_pengetahuan
+      (
+        pengetahuan_id,
+        tanggal_kegiatan,
+        penerima_pengetahuan,
+        lesson_learned_evaluasi,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        pengetahuanId,
+        tanggal_kegiatan,
+        penerima_pengetahuan.trim(),
+        lesson_learned_evaluasi || null,
+        created_by
+      ]
+    );
+
+    const alihPengetahuanId = result.insertId;
+
+    // Simpan masing-masing metode
+    for (const item of metode_alih) {
+      await connection.query(
+        `
+        INSERT INTO mpn_metode_alih
+        (
+          alih_pengetahuan_id,
+          metode,
+          keterangan
+        )
+        VALUES (?, ?, ?)
+        `,
+        [
+          alihPengetahuanId,
+          item.metode,
+          item.keterangan || null
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(201).json({
+      message: 'Data alih pengetahuan berhasil disimpan',
+      data: {
+        id: alihPengetahuanId,
+        pengetahuan_id: pengetahuanId,
+        tanggal_kegiatan,
+        penerima_pengetahuan:
+          penerima_pengetahuan.trim(),
+        lesson_learned_evaluasi:
+          lesson_learned_evaluasi || null,
+        metode_alih,
+        created_by
+      }
+    });
+
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      'ERROR CREATE ALIH PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+exports.getDetailAlihPengetahuan = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID alih pengetahuan tidak valid'
+      });
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        ap.id,
+        ap.pengetahuan_id,
+        p.kode_pengetahuan,
+        p.nama_pengetahuan,
+
+        DATE_FORMAT(
+          ap.tanggal_kegiatan,
+          '%Y-%m-%d'
+        ) AS tanggal_kegiatan,
+
+        ap.penerima_pengetahuan,
+        ap.lesson_learned_evaluasi,
+
+        ap.created_by,
+        u.nama AS pembuat,
+
+        ap.created_at,
+        ap.updated_at
+
+      FROM mpn_alih_pengetahuan ap
+
+      JOIN mpn_pengetahuan p
+        ON p.id = ap.pengetahuan_id
+
+      JOIN users u
+        ON u.id = ap.created_by
+
+      WHERE ap.id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data alih pengetahuan tidak ditemukan'
+      });
+    }
+
+    const [metode] = await db.query(
+      `
+      SELECT
+        id,
+        metode,
+        keterangan,
+        created_at
+      FROM mpn_metode_alih
+      WHERE alih_pengetahuan_id = ?
+      ORDER BY id ASC
+      `,
+      [id]
+    );
+
+    rows[0].metode_alih = metode;
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR GET DETAIL ALIH PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.updateAlihPengetahuan = async (req, res) => {
+  let connection;
+
+  try {
+    const id = Number(req.params.id);
+
+    const {
+      pengetahuan_id,
+      tanggal_kegiatan,
+      penerima_pengetahuan,
+      lesson_learned_evaluasi = null,
+      metode_alih = []
+    } = req.body;
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID alih pengetahuan tidak valid'
+      });
+    }
+
+    // =========================
+    // CEK DATA ALIH
+    // =========================
+
+    const [existing] = await db.query(
+      `
+      SELECT id
+      FROM mpn_alih_pengetahuan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        message: 'Data alih pengetahuan tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // VALIDASI PENGETAHUAN
+    // =========================
+
+    const pengetahuanId = Number(pengetahuan_id);
+
+    if (
+      !Number.isInteger(pengetahuanId) ||
+      pengetahuanId <= 0
+    ) {
+      return res.status(400).json({
+        message: 'ID pengetahuan wajib diisi dan harus valid'
+      });
+    }
+
+    // =========================
+    // VALIDASI TANGGAL
+    // =========================
+
+    if (
+      typeof tanggal_kegiatan !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_kegiatan)
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal kegiatan wajib menggunakan format YYYY-MM-DD'
+      });
+    }
+
+    // =========================
+    // VALIDASI PENERIMA
+    // =========================
+
+    if (
+      typeof penerima_pengetahuan !== 'string' ||
+      penerima_pengetahuan.trim() === ''
+    ) {
+      return res.status(400).json({
+        message: 'Penerima pengetahuan wajib diisi'
+      });
+    }
+
+    if (penerima_pengetahuan.trim().length > 255) {
+      return res.status(400).json({
+        message: 'Penerima pengetahuan maksimal 255 karakter'
+      });
+    }
+
+    // =========================
+    // CEK PENGETAHUAN
+    // =========================
+
+    const [pengetahuan] = await db.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [pengetahuanId]
+    );
+
+    if (pengetahuan.length === 0) {
+      return res.status(400).json({
+        message: 'Data pengetahuan tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // VALIDASI METODE
+    // =========================
+
+    if (!Array.isArray(metode_alih)) {
+      return res.status(400).json({
+        message: 'Metode alih harus berupa array'
+      });
+    }
+
+    const metodeValid = [
+      'Pelatihan',
+      'Workshop',
+      'Sosialisasi',
+      'Mentoring',
+      'Sharing',
+      'Lainnya'
+    ];
+
+    for (const item of metode_alih) {
+      if (
+        !item ||
+        typeof item !== 'object' ||
+        !metodeValid.includes(item.metode)
+      ) {
+        return res.status(400).json({
+          message: 'Metode alih tidak valid'
+        });
+      }
+
+      if (
+        item.keterangan !== undefined &&
+        item.keterangan !== null &&
+        typeof item.keterangan !== 'string'
+      ) {
+        return res.status(400).json({
+          message: 'Keterangan metode harus berupa teks'
+        });
+      }
+    }
+
+    // =========================
+    // TRANSACTION
+    // =========================
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    await connection.query(
+      `
+      UPDATE mpn_alih_pengetahuan
+      SET
+        pengetahuan_id = ?,
+        tanggal_kegiatan = ?,
+        penerima_pengetahuan = ?,
+        lesson_learned_evaluasi = ?
+      WHERE id = ?
+      `,
+      [
+        pengetahuanId,
+        tanggal_kegiatan,
+        penerima_pengetahuan.trim(),
+        lesson_learned_evaluasi || null,
+        id
+      ]
+    );
+
+    // Hapus metode lama
+    await connection.query(
+      `
+      DELETE FROM mpn_metode_alih
+      WHERE alih_pengetahuan_id = ?
+      `,
+      [id]
+    );
+
+    // Masukkan metode terbaru
+    for (const item of metode_alih) {
+      await connection.query(
+        `
+        INSERT INTO mpn_metode_alih
+        (
+          alih_pengetahuan_id,
+          metode,
+          keterangan
+        )
+        VALUES (?, ?, ?)
+        `,
+        [
+          id,
+          item.metode,
+          item.keterangan || null
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(200).json({
+      message: 'Data alih pengetahuan berhasil diperbarui',
+      data: {
+        id,
+        pengetahuan_id: pengetahuanId,
+        tanggal_kegiatan,
+        penerima_pengetahuan:
+          penerima_pengetahuan.trim(),
+        lesson_learned_evaluasi:
+          lesson_learned_evaluasi || null,
+        metode_alih
+      }
+    });
+
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      'ERROR UPDATE ALIH PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+exports.deleteAlihPengetahuan = async (req, res) => {
+  let connection;
+
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID alih pengetahuan tidak valid'
+      });
+    }
+
+    const [data] = await db.query(
+      `
+      SELECT id
+      FROM mpn_alih_pengetahuan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (data.length === 0) {
+      return res.status(404).json({
+        message: 'Data alih pengetahuan tidak ditemukan'
+      });
+    }
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    // Hapus child terlebih dahulu
+    await connection.query(
+      `
+      DELETE FROM mpn_metode_alih
+      WHERE alih_pengetahuan_id = ?
+      `,
+      [id]
+    );
+
+    // Hapus parent
+    await connection.query(
+      `
+      DELETE FROM mpn_alih_pengetahuan
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      message: 'Data alih pengetahuan berhasil dihapus'
+    });
+
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      'ERROR DELETE ALIH PENGETAHUAN:',
+      error
+    );
+
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' ||
+      error.code === 'ER_ROW_IS_REFERENCED'
+    ) {
+      return res.status(409).json({
+        message: 'Data alih pengetahuan tidak dapat dihapus karena masih digunakan'
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+exports.getAllEvaluasi = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        e.id,
+        e.indikator_perencanaan_id,
+
+        ip.perencanaan_id,
+        ip.kode_indikator,
+        ip.nilai_saat_ini,
+        ip.nilai_target,
+
+        DATE_FORMAT(
+          e.tanggal_evaluasi,
+          '%Y-%m-%d'
+        ) AS tanggal_evaluasi,
+
+        e.nilai_realisasi,
+        e.analisis,
+        e.tindak_lanjut,
+        e.pelaksana_terkait,
+
+        e.created_by,
+        u.nama AS pembuat,
+
+        e.created_at,
+        e.updated_at
+
+      FROM mpn_evaluasi e
+
+      JOIN mpn_indikator_perencanaan ip
+        ON ip.id = e.indikator_perencanaan_id
+
+      JOIN users u
+        ON u.id = e.created_by
+
+      ORDER BY
+        e.tanggal_evaluasi DESC,
+        e.created_at DESC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR GET EVALUASI PENGETAHUAN:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.createEvaluasi = async (req, res) => {
+  try {
+    const {
+      indikator_perencanaan_id,
+      tanggal_evaluasi,
+      nilai_realisasi,
+      analisis = null,
+      tindak_lanjut = null,
+      pelaksana_terkait
+    } = req.body;
+
+    const created_by = req.user.id;
+
+    // =========================
+    // VALIDASI INDIKATOR
+    // =========================
+
+    const indikatorId = Number(
+      indikator_perencanaan_id
+    );
+
+    if (
+      !Number.isInteger(indikatorId) ||
+      indikatorId <= 0
+    ) {
+      return res.status(400).json({
+        message:
+          'ID indikator perencanaan wajib diisi dan harus valid'
+      });
+    }
+
+    // =========================
+    // VALIDASI TANGGAL
+    // =========================
+
+    if (
+      typeof tanggal_evaluasi !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(
+        tanggal_evaluasi
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          'Tanggal evaluasi wajib menggunakan format YYYY-MM-DD'
+      });
+    }
+
+    // =========================
+    // VALIDASI NILAI REALISASI
+    // DB CHECK: 0 - 100
+    // =========================
+
+    const nilaiRealisasi =
+      Number(nilai_realisasi);
+
+    if (
+      !Number.isFinite(nilaiRealisasi) ||
+      nilaiRealisasi < 0 ||
+      nilaiRealisasi > 100
+    ) {
+      return res.status(400).json({
+        message:
+          'Nilai realisasi harus berada antara 0 sampai 100'
+      });
+    }
+
+    // =========================
+    // VALIDASI PELAKSANA
+    // =========================
+
+    if (
+      typeof pelaksana_terkait !== 'string' ||
+      pelaksana_terkait.trim() === ''
+    ) {
+      return res.status(400).json({
+        message:
+          'Pelaksana terkait wajib diisi'
+      });
+    }
+
+    if (
+      pelaksana_terkait.trim().length > 255
+    ) {
+      return res.status(400).json({
+        message:
+          'Pelaksana terkait maksimal 255 karakter'
+      });
+    }
+
+    // =========================
+    // CEK INDIKATOR
+    // =========================
+
+    const [indikator] = await db.query(
+      `
+      SELECT
+        id,
+        perencanaan_id,
+        kode_indikator,
+        nilai_target
+      FROM mpn_indikator_perencanaan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [indikatorId]
+    );
+
+    if (indikator.length === 0) {
+      return res.status(400).json({
+        message:
+          'Indikator perencanaan tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // CEK DUPLICATE
+    // indikator + tanggal harus unik
+    // =========================
+
+    const [existing] = await db.query(
+      `
+      SELECT id
+      FROM mpn_evaluasi
+      WHERE indikator_perencanaan_id = ?
+        AND tanggal_evaluasi = ?
+      LIMIT 1
+      `,
+      [
+        indikatorId,
+        tanggal_evaluasi
+      ]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({
+        message:
+          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+      });
+    }
+
+    // =========================
+    // INSERT
+    // =========================
+
+    const [result] = await db.query(
+      `
+      INSERT INTO mpn_evaluasi
+      (
+        indikator_perencanaan_id,
+        tanggal_evaluasi,
+        nilai_realisasi,
+        analisis,
+        tindak_lanjut,
+        pelaksana_terkait,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        indikatorId,
+        tanggal_evaluasi,
+        nilaiRealisasi,
+        analisis || null,
+        tindak_lanjut || null,
+        pelaksana_terkait.trim(),
+        created_by
+      ]
+    );
+
+    return res.status(201).json({
+      message:
+        'Data evaluasi berhasil disimpan',
+
+      data: {
+        id: result.insertId,
+        indikator_perencanaan_id:
+          indikatorId,
+        tanggal_evaluasi,
+        nilai_realisasi:
+          nilaiRealisasi,
+        analisis:
+          analisis || null,
+        tindak_lanjut:
+          tindak_lanjut || null,
+        pelaksana_terkait:
+          pelaksana_terkait.trim(),
+        created_by
+      }
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR CREATE EVALUASI:',
+      error
+    );
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        message:
+          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+      });
+    }
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getDetailEvaluasi = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID evaluasi tidak valid'
+      });
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        e.id,
+        e.indikator_perencanaan_id,
+
+        ip.perencanaan_id,
+        ip.kode_indikator,
+        ip.nilai_saat_ini,
+        ip.nilai_target,
+
+        DATE_FORMAT(
+          e.tanggal_evaluasi,
+          '%Y-%m-%d'
+        ) AS tanggal_evaluasi,
+
+        e.nilai_realisasi,
+        e.analisis,
+        e.tindak_lanjut,
+        e.pelaksana_terkait,
+
+        e.created_by,
+        u.nama AS pembuat,
+
+        e.created_at,
+        e.updated_at
+
+      FROM mpn_evaluasi e
+
+      JOIN mpn_indikator_perencanaan ip
+        ON ip.id = e.indikator_perencanaan_id
+
+      JOIN users u
+        ON u.id = e.created_by
+
+      WHERE e.id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data evaluasi tidak ditemukan'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR GET DETAIL EVALUASI:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.updateEvaluasi = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    const {
+      indikator_perencanaan_id,
+      tanggal_evaluasi,
+      nilai_realisasi,
+      analisis = null,
+      tindak_lanjut = null,
+      pelaksana_terkait
+    } = req.body;
+
+    // =========================
+    // VALIDASI ID
+    // =========================
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID evaluasi tidak valid'
+      });
+    }
+
+    // =========================
+    // CEK DATA EVALUASI
+    // =========================
+
+    const [existingEvaluasi] = await db.query(
+      `
+      SELECT id
+      FROM mpn_evaluasi
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (existingEvaluasi.length === 0) {
+      return res.status(404).json({
+        message: 'Data evaluasi tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // VALIDASI INDIKATOR
+    // =========================
+
+    const indikatorId = Number(
+      indikator_perencanaan_id
+    );
+
+    if (
+      !Number.isInteger(indikatorId) ||
+      indikatorId <= 0
+    ) {
+      return res.status(400).json({
+        message:
+          'ID indikator perencanaan wajib diisi dan harus valid'
+      });
+    }
+
+    // =========================
+    // VALIDASI TANGGAL
+    // =========================
+
+    if (
+      typeof tanggal_evaluasi !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_evaluasi)
+    ) {
+      return res.status(400).json({
+        message:
+          'Tanggal evaluasi wajib menggunakan format YYYY-MM-DD'
+      });
+    }
+
+    // =========================
+    // VALIDASI NILAI REALISASI
+    // DB: 0 - 100
+    // =========================
+
+    const nilaiRealisasi =
+      Number(nilai_realisasi);
+
+    if (
+      !Number.isFinite(nilaiRealisasi) ||
+      nilaiRealisasi < 0 ||
+      nilaiRealisasi > 100
+    ) {
+      return res.status(400).json({
+        message:
+          'Nilai realisasi harus berada antara 0 sampai 100'
+      });
+    }
+
+    // =========================
+    // VALIDASI PELAKSANA
+    // =========================
+
+    if (
+      typeof pelaksana_terkait !== 'string' ||
+      pelaksana_terkait.trim() === ''
+    ) {
+      return res.status(400).json({
+        message:
+          'Pelaksana terkait wajib diisi'
+      });
+    }
+
+    if (
+      pelaksana_terkait.trim().length > 255
+    ) {
+      return res.status(400).json({
+        message:
+          'Pelaksana terkait maksimal 255 karakter'
+      });
+    }
+
+    // =========================
+    // CEK INDIKATOR
+    // =========================
+
+    const [indikator] = await db.query(
+      `
+      SELECT id
+      FROM mpn_indikator_perencanaan
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [indikatorId]
+    );
+
+    if (indikator.length === 0) {
+      return res.status(400).json({
+        message:
+          'Indikator perencanaan tidak ditemukan'
+      });
+    }
+
+    // =========================
+    // CEK DUPLICATE
+    // indikator + tanggal
+    // kecuali record yang sedang diedit
+    // =========================
+
+    const [duplicate] = await db.query(
+      `
+      SELECT id
+      FROM mpn_evaluasi
+      WHERE indikator_perencanaan_id = ?
+        AND tanggal_evaluasi = ?
+        AND id <> ?
+      LIMIT 1
+      `,
+      [
+        indikatorId,
+        tanggal_evaluasi,
+        id
+      ]
+    );
+
+    if (duplicate.length > 0) {
+      return res.status(409).json({
+        message:
+          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+      });
+    }
+
+    // =========================
+    // UPDATE
+    // created_by TIDAK diubah
+    // =========================
+
+    await db.query(
+      `
+      UPDATE mpn_evaluasi
+      SET
+        indikator_perencanaan_id = ?,
+        tanggal_evaluasi = ?,
+        nilai_realisasi = ?,
+        analisis = ?,
+        tindak_lanjut = ?,
+        pelaksana_terkait = ?
+      WHERE id = ?
+      `,
+      [
+        indikatorId,
+        tanggal_evaluasi,
+        nilaiRealisasi,
+        analisis || null,
+        tindak_lanjut || null,
+        pelaksana_terkait.trim(),
+        id
+      ]
+    );
+
+    return res.status(200).json({
+      message:
+        'Data evaluasi berhasil diperbarui',
+
+      data: {
+        id,
+        indikator_perencanaan_id:
+          indikatorId,
+        tanggal_evaluasi,
+        nilai_realisasi:
+          nilaiRealisasi,
+        analisis:
+          analisis || null,
+        tindak_lanjut:
+          tindak_lanjut || null,
+        pelaksana_terkait:
+          pelaksana_terkait.trim()
+      }
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR UPDATE EVALUASI:',
+      error
+    );
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        message:
+          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.deleteEvaluasi = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        message: 'ID evaluasi tidak valid'
+      });
+    }
+
+    const [data] = await db.query(
+      `
+      SELECT id
+      FROM mpn_evaluasi
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (data.length === 0) {
+      return res.status(404).json({
+        message: 'Data evaluasi tidak ditemukan'
+      });
+    }
+
+    await db.query(
+      `
+      DELETE FROM mpn_evaluasi
+      WHERE id = ?
+      `,
+      [id]
+    );
+
+    return res.status(200).json({
+      message: 'Data evaluasi berhasil dihapus'
+    });
+
+  } catch (error) {
+    console.error(
+      'ERROR DELETE EVALUASI:',
+      error
+    );
+
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' ||
+      error.code === 'ER_ROW_IS_REFERENCED'
+    ) {
+      return res.status(409).json({
+        message:
+          'Data evaluasi tidak dapat dihapus karena masih digunakan'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'

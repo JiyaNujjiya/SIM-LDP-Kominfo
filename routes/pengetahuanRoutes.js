@@ -204,4 +204,122 @@ router.delete(
   requirePermission('knowledge.delete'),
   pengetahuanController.deleteDokumentasi
 );
+
+// ======================================================
+// MPN03 - PEMANFAATAN PENGETAHUAN
+// ======================================================
+
+router.get(
+  '/pemanfaatan',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getAllPemanfaatan
+);
+
+router.post(
+  '/pemanfaatan',
+  authMiddleware,
+  requirePermission('knowledge.create'),
+  pengetahuanController.createPemanfaatan
+);
+
+router.get(
+  '/pemanfaatan/:id',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getDetailPemanfaatan
+);
+
+router.put(
+  '/pemanfaatan/:id',
+  authMiddleware,
+  requirePermission('knowledge.update'),
+  pengetahuanController.updatePemanfaatan
+);
+
+router.delete(
+  '/pemanfaatan/:id',
+  authMiddleware,
+  requirePermission('knowledge.delete'),
+  pengetahuanController.deletePemanfaatan
+);
+
+// ======================================================
+// MPN03 - ALIH PENGETAHUAN
+// ======================================================
+
+router.get(
+  '/alih-pengetahuan',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getAllAlihPengetahuan
+);
+
+router.post(
+  '/alih-pengetahuan',
+  authMiddleware,
+  requirePermission('knowledge.create'),
+  pengetahuanController.createAlihPengetahuan
+);
+
+router.get(
+  '/alih-pengetahuan/:id',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getDetailAlihPengetahuan
+);
+
+router.put(
+  '/alih-pengetahuan/:id',
+  authMiddleware,
+  requirePermission('knowledge.update'),
+  pengetahuanController.updateAlihPengetahuan
+);
+
+router.delete(
+  '/alih-pengetahuan/:id',
+  authMiddleware,
+  requirePermission('knowledge.delete'),
+  pengetahuanController.deleteAlihPengetahuan
+);
+
+// ======================================================
+// MPN04 - EVALUASI
+// ======================================================
+
+router.get(
+  '/evaluasi',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getAllEvaluasi
+);
+
+router.post(
+  '/evaluasi',
+  authMiddleware,
+  requirePermission('knowledge.create'),
+  pengetahuanController.createEvaluasi
+);
+
+router.get(
+  '/evaluasi/:id',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getDetailEvaluasi
+);
+
+router.put(
+  '/evaluasi/:id',
+  authMiddleware,
+  requirePermission('knowledge.update'),
+  pengetahuanController.updateEvaluasi
+);
+
+router.delete(
+  '/evaluasi/:id',
+  authMiddleware,
+  requirePermission('knowledge.delete'),
+  pengetahuanController.deleteEvaluasi
+);
+
 module.exports = router;
