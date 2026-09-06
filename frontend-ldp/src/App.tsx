@@ -11,11 +11,13 @@ import PetaRisikoPage from './pages/PetaRisikoPage';
 import MonitoringSemester1Page from './pages/MonitoringSemester1Page';
 import MonitoringSemester2Page from './pages/MonitoringSemester2Page';
 import MonitoringTahunanPage from './pages/MonitoringTahunanPage';
+import AppLayout from './AppLayout';
+import RiskOverviewPage from './pages/RiskOverviewPage';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {;
+  useEffect(() => {
     const savedUser = localStorage.getItem('user');
 
     if (savedUser) {
@@ -28,7 +30,7 @@ export default function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('rememberMe');
     setUser(null);
-  }
+  };
 
   return (
     <BrowserRouter>
@@ -49,68 +51,81 @@ export default function App() {
             path="/dashboard"
             element={<Dashboard onLogout={handleLogout} />}
           />
-
-          <Route
-            path="/risiko"
-            element={
-              <RequirePermission permission="risk.view">
-                <RisikoPage />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="/risiko/konteks"
-            element={
-              <RequirePermission permission="risk.view">
-                <KonteksRisikoPage />
-              </RequirePermission>
+          
+          <Route element={<AppLayout onLogout={handleLogout} />}>
+            <Route
+              path="/risiko"
+              element={
+                <RequirePermission permission="risk.view">
+                  <RisikoPage />
+                </RequirePermission>
               }
-          />
+            />
 
-          <Route
-            path="/risiko/layanan-prioritas"
+            <Route
+            path="/risiko/overview"
             element={
               <RequirePermission permission="risk.view">
-                <LayananPrioritasPage />
+                <RiskOverviewPage />
               </RequirePermission>
             }
           />
 
-          <Route
-            path="/risiko/peta-risiko"
-            element={
-              <RequirePermission permission="risk.view">
-                <PetaRisikoPage/>
-              </RequirePermission> 
-            }
-          />
+            <Route
+              path="/risiko/konteks"
+              element={
+                <RequirePermission permission="risk.view">
+                  <KonteksRisikoPage />
+                </RequirePermission>
+              }
+            />
 
-          <Route
-            path="/risiko/monitoring/semester-1"
-            element={
-              <RequirePermission permission="risk.view">
-                <MonitoringSemester1Page />
-              </RequirePermission>
-            }
-          />
+            <Route
+              path="/risiko/layanan-prioritas"
+              element={
+                <RequirePermission permission="risk.view">
+                  <LayananPrioritasPage />
+                </RequirePermission>
+              }
+            />
 
-          <Route
-            path="/risiko/monitoring/semester-2"
-            element={
-              <RequirePermission permission="risk.view">
-                <MonitoringSemester2Page />
-              </RequirePermission>
-            }
-          />
+            <Route
+              path="/risiko/peta-risiko"
+              element={
+                <RequirePermission permission="risk.view">
+                  <PetaRisikoPage />
+                </RequirePermission>
+              }
+            />
 
-          <Route
-            path="/risiko/monitoring/tahunan"
-            element={
-              <RequirePermission permission="risk.view">
-                <MonitoringTahunanPage />
-              </RequirePermission>
-            }
-          />
+            <Route
+              path="/risiko/monitoring/semester-1"
+              element={
+                <RequirePermission permission="risk.view">
+                  <MonitoringSemester1Page />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/risiko/monitoring/semester-2"
+              element={
+                <RequirePermission permission="risk.view">
+                  <MonitoringSemester2Page />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/risiko/monitoring/tahunan"
+              element={
+                <RequirePermission permission="risk.view">
+                  <MonitoringTahunanPage />
+                </RequirePermission>
+              }
+            />
+          </Route>
+
           <Route
             path="*"
             element={<Navigate to="/dashboard" replace />}

@@ -437,9 +437,11 @@ export default function SimLdpDashboard({
                   return (
                     <div key={m.id}>
                       <button
-                        onClick={() =>
-                          handleMenuClick("risiko")
-                        }
+                        onClick={() => {
+                          setActive("risiko");
+                          setRiskOpen(true);
+                          navigate("/risiko/overview")
+                        }}
                         style={{
                           display: "flex",
                           alignItems: "center",
