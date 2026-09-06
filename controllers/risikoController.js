@@ -5,23 +5,22 @@ const path = require('path');
 
 // 1. Tambah Data Risiko (Form 1.0)
 exports.createRisiko = async (req, res) => {
-    const { 
+    const {
         konteks_id,
 
         // a. identifikasi risiko
         sasaran_pembangunan_nasional,
         sasaran_upr,
         indikator_kinerja,
-        kode_risiko,
         peristiwa_risiko,
 
         // b. analisis dan evaluasi risiko
-        kategori_risiko, 
-        penyebab, 
-        dampak, 
+        kategori_risiko,
+        penyebab,
+        dampak,
         area_dampak,
-        kemungkinan, 
-        nilai_dampak, 
+        kemungkinan,
+        nilai_dampak,
         prioritas_risiko,
 
         // c. perlakuan risiko
@@ -29,7 +28,7 @@ exports.createRisiko = async (req, res) => {
         deskripsi_detail_perlakuan,
         waktu_rencana_perlakuan,
         penanggung_jawab_id,
-        
+
         // d. risiko residual
         level_kemungkinan_residual,
         level_dampak_residual,
@@ -42,121 +41,182 @@ exports.createRisiko = async (req, res) => {
         lintas_sektor,
         membutuhkan_perubahan,
 
-        ippd_ids
-
+        ippd_ids,
     } = req.body;
-    
-    const created_by = req.user ? req.user.id : null; 
+
+    const created_by = req.user ? req.user.id : null;
 
     try {
-        const query = `
-            INSERT INTO mr_risiko (
-            konteks_id,
-            sasaran_pembangunan_nasional,
-            sasaran_upr,
-            indikator_kinerja,
-            kode_risiko,
-            peristiwa_risiko,
-            kategori_risiko,
-            penyebab,
-            dampak,
-            area_dampak,
-            kemungkinan,
-            nilai_dampak,
-            prioritas_risiko,
-            keputusan_perlakuan,
-            deskripsi_detail_perlakuan,
-            waktu_rencana_perlakuan,
-            penanggung_jawab_id,
-            level_kemungkinan_residual,
-            level_dampak_residual,
-            layanan_id,
-            layanan_prioritas_id,
-            pemilik_layanan,
-            strategis_operasional,
-            lintas_sektor,
-            membutuhkan_perubahan,
+        let result = null;
+        let kodeRisiko = null;
 
-            created_by
-        ) 
-            VALUES (?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?,
-                ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?)
-        `;
-        
-        const [result] = await db.query(query, [
-            konteks_id || null,
+        const maxRetry = 5;
 
-            // a. identifikasi risiko
-            sasaran_pembangunan_nasional || null,
-            sasaran_upr || null,
-            indikator_kinerja || null,
-            kode_risiko,
-            peristiwa_risiko,
+        for (let attempt = 0; attempt < maxRetry; attempt++) {
+            const [kodeRows] = await db.query(`
+                SELECT MAX(
+                    CAST(
+                        SUBSTRING_INDEX(kode_risiko, '-', -1)
+                        AS UNSIGNED
+                    )
+                ) AS max_nomor
+                FROM mr_risiko
+                WHERE kode_risiko REGEXP '^RSK-[0-9]+$'
+            `);
 
-            // b. analisis dan evaluasi Risiko
-            kategori_risiko || null,
-            penyebab || null,
-            dampak || null,
-            area_dampak || null,
-            kemungkinan || null,
-            nilai_dampak || null,
-            prioritas_risiko || null,
+            const nextNumber =
+                Number(kodeRows[0]?.max_nomor || 0) + 1;
 
-            // c. perlakuan risiko
-            keputusan_perlakuan || null,
-            deskripsi_detail_perlakuan || null,
-            waktu_rencana_perlakuan || null,
-            penanggung_jawab_id || null,
+            kodeRisiko =
+                `RSK-${String(nextNumber).padStart(3, '0')}`;
 
-            // d. risiko residual
-            level_kemungkinan_residual || null,
-            level_dampak_residual || null,
+            try {
+                const query = `
+                    INSERT INTO mr_risiko (
+                        konteks_id,
+                        sasaran_pembangunan_nasional,
+                        sasaran_upr,
+                        indikator_kinerja,
+                        kode_risiko,
+                        peristiwa_risiko,
+                        kategori_risiko,
+                        penyebab,
+                        dampak,
+                        area_dampak,
+                        kemungkinan,
+                        nilai_dampak,
+                        prioritas_risiko,
+                        keputusan_perlakuan,
+                        deskripsi_detail_perlakuan,
+                        waktu_rencana_perlakuan,
+                        penanggung_jawab_id,
+                        level_kemungkinan_residual,
+                        level_dampak_residual,
+                        layanan_id,
+                        layanan_prioritas_id,
+                        pemilik_layanan,
+                        strategis_operasional,
+                        lintas_sektor,
+                        membutuhkan_perubahan,
+                        created_by
+                    )
+                    VALUES (
+                        ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?,
+                        ?, ?, ?, ?, ?, ?,
+                        ?
+                    )
+                `;
 
-            // e. kolom tambahan
-            layanan_id || null,
-            layanan_prioritas_id || null,
-            pemilik_layanan || null,
-            strategis_operasional || null,
-            lintas_sektor ? 1 : 0,
-            membutuhkan_perubahan ? 1 : 0, 
+                [result] = await db.query(query, [
+                    konteks_id || null,
 
-            
-            created_by
-        ]);
+                    // a. identifikasi risiko
+                    sasaran_pembangunan_nasional || null,
+                    sasaran_upr || null,
+                    indikator_kinerja || null,
+                    kodeRisiko,
+                    peristiwa_risiko,
 
-        res.status(201).json({ 
-            message: 'Data Risiko berhasil ditambahkan!' 
-        });
+                    // b. analisis dan evaluasi risiko
+                    kategori_risiko || null,
+                    penyebab || null,
+                    dampak || null,
+                    area_dampak || null,
+                    kemungkinan || null,
+                    nilai_dampak || null,
+                    prioritas_risiko || null,
+
+                    // c. perlakuan risiko
+                    keputusan_perlakuan || null,
+                    deskripsi_detail_perlakuan || null,
+                    waktu_rencana_perlakuan || null,
+                    penanggung_jawab_id || null,
+
+                    // d. risiko residual
+                    level_kemungkinan_residual || null,
+                    level_dampak_residual || null,
+
+                    // e. kolom tambahan
+                    layanan_id || null,
+                    layanan_prioritas_id || null,
+                    pemilik_layanan || null,
+                    strategis_operasional || null,
+                    lintas_sektor ? 1 : 0,
+                    membutuhkan_perubahan ? 1 : 0,
+
+                    created_by,
+                ]);
+
+                break;
+            } catch (error) {
+                if (
+                    error.code === 'ER_DUP_ENTRY' &&
+                    attempt < maxRetry - 1
+                ) {
+                    continue;
+                }
+
+                throw error;
+            }
+        }
+
+        if (!result) {
+            return res.status(409).json({
+                message:
+                    'Gagal membuat kode risiko karena terjadi konflik. Silakan coba kembali.',
+            });
+        }
 
         const risikoId = result.insertId;
 
-        if (Array.isArray(ippd_ids) && ippd_ids.length > 0) {
-            const values = ippd_ids.map((instansiId) => [
-                risikoId,
-                instansiId
-            ]);
+        if (
+            Array.isArray(ippd_ids) &&
+            ippd_ids.length > 0
+        ) {
+            const values = ippd_ids.map(
+                (instansiId) => [
+                    risikoId,
+                    instansiId,
+                ]
+            );
 
             await db.query(
                 `
-                INSERT INTO mr_risiko_IPPD (
-                    risiko_id,
-                    instansi_id
-                )
-                VALUES ?
+                    INSERT INTO mr_risiko_ippd (
+                        risiko_id,
+                        instansi_id
+                    )
+                    VALUES ?
                 `,
                 [values]
             );
         }
 
+        return res.status(201).json({
+            message: 'Data Risiko berhasil ditambahkan!',
+            id: risikoId,
+            kode_risiko: kodeRisiko,
+        });
+
     } catch (error) {
-        console.error('ERROR DATABASE:', error); 
-        
-        res.status(500).json({ 
-            error: error.message });
+        console.error(
+            'ERROR CREATE RISIKO:',
+            error
+        );
+
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({
+                message:
+                    'Kode risiko sudah digunakan. Silakan coba kembali.',
+            });
+        }
+
+        return res.status(500).json({
+            error: error.message,
+        });
     }
 };
 

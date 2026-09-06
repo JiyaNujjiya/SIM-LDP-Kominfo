@@ -1,5 +1,5 @@
 import React, { use, useEffect, useState } from 'react';
-import { data } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 interface RisikoItem {
   id: number;
@@ -57,6 +57,7 @@ interface RisikoItem {
 
 
 export default function RisikoPage() {
+  const navigate = useNavigate();
   const [dataRisiko, setDataRisiko] = useState<RisikoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -843,74 +844,277 @@ export default function RisikoPage() {
     fetchKonteksOptions();
   }, []);
 
-  
+  const [search, setSearch] = useState('');
+  const [kategoriFilter, setKategoriFilter] = useState('Semua');
+  const [statusFilter, setStatusFilter] = useState('Semua');
 
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800 uppercase">
-            Manajemen Risiko SPBE
-          </h2>
+  const kategoriOptions = Array.from(
+      new Set(
+        dataRisiko
+          .map((item) => item.kategori_risiko)
+          .filter(
+            (item): item is string =>
+              Boolean(item && item.trim())
+          )
+      )
+    ).sort();
 
-          <p className="text-sm text-gray-500">
-            Daftar identifikasi, analisis, dan mitigasi risiko layanan digital
-          </p>
+  const filteredRisiko = dataRisiko
+    .filter((item) => {
+      const keyword = search.trim().toLowerCase();
+
+      const matchSearch =
+        !keyword ||
+        item.kode_risiko
+          ?.toLowerCase()
+          .includes(keyword) ||
+        item.peristiwa_risiko
+          ?.toLowerCase()
+          .includes(keyword) ||
+        item.kategori_risiko
+          ?.toLowerCase()
+          .includes(keyword);
+
+      const matchKategori =
+        kategoriFilter === 'Semua' ||
+        item.kategori_risiko === kategoriFilter;
+
+      const matchStatus =
+        statusFilter === 'Semua' ||
+        (item.status_risiko || 'Draft') ===
+          statusFilter;
+
+      return (
+        matchSearch &&
+        matchKategori &&
+        matchStatus
+      );
+    })
+    .sort((a, b) =>
+      (a.kode_risiko || '').localeCompare(
+        b.kode_risiko || '',
+        undefined,
+        { numeric: true }
+      )
+    );
+
+  const getStatusClass = (
+    status?: string | null
+  ) => {
+    switch (status) {
+      case 'Disetujui':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+      case 'Diajukan':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+
+      case 'Ditolak':
+        return 'bg-red-50 text-red-700 border-red-200';
+
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-200';
+    }
+  };
+
+  const getPrioritasClass = (
+    prioritas?: string | null
+  ) => {
+    switch (
+      prioritas?.trim().toLowerCase()
+    ) {
+      case 'tinggi':
+        return 'bg-red-50 text-red-700 border-red-200';
+
+      case 'sedang':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+
+      case 'rendah':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+      default:
+        return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
+
+  const [openActionId, setOpenActionId] = useState<number | null>(null);
+
+  const getNextKodeRisiko = () => {
+  const numbers = dataRisiko
+    .map((item) => {
+      const match = item.kode_risiko
+        ?.trim()
+        .match(/^RSK-(\d+)$/i);
+
+      return match
+        ? Number(match[1])
+        : 0;
+    });
+
+  const maxNumber =
+    numbers.length > 0
+      ? Math.max(...numbers)
+      : 0;
+
+  return `RSK-${String(
+    maxNumber + 1
+  ).padStart(3, '0')}`;
+};
+
+return (
+  <div className="p-6">
+    <div className="mb-6">
+      <h1 className="text-2xl font-bold text-slate-900">
+        Profil dan Penilaian Risiko
+      </h1>
+
+      <p className="mt-1 text-sm text-slate-500">
+        Identifikasi, analisis, evaluasi, dan perlakuan risiko layanan digital pemerintah.
+      </p>
+    </div>
+
+    <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-4">
+      <div className="flex items-center">
+        <div className="flex min-w-fit items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/konteks')}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+          >
+            1
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/konteks')}
+            className="text-xs text-slate-500 hover:text-slate-800"
+          >
+            Penetapan Konteks
+          </button>
         </div>
 
-        <div className="flex items-center gap-4">
-          {canCreate && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg"
-            >
-              + Tambah Risiko
-            </button>
-          )}
+        <div className="mx-4 h-px flex-1 bg-slate-300" />
 
-          <div className="text-right">
-            <span className="text-sm text-gray-600 block font-medium">
-              {user?.nama || '-'}
-            </span>
-
-            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
-              {user?.role || '-'}
-            </span>
+        <div className="flex min-w-fit items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1B2A4A] text-xs font-semibold text-white">
+            2
           </div>
+
+          <span className="text-xs font-semibold text-slate-900">
+            Profil & Penilaian Risiko
+          </span>
+        </div>
+
+        <div className="mx-4 h-px flex-1 bg-slate-300" />
+
+        <div className="flex min-w-fit items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/layanan-prioritas')}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+          >
+            3
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/layanan-prioritas')}
+            className="text-xs text-slate-500 hover:text-slate-800"
+          >
+            Layanan Digital Prioritas
+          </button>
+        </div>
+
+        <div className="mx-4 h-px flex-1 bg-slate-300" />
+
+        <div className="flex min-w-fit items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/peta-risiko')}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+          >
+            4
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/peta-risiko')}
+            className="text-xs text-slate-500 hover:text-slate-800"
+          >
+            Peta Risiko
+          </button>
+        </div>
+
+        <div className="mx-4 h-px flex-1 bg-slate-300" />
+
+        <div className="flex min-w-fit items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/monitoring/semester-1')}
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+          >
+            5
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/monitoring/semester-1')}
+            className="text-xs text-slate-500 hover:text-slate-800"
+          >
+            Pemantauan & Pelaporan
+          </button>
         </div>
       </div>
+    </div>
 
-      {message && (
-        <div className="mb-4 text-sm text-gray-700">
-          {message}
-        </div>
-      )}
+    {message && (
+      <div className="mb-4 text-sm text-gray-700">
+        {message}
+      </div>
+    )}
 
-      {showForm && (
-        <div className="mb-6 p-5 border border-gray-200 rounded-lg bg-gray-50">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800">
-              Tambah Risiko
-            </h3>
-
+    {showForm && (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
         <div className="mb-6">
-          <div className="grid grid-cols-5 gap-2">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">
+                {editingId ? 'Edit Risiko' : 'Tambah Risiko'}
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Lengkapi data Form 1.0 Profil dan Penilaian Risiko.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+                setCurrentStep(1);
+              }}
+              className="text-sm font-semibold text-slate-500 hover:text-slate-800"
+            >
+              Batal
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
             {[
               { step: 1, label: 'Identifikasi Risiko' },
-              { step: 2, label: 'Analisis dan Evaluasi Risiko' },
+              { step: 2, label: 'Analisis dan Evaluasi' },
               { step: 3, label: 'Perlakuan Risiko' },
               { step: 4, label: 'Risiko Residual' },
               { step: 5, label: 'Kolom Tambahan' },
-            ].map((item) =>(
+            ].map((item) => (
               <button
                 key={item.step}
                 type="button"
                 onClick={() => setCurrentStep(item.step)}
-                className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
+                className={`min-h-[52px] rounded-lg border px-3 py-2 text-sm font-semibold ${
                   currentStep === item.step
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    ? 'border-[#1B2A4A] bg-[#1B2A4A] text-white'
+                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {item.step}. {item.label}
@@ -919,613 +1123,627 @@ export default function RisikoPage() {
           </div>
         </div>
 
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="text-gray-500 hover:text-gray-800 font-semibold"
-            >
-              Tutup
-            </button>
-          </div>
+        <form onSubmit={handleSubmit}>
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              <section>
+                <h4 className="mb-4 text-sm font-bold text-slate-900">
+                  Informasi Konteks
+                </h4>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Konteks Risiko
-            </label>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Konteks Risiko
+                    </label>
 
-            <select
-              name="konteks_id"
-              value={formData.konteks_id}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  konteks_id: e.target.value,
-                }))
-              }
-              className="w-full h-12 border border-gray-300 rounded-lg px-3"
-              required
-            >
-              <option value="">
-                Pilih Konteks Risiko
-              </option>
+                    <select
+                      name="konteks_id"
+                      value={formData.konteks_id}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          konteks_id: e.target.value,
+                        }))
+                      }
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                      required
+                    >
+                      <option value="">
+                        Pilih Konteks Risiko
+                      </option>
 
-              {konteksOptions.map((item) => (
-                <option key={item.id} value={item.id} >
-                  {item.nama_upr} - {item.tahun_pelaksanaan}
-                </option>
-              ))}
-            </select>
-          </div>
+                      {konteksOptions.map((item) => (
+                        <option
+                          key={item.id}
+                          value={item.id}
+                        >
+                          {item.nama_upr} - {item.tahun_pelaksanaan}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-          {selectedRisiko && (
-            <div>
-              <p className="font-semibold text-gray-700">
-                Konteks Risiko
-              </p>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Sasaran Pembangunan Nasional
+                    </label>
 
-              <p>
-                {selectedRisiko.konteks_nama_upr
-                ? `${selectedRisiko.konteks_nama_upr} - ${selectedRisiko.konteks_tahun}`
-                : '-'}
-              </p>
+                    <textarea
+                      value={formData.sasaran_pembangunan_nasional}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          sasaran_pembangunan_nasional: e.target.value,
+                        })
+                      }
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      placeholder="Masukkan sasaran pembangunan nasional"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Sasaran UPR
+                    </label>
+
+                    <textarea
+                      value={formData.sasaran_upr}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          sasaran_upr: e.target.value,
+                        })
+                      }
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      placeholder="Masukkan sasaran UPR"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Indikator Kinerja
+                    </label>
+
+                    <textarea
+                      value={formData.indikator_kinerja}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          indikator_kinerja: e.target.value,
+                        })
+                      }
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      placeholder="Masukkan indikator kinerja"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="border-t border-slate-200 pt-5">
+                <h4 className="mb-4 text-sm font-bold text-slate-900">
+                  Identifikasi Risiko
+                </h4>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Kode Risiko
+                    </label>
+
+                    <input
+                      type="text"
+                      value={formData.kode_risiko}
+                      readOnly
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-slate-700"
+                      placeholder="Contoh: RSK-001"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Peristiwa Risiko
+                    </label>
+
+                    <textarea
+                      value={formData.peristiwa_risiko}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          peristiwa_risiko: e.target.value,
+                        })
+                      }
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      placeholder="Masukkan peristiwa risiko"
+                    />
+                  </div>
+                </div>
+              </section>
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-            {currentStep === 1 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sasaran Pembangunan Nasional
-                  </label>
-
-                  <textarea
-                    value={formData.sasaran_pembangunan_nasional}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        sasaran_pembangunan_nasional: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Masukkan sasaran pembangunan nasional"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sasaran UPR
-                  </label>
-
-                  <textarea
-                    value={formData.sasaran_upr}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        sasaran_upr: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Masukkan sasaran UPR"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Indikator Kinerja
-                  </label>
-
-                  <textarea
-                    value={formData.indikator_kinerja}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        indikator_kinerja: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Masukkan indikator kinerja"
-                  />
-                </div>
-
-              <div className="grid grid-cols-2 gap-4">
+          {currentStep === 2 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kode Risiko
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Kategori Risiko
                 </label>
 
                 <input
                   type="text"
-                  value={formData.kode_risiko}
+                  value={formData.kategori_risiko}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      kode_risiko: e.target.value,
+                      kategori_risiko: e.target.value,
                     })
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  placeholder="Contoh: RSK-002"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  placeholder="Masukkan kategori risiko"
                 />
               </div>
 
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Peristiwa Risiko
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Area Dampak
+                </label>
+
+                <input
+                  type="text"
+                  value={formData.area_dampak}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      area_dampak: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  placeholder="Masukkan area dampak"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Penyebab
                 </label>
 
                 <textarea
-                  value={formData.peristiwa_risiko}
+                  value={formData.penyebab}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      peristiwa_risiko: e.target.value,
+                      penyebab: e.target.value,
                     })
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  placeholder="Masukkan peristiwa risiko"
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                  placeholder="Masukkan penyebab"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Dampak
+                </label>
+
+                <textarea
+                  value={formData.dampak}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      dampak: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                  placeholder="Masukkan dampak"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Level Kemungkinan
+                </label>
+
+                <select
+                  value={formData.kemungkinan}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      kemungkinan: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Level Dampak
+                </label>
+
+                <select
+                  value={formData.nilai_dampak}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      nilai_dampak: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Besaran Risiko
+                </label>
+
+                <input
+                  type="text"
+                  value={
+                    Number(formData.kemungkinan) *
+                    Number(formData.nilai_dampak)
+                  }
+                  readOnly
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Prioritas Risiko
+                </label>
+
+                <input
+                  type="text"
+                  value={formData.prioritas_risiko}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      prioritas_risiko: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  placeholder="Masukkan prioritas risiko"
                 />
               </div>
             </div>
-          </div>  
-        )}
+          )}
 
-            {currentStep === 2 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Kategori Risiko
-                  </label>
+          {currentStep === 3 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Keputusan Perlakuan Risiko
+                </label>
 
-                  <input
-                    type="text"
-                    value={formData.kategori_risiko}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        kategori_risiko: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Masukkan kategori risiko"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Area Dampak
-                  </label>
-
-                  <input
-                    type="text"
-                    value={formData.area_dampak}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        area_dampak: e.target.value,
-                      })
-                    }
-                    className="w-full h12 border border-gray-300 rounded-lg px-3 py-2 resize-none"
-                    placeholder="Masukkan area dampak"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Penyebab
-                  </label>
-
-                  <textarea
-                    value={formData.penyebab}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        penyebab: e.target.value,
+                <select
+                  value={formData.keputusan_perlakuan}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      keputusan_perlakuan: e.target.value,
                     })
-                  } 
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  placeholder="Masukkan penyebab"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dampak
-                  </label>
-
-                  <textarea
-                    value={formData.dampak}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        dampak: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Masukkan dampak"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Level Kemungkinan
-                  </label>
-
-                  <select
-                    value={formData.kemungkinan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        kemungkinan: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Level Dampak
-                  </label>
-
-                  <select
-                    value={formData.nilai_dampak}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        nilai_dampak: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Besaran Risiko
-                  </label>
-
-                  <input
-                    type="text"
-                    value={
-                      Number(formData.kemungkinan) *
-                      Number(formData.nilai_dampak)
-                    }
-                    readOnly
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Prioritas Risiko
-                  </label>
-
-                  <input
-                    type="text"
-                    value={formData.prioritas_risiko}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        prioritas_risiko: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    placeholder="Masukkan prioritas risiko"
-                  />
-                </div>
-
-              </div> 
-            )}
-
-            {currentStep === 3 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Keputusan Perlakuan Risiko
-                  </label>
-
-                  <select
-                    value={formData.keputusan_perlakuan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        keputusan_perlakuan: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="Mengurangi Risiko">
-                      Mengurangi Risiko
-                    </option>
-                    <option value="Membagi Risiko">
-                      Membagi Risiko
-                    </option>
-                    <option value="Menerima Risiko">
-                      Menerima Risiko
-                    </option>
-                    <option value="Menghindari Risiko">
-                      Menghindari Risiko
-                    </option>
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Deskripsi Detail Perlakuan Risiko
-                  </label>
-
-                  <textarea
-                    value={formData.deskripsi_detail_perlakuan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        deskripsi_detail_perlakuan: e.target.value,
-                      })
-                    }
-                    className="w-full min-h-[96px] border border-gray-300 rounded-lg px-3 py-2 resize-none"
-                    placeholder="Jelaskan rencana perlakuan risiko"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Waktu Rencana Perlakuan Risiko
-                  </label>
-
-                  <input
-                    type="date"
-                    value={formData.waktu_rencana_perlakuan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        waktu_rencana_perlakuan: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Penanggung Jawab
-                  </label>
-
-                  <select
-                    value={formData.penanggung_jawab_id}
-                    onChange={(e) => 
-                      setFormData({
-                        ...formData,
-                        penanggung_jawab_id: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="">Pilih Penanggung Jawab</option>
-                    {penanggungJawabOptions.map((item) =>(
-                      <option key={item.id} value={item.id}>
-                        {item.nama},
-                        {item.nama_role? ` - ${item.nama_role}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="Mengurangi Risiko">
+                    Mengurangi Risiko
+                  </option>
+                  <option value="Membagi Risiko">
+                    Membagi Risiko
+                  </option>
+                  <option value="Menerima Risiko">
+                    Menerima Risiko
+                  </option>
+                  <option value="Menghindari Risiko">
+                    Menghindari Risiko
+                  </option>
+                </select>
               </div>
-            )}
 
-            {currentStep === 4 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Level Kemungkinan Residual
-                  </label>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Deskripsi Detail Perlakuan Risiko
+                </label>
 
-                  <select
-                    value={formData.level_kemungkinan_residual}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        level_kemungkinan_residual: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Level Dampak Residual
-                  </label>
-
-                  <select
-                    value={formData.level_dampak_residual}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        level_dampak_residual: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Besaran Risiko Residual
-                  </label>
-
-                  <input
-                    type="text"
-                    value={
-                      Number(formData.level_kemungkinan_residual) *
-                      Number(formData.level_dampak_residual)
-                    }
-                    readOnly
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100"
-                  />
-                </div>
+                <textarea
+                  value={formData.deskripsi_detail_perlakuan}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      deskripsi_detail_perlakuan: e.target.value,
+                    })
+                  }
+                  className="min-h-[96px] w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                  placeholder="Jelaskan rencana perlakuan risiko"
+                />
               </div>
-            )}
 
-            {currentStep === 5 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Layanan Pendukung
-                  </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Waktu Rencana Perlakuan Risiko
+                </label>
 
-                  <select
-                    value={formData.layanan_id}
-                    onChange={(e) => 
-                      setFormData({
-                        ...formData,
-                        layanan_id: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="">Pilih layanan pendukung</option>
+                <input
+                  type="date"
+                  value={formData.waktu_rencana_perlakuan}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      waktu_rencana_perlakuan: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                />
+              </div>
 
-                    {layananOptions.map((item) => (
-                      <option key={item.id} value={item.id} >
-                        {item.kode_layanan} - {item.nama_layanan}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Layanan Prioritas
-                  </label>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Penanggung Jawab
+                </label>
 
-                  <select
-                    value={formData.layanan_prioritas_id}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        layanan_prioritas_id: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="">Pilih layanan prioritas</option>
-                    {layananPrioritasOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.kode_prioritas} - {item.nama_layanan}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={formData.penanggung_jawab_id}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      penanggung_jawab_id: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    Pilih Penanggung Jawab
+                  </option>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Pemilik Layanan
-                  </label>
+                  {penanggungJawabOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nama}
+                      {item.nama_role ? ` - ${item.nama_role}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
-                  <select
-                    value={formData.pemilik_layanan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        pemilik_layanan: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="">Pilih pemilik layanan</option>
-                    <option value="Milik Sendiri">Milik Sendiri</option>
-                    <option value="Instansi Lain">Instansi Lain</option>
-                    <option value="Pusat">Pusat</option>
-                  </select>
-                </div>
-              
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Strategis / Operasional
-                  </label>
+          {currentStep === 4 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Level Kemungkinan Residual
+                </label>
 
-                  <select
-                    value={formData.strategis_operasional}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        strategis_operasional: e.target.value,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                  >
-                    <option value="">Pilih tipe risiko</option>
-                    <option value="Strategis">Strategis</option>
-                    <option value="Operasional">Operasional</option>
-                  </select>
-                </div>
+                <select
+                  value={formData.level_kemungkinan_residual}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      level_kemungkinan_residual: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.lintas_sektor}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        lintas_sektor: e.target.checked,
-                      })
-                    }
-                  />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Level Dampak Residual
+                </label>
 
-                  <label className="text-sm font-medium text-gray-700">
-                    Lintas Sektor
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.membutuhkan_perubahan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        membutuhkan_perubahan: e.target.checked,
-                      })
-                    }
-                  />
-                  <label className="text-sm font-medium text-gray-700">
-                    Membutuhkan Perubahan
-                  </label>
-                </div>
+                <select
+                  value={formData.level_dampak_residual}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      level_dampak_residual: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
 
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    IPPD Terkait
-                  </label>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Besaran Risiko Residual
+                </label>
 
-                  <div className="w-full border border-gray-300 rounded-lg px-3 py-2">
-                    {ippdOptions.length > 0 ? (
-                      ippdOptions.map((item) => (
+                <input
+                  type="text"
+                  value={
+                    Number(formData.level_kemungkinan_residual) *
+                    Number(formData.level_dampak_residual)
+                  }
+                  readOnly
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-slate-700"
+                />
+              </div>
+            </div>
+          )}
+
+          {currentStep === 5 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Layanan Pendukung
+                </label>
+
+                <select
+                  value={formData.layanan_id}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      layanan_id: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    Pilih layanan pendukung
+                  </option>
+
+                  {layananOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.kode_layanan} - {item.nama_layanan}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Layanan Prioritas
+                </label>
+
+                <select
+                  value={formData.layanan_prioritas_id}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      layanan_prioritas_id: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    Pilih layanan prioritas
+                  </option>
+
+                  {layananPrioritasOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.kode_prioritas} - {item.nama_layanan}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Pemilik Layanan
+                </label>
+
+                <select
+                  value={formData.pemilik_layanan}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      pemilik_layanan: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    Pilih pemilik layanan
+                  </option>
+                  <option value="Milik Sendiri">
+                    Milik Sendiri
+                  </option>
+                  <option value="Instansi Lain">
+                    Instansi Lain
+                  </option>
+                  <option value="Pusat">
+                    Pusat
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Strategis / Operasional
+                </label>
+
+                <select
+                  value={formData.strategis_operasional}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      strategis_operasional: e.target.value,
+                    })
+                  }
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    Pilih tipe risiko
+                  </option>
+                  <option value="Strategis">
+                    Strategis
+                  </option>
+                  <option value="Operasional">
+                    Operasional
+                  </option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={formData.lintas_sektor}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      lintas_sektor: e.target.checked,
+                    })
+                  }
+                />
+                Lintas Sektor
+              </label>
+
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={formData.membutuhkan_perubahan}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      membutuhkan_perubahan: e.target.checked,
+                    })
+                  }
+                />
+                Membutuhkan Perubahan
+              </label>
+
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  IPPD Terkait
+                </label>
+
+                <div className="rounded-lg border border-slate-300 px-3 py-3">
+                  {ippdOptions.length > 0 ? (
+                    <div className="space-y-2">
+                      {ippdOptions.map((item) => (
                         <label
                           key={item.id}
-                          className="flex items-center gap-2 cursor-pointer"
+                          className="flex cursor-pointer items-center gap-2"
                         >
                           <input
                             type="checkbox"
@@ -1545,546 +1763,779 @@ export default function RisikoPage() {
                               }
                             }}
                           />
-                        <span className="text-sm text-gray-700">
-                          {item.kode_instansi} - {item.nama_instansi}
-                        </span>
-                      </label>
-                    ))
+
+                          <span className="text-sm text-slate-700">
+                            {item.kode_instansi} - {item.nama_instansi}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   ) : (
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-slate-500">
                       Tidak ada data IPPD aktif
                     </span>
                   )}
-                  </div>
                 </div>
               </div>
-            )}
-
-            <div className="flex justify-between mt-6">
-              <button
-                type="button"
-                onClick={() => 
-                  setCurrentStep((prev) => Math.max(prev - 1,1 ))
-                }
-                disabled={currentStep === 1}
-                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-40"
-              >
-                Kembali
-              </button>
-              
-              {currentStep < 5 ? (
-                <button
-                  key="next-button"
-                  type="button"
-                  onClick={() =>
-                    setCurrentStep((prev) => Math.min(prev + 1, 5))
-                  }
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg"
-                >
-                  Selanjutnya
-                </button>
-              ) : (
-                <button
-                  key="submit-button"
-                  type="submit"
-                  disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-lg"
-                >
-                  {saving ? 'Menyimpan...' : 'Simpan Risiko'}
-                </button>
-              )}
             </div>
-          </form>
-        </div>
-      )}
+          )}
 
-      {selectedRisiko && (
-        <div className="mb-6 p-5 border border-gray-200 rounded-lg bg-white shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <div> 
-              <h3 className="text-lg font-bold text-gray-800">
-                Detail Risiko
-              </h3>
-              <p className="text-sm text-gray-500">
-                {selectedRisiko.kode_risiko}
-              </p>
-            </div>
-
+          <div className="mt-6 flex justify-between border-t border-slate-200 pt-5">
             <button
               type="button"
-              onClick={() => setSelectedRisiko(null)}
-              className="text-gray-500 hover:text-gray-800 font-semibold"
+              onClick={() =>
+                setCurrentStep((prev) => Math.max(prev - 1, 1))
+              }
+              disabled={currentStep === 1}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
             >
-              Tutup
+              Kembali
             </button>
+
+            {currentStep < 5 ? (
+              <button
+                key="next-button"
+                type="button"
+                onClick={() =>
+                  setCurrentStep((prev) => Math.min(prev + 1, 5))
+                }
+                className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
+              >
+                Selanjutnya
+              </button>
+            ) : (
+              <button
+                key="submit-button"
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f] disabled:opacity-50"
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Risiko'}
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+    )}
+
+    {selectedRisiko && (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Detail Risiko
+            </h3>
+
+            <p className="mt-1 text-sm text-slate-500">
+              {selectedRisiko.kode_risiko || '-'}
+            </p>
           </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <h4 className="text-base font-bold text-gray-800 mb-4">
+          <button
+            type="button"
+            onClick={() => setSelectedRisiko(null)}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Tutup
+          </button>
+        </div>
+
+        <div className="space-y-8">
+          <section className="border-t border-slate-200 pt-5">
+            <h4 className="mb-4 text-sm font-bold text-slate-900">
               A. Identifikasi Risiko
             </h4>
-          
-          <div className="col-span-2 mb-4">
-            <p className="text-xs text-gray-500 mb-1">
-              Konteks Risiko
-            </p>
 
-            <p className="text-sm text-gray-800">
-              {selectedRisiko.konteks_nama_upr
-                ? `${selectedRisiko.konteks_nama_upr} - ${
-                    selectedRisiko.konteks_tahun ?? '-'
-                  }`
-                : '-'}
-            </p>
-          </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                 <p className="text-xs text-gray-500 mb-1">
-                  Sasaran Pembangunan Nasional
-                 </p>
-                 <p className="text-sm text-gray-800">
-                  {selectedRisiko.sasaran_pembangunan_nasional || '-'}
-                 </p>
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">
-                  Sasaran UPR
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Konteks Risiko
                 </p>
-                <p className="text-sm text-gray-800">
-                  {selectedRisiko.sasaran_upr || '-'}
-                </p>
-              </div>
-
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">
-                  Indikator Kinerja
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.konteks_nama_upr
+                    ? `${selectedRisiko.konteks_nama_upr} - ${
+                        selectedRisiko.konteks_tahun ?? '-'
+                      }`
+                    : '-'}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 mb-1">
+                <p className="mb-1 text-xs font-medium text-slate-500">
                   Kode Risiko
                 </p>
-                <p className="text-sm font-semibold text-gray-800">
+                <p className="text-sm font-semibold text-slate-900">
                   {selectedRisiko.kode_risiko || '-'}
                 </p>
               </div>
 
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Sasaran Pembangunan Nasional
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.sasaran_pembangunan_nasional || '-'}
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Sasaran UPR
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.sasaran_upr || '-'}
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Indikator Kinerja
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.indikator_kinerja || '-'}
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
                   Peristiwa Risiko
                 </p>
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-slate-800">
                   {selectedRisiko.peristiwa_risiko || '-'}
                 </p>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="border-t border-gray-200 pt-4 mt-6">
-            <h4 className="text-base font-bold text-gray-800 mb-4">
+          <section className="border-t border-slate-200 pt-5">
+            <h4 className="mb-4 text-sm font-bold text-slate-900">
               B. Analisis dan Evaluasi Risiko
             </h4>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
               <div>
-                <p className="text-xs text-gray-500 mb-1">
+                <p className="mb-1 text-xs font-medium text-slate-500">
                   Kategori Risiko
                 </p>
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-slate-800">
                   {selectedRisiko.kategori_risiko || '-'}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 mb-1">
+                <p className="mb-1 text-xs font-medium text-slate-500">
                   Area Dampak
                 </p>
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-slate-800">
                   {selectedRisiko.area_dampak || '-'}
                 </p>
               </div>
 
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
                   Penyebab
                 </p>
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-slate-800">
                   {selectedRisiko.penyebab || '-'}
                 </p>
               </div>
 
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
                   Dampak
                 </p>
-                <p className="text-sm text-gray-800">
+                <p className="text-sm text-slate-800">
                   {selectedRisiko.dampak || '-'}
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs text-gray-500 mb-1">
-                  Level Kemungkinan
-                </p>
-                <p className="text-sm text-gray-800">
-                  {selectedRisiko.kemungkinan ?? '-'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">
-                  Level Dampak
-                </p>
-                <p className="text-sm text-gray-800">
-                  {selectedRisiko.nilai_dampak ?? '-'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">
-                  Besaran Risiko
-                </p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {selectedRisiko.besaran_risiko ?? '-'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">
-                  Prioritas Risiko
-                </p>
-                <p className="text-sm text-gray-800">
-                  {selectedRisiko.prioritas_risiko || '-'}
-                </p>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 pt-4 mt-6">
-              <h4 className="text-base font-bold text-gray-800 mb-4">
-                C. Perlakuan Risiko
-              </h4>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 md:col-span-2 lg:grid-cols-4">
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Keputusan Perlakuan
+                  <p className="mb-1 text-xs font-medium text-slate-500">
+                    Level Kemungkinan
                   </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.keputusan_perlakuan || '-'}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selectedRisiko.kemungkinan ?? '-'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Penanggung Jawab
+                  <p className="mb-1 text-xs font-medium text-slate-500">
+                    Level Dampak
                   </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.nama_penanggung_jawab || '-'}
-                  </p>
-                </div>
-
-                <div className="col-span-2">
-                  <p className="text-xs text-gray-500 mb-1">
-                    Deskripsi Detail Perlakuan
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.deskripsi_detail_perlakuan || '-'}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selectedRisiko.nilai_dampak ?? '-'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Waktu Rencana Perlakuan
+                  <p className="mb-1 text-xs font-medium text-slate-500">
+                    Besaran Risiko
                   </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.waktu_rencana_perlakuan
-                      ? new Date(
-                          selectedRisiko.waktu_rencana_perlakuan
-                        ).toLocaleDateString('id-ID')
-                      : '-'}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {selectedRisiko.besaran_risiko ?? '-'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="mb-1 text-xs font-medium text-slate-500">
+                    Prioritas Risiko
+                  </p>
+                  <p className="text-sm text-slate-800">
+                    {selectedRisiko.prioritas_risiko || '-'}
                   </p>
                 </div>
               </div>
             </div>
-            
-            <div className="border-t border-gray-200 pt-4 mt-6">
-              <h4 className="text-base font-bold text-gray-800 mb-4">
-                D. Risiko Residual
-              </h4>
+          </section>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Level Kemungkinan Residual
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.level_kemungkinan_residual ?? '-'}
-                  </p>
-                </div>
+          <section className="border-t border-slate-200 pt-5">
+            <h4 className="mb-4 text-sm font-bold text-slate-900">
+              C. Perlakuan Risiko
+            </h4>
 
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Level Dampak Residual
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.level_dampak_residual ?? '-'}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Besaran Risiko Residual
-                  </p>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {selectedRisiko.besaran_risiko_residual ?? '-'}
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Keputusan Perlakuan Risiko
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.keputusan_perlakuan || '-'}
+                </p>
               </div>
-            </div>            
 
-            <div className="border-t border-gray-200 pt-4 mt-6">
-              <h4 className="text-base font-bold text-gray-800 mb-4">
-                E. Kolom Tambahan
-              </h4>
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Penanggung Jawab
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.nama_penanggung_jawab || '-'}
+                </p>
+              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Layanan Pendukung
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.kode_layanan && selectedRisiko.nama_layanan
-                      ? `${selectedRisiko.kode_layanan} - ${selectedRisiko.nama_layanan}`
-                      : '-'}
-                  </p>
-                </div>
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Deskripsi Detail Perlakuan Risiko
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.deskripsi_detail_perlakuan || '-'}
+                </p>
+              </div>
 
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Layanan Prioritas
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.kode_prioritas || '-'}
-                  </p>
-                </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Waktu Rencana Perlakuan Risiko
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.waktu_rencana_perlakuan
+                    ? new Date(
+                        selectedRisiko.waktu_rencana_perlakuan
+                      ).toLocaleDateString('id-ID')
+                    : '-'}
+                </p>
+              </div>
+            </div>
+          </section>
 
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Pemilik Layanan
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.pemilik_layanan || '-'}
-                  </p>
-                </div>
+          <section className="border-t border-slate-200 pt-5">
+            <h4 className="mb-4 text-sm font-bold text-slate-900">
+              D. Risiko Residual
+            </h4>
 
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Strategis / Operasional
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.strategis_operasional || '-'}
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Level Kemungkinan Residual
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {selectedRisiko.level_kemungkinan_residual ?? '-'}
+                </p>
+              </div>
 
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Lintas Sektor
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.lintas_sektor ? 'Ya' : 'Tidak'}
-                  </p>
-                </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Level Dampak Residual
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {selectedRisiko.level_dampak_residual ?? '-'}
+                </p>
+              </div>
 
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Membutuhkan Perubahan
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {selectedRisiko.membutuhkan_perubahan ? 'Ya' : 'Tidak'}
-                  </p>
-                </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Besaran Risiko Residual
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {selectedRisiko.besaran_risiko_residual ?? '-'}
+                </p>
+              </div>
+            </div>
+          </section>
 
-                <div className="col-span-2">
-                  <p className="text-xs text-gray-500 mb-1">
-                    IPPD Terkait
-                  </p>
+          <section className="border-t border-slate-200 pt-5">
+            <h4 className="mb-4 text-sm font-bold text-slate-900">
+              E. Informasi Tambahan
+            </h4>
 
-                  {selectedRisiko.ippd_terkait &&
-                    selectedRisiko.ippd_terkait.length > 0 ? (
-                    <div className="space-y-1">
-                      {selectedRisiko.ippd_terkait.map((item) => (
-                        <p
-                          key={item.id}
-                          className="text-sm text-gray-800"
+            <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Layanan Pendukung
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.kode_layanan &&
+                  selectedRisiko.nama_layanan
+                    ? `${selectedRisiko.kode_layanan} - ${selectedRisiko.nama_layanan}`
+                    : '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Layanan Prioritas
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.kode_prioritas || '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Pemilik Layanan
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.pemilik_layanan || '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Strategis / Operasional
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.strategis_operasional || '-'}
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Lintas Sektor
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.lintas_sektor ? 'Ya' : 'Tidak'}
+                </p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  Membutuhkan Perubahan
+                </p>
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.membutuhkan_perubahan ? 'Ya' : 'Tidak'}
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <p className="mb-1 text-xs font-medium text-slate-500">
+                  IPPD Terkait
+                </p>
+
+                {selectedRisiko.ippd_terkait &&
+                selectedRisiko.ippd_terkait.length > 0 ? (
+                  <div className="space-y-1">
+                    {selectedRisiko.ippd_terkait.map((item) => (
+                      <p
+                        key={item.id}
+                        className="text-sm text-slate-800"
+                      >
+                        {item.kode_instansi} - {item.nama_instansi}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-800">
+                    -
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    )}
+
+    {!showForm && !selectedRisiko && (
+      <div className="rounded-xl border border-slate-200 bg-white p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">
+              Daftar Profil dan Penilaian Risiko
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Daftar data Form 1.0 yang telah tersimpan.
+            </p>
+          </div>
+
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingId(null);
+                setCurrentStep(1);
+                setSelectedRisiko(null);
+
+                setFormData({
+                  konteks_id: '',
+                  sasaran_pembangunan_nasional: '',
+                  sasaran_upr: '',
+                  indikator_kinerja: '',
+                  kode_risiko: getNextKodeRisiko(),
+                  kategori_risiko: '',
+                  peristiwa_risiko: '',
+                  penyebab: '',
+                  dampak: '',
+                  kemungkinan: '1',
+                  nilai_dampak: '1',
+                  keputusan_perlakuan: 'Mengurangi Risiko',
+                  area_dampak: '',
+                  prioritas_risiko: '',
+                  deskripsi_detail_perlakuan: '',
+                  waktu_rencana_perlakuan: '',
+                  penanggung_jawab_id: '',
+                  level_kemungkinan_residual: '1',
+                  level_dampak_residual: '1',
+                  layanan_id: '',
+                  layanan_prioritas_id: '',
+                  pemilik_layanan: '',
+                  strategis_operasional: '',
+                  lintas_sektor: false,
+                  membutuhkan_perubahan: false,
+                });
+
+                setSelectedIppdIds([]);
+                setShowForm(true);
+              }}
+              className="shrink-0 rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#24385f]"
+            >
+              Tambah Data
+            </button>
+          )}
+        </div>
+
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Kategori Risiko
+            </label>
+
+            <select
+              value={kategoriFilter}
+              onChange={(e) =>
+                setKategoriFilter(e.target.value)
+              }
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="Semua">
+                Semua Kategori
+              </option>
+
+              {kategoriOptions.map((kategori) => (
+                <option
+                  key={kategori}
+                  value={kategori}
+                >
+                  {kategori}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Status Risiko
+            </label>
+
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value)
+              }
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+            >
+              <option value="Semua">
+                Semua Status
+              </option>
+              <option value="Draft">
+                Draft
+              </option>
+              <option value="Diajukan">
+                Diajukan
+              </option>
+              <option value="Disetujui">
+                Disetujui
+              </option>
+              <option value="Ditolak">
+                Ditolak
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Pencarian
+            </label>
+
+            <input
+              type="text"
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              placeholder="Cari kode, risiko, atau kategori..."
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="py-10 text-center text-sm text-slate-500">
+            Memuat data risiko...
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[1150px] border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-50 text-sm font-semibold text-slate-700">
+                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                    No
+                  </th>
+
+                  <th className="w-[120px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Kode Risiko
+                  </th>
+
+                  <th className="w-[300px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Peristiwa Risiko
+                  </th>
+
+                  <th className="w-[150px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Kategori Risiko
+                  </th>
+
+                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Besaran Risiko
+                  </th>
+
+                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Prioritas
+                  </th>
+
+                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Status Risiko
+                  </th>
+
+                  <th className="border-b border-slate-200 px-4 py-3 text-center">
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="text-sm text-slate-700">
+                {filteredRisiko.length > 0 ? (
+                  filteredRisiko.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50"
+                    >
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                        {index + 1}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 font-semibold text-slate-900">
+                        {item.kode_risiko || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.peristiwa_risiko || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.kategori_risiko || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">
+                        {item.besaran_risiko ?? '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                        {item.prioritas_risiko ? (
+                          <span
+                            className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getPrioritasClass(
+                              item.prioritas_risiko
+                            )}`}
+                          >
+                            {item.prioritas_risiko}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">
+                            -
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                        <span
+                          className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getStatusClass(
+                            item.status_risiko || 'Draft'
+                          )}`}
                         >
-                          {item.kode_instansi} - {item.nama_instansi}
-                        </p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-800">-</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>  
-        </div>
-      )}
+                          {item.status_risiko || 'Draft'}
+                        </span>
+                      </td>
 
-      {loading ? (
-        <div className="text-center py-8 text-gray-500">
-          Memuat data risiko...
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-700 text-sm font-semibold">
-                <th className="p-3">Kode Risiko</th>
-                <th className="p-3">Kategori</th>
-                <th className="p-3">Peristiwa Risiko</th>
-                <th className="p-3">Penyebab</th>
-                <th className="p-3">Dampak</th>
-                <th className="p-3">Kemungkinan</th>
-                <th className="p-3">Nilai Dampak</th>
-                <th className="p-3">Besaran Risiko</th>
-                <th className="p-3">Pembuat</th>
-                <th className="p-3">Keputusan Perlakuan</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Aksi</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
-              {dataRisiko.length > 0 ? (
-                dataRisiko.map((item, index) => (
-                  <tr
-                    key={item.id || index}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="p-3 font-semibold">
-                      {item.kode_risiko || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.kategori_risiko || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.peristiwa_risiko || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.penyebab || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.dampak || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.kemungkinan || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.nilai_dampak || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.besaran_risiko ?? '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.pembuat || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      {item.keputusan_perlakuan || '-'}
-                    </td>
-
-                    <td className="p-3">
-                      <span className="font-semibold">
-                        {item.status_risiko || 'Draft'}
-                      </span>
-                    </td>
-
-                    <td className="p-3">
-                      <button
-                        type="button"
-                        onClick={() => handleDetail(item.id)}
-                        disabled={loadingDetail}
-                        className="text-blue-600 hover:text-blue-800 font-semibold"
-                      >
-                        Detail
-                      </button>
-
-                      {item.status_risiko === 'Draft' && (
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(item.id)}
-                          className="text-amber-600 hover:text-amber-800 font-semibold"
-                          >
-                        Edit
-                      </button>
-                      )}
-                      
-                      {item.status_risiko === 'Draft' && (
-                        <button
-                        type="button"
-                        onClick={() => handleDelete(item.id)}
-                        className="text-red-600 hover:text-red-800 font-semibold"
-                      >
-                        Hapus
-                      </button>
-                      )}
-                      
-                      {canSubmit && item.status_risiko === 'Draft' && (
+                      <td className="border-b border-slate-200 px-4 py-3">
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleSubmitRisiko(item.id)}
-                            className="text-green-600 hover:text-green-800 font-semibold"
+                            onClick={() => handleDetail(item.id)}
+                            disabled={loadingDetail}
+                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                           >
-                            Submit
+                            Detail
                           </button>
-                      )}
-                      {canApprove && item.status_risiko === 'Diajukan' && (
-                          <button
-                            type="button"
-                            onClick={() => handleApproveRisiko(item.id)}
-                            className="text-purple-600 hover:text-purple-800 font-semibold"
-                          >
-                           Approve
-                        </button>
-                      )}
-                      {canReject && item.status_risiko === 'Diajukan' && (
-                          <button
-                            type="button"
-                            onClick={() => handleRejectRisiko(item.id)}
-                            className="text-red-700 hover:text-red-900 font-semibold"
-                          >
-                            Reject
-                          </button>
-                      )}
+
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenActionId((prev) =>
+                                  prev === item.id
+                                    ? null
+                                    : item.id
+                                )
+                              }
+                              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              ⋮
+                            </button>
+
+                            {openActionId === item.id && (
+                              <div className="absolute right-0 z-20 mt-2 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                                {canUpdate &&
+                                  item.status_risiko === 'Draft' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionId(null);
+                                        handleEdit(item.id);
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+
+                                {canDelete &&
+                                  item.status_risiko === 'Draft' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionId(null);
+                                        handleDelete(item.id);
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                    >
+                                      Hapus
+                                    </button>
+                                  )}
+
+                                {canSubmit &&
+                                  item.status_risiko === 'Draft' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionId(null);
+                                        handleSubmitRisiko(item.id);
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
+                                    >
+                                      Submit
+                                    </button>
+                                  )}
+
+                                {canApprove &&
+                                  item.status_risiko === 'Diajukan' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionId(null);
+                                        handleApproveRisiko(item.id);
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
+                                    >
+                                      Approve
+                                    </button>
+                                  )}
+
+                                {canReject &&
+                                  item.status_risiko === 'Diajukan' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionId(null);
+                                        handleRejectRisiko(item.id);
+                                      }}
+                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                    >
+                                      Reject
+                                    </button>
+                                  )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-4 py-8 text-center text-sm text-slate-400"
+                    >
+                      Tidak ada data risiko yang sesuai.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={12}
-                    className="p-4 text-center text-gray-400"
-                  >
-                    Belum ada data risiko.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/konteks')}
+            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Kembali ke Penetapan Konteks
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/risiko/layanan-prioritas')}
+            className="rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
+          >
+            Lanjut ke Layanan Digital Prioritas
+            <span className="ml-2" aria-hidden="true">
+              →
+            </span>
+          </button>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
+
 }

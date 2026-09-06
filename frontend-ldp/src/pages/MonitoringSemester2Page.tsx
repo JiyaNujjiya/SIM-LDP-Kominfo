@@ -1,4 +1,5 @@
 import React from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 interface MonitoringDokumen {
   id: number;
@@ -58,6 +59,8 @@ const MonitoringSemester2Page: React.FC = () => {
   const [saving, setSaving] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
+  const navigate = useNavigate();
+
   const tahunSekarang = new Date().getFullYear();
 
   const fetchMonitoring = async () => {
@@ -82,7 +85,7 @@ const MonitoringSemester2Page: React.FC = () => {
         throw new Error(
           result.message ||
             result.error ||
-            'Gagal mengambil data monitoring Semester I'
+            'Gagal mengambil data monitoring Semester II'
         );
       }
 
@@ -91,7 +94,7 @@ const MonitoringSemester2Page: React.FC = () => {
       const err = error as Error;
 
       console.error(
-        'ERROR FETCH MONITORING SEMESTER I:',
+        'ERROR FETCH MONITORING SEMESTER II:',
         err
       );
 
@@ -227,7 +230,7 @@ const MonitoringSemester2Page: React.FC = () => {
         throw new Error(
           result.message ||
             result.error ||
-            'Gagal menyimpan monitoring Semester I'
+            'Gagal menyimpan monitoring Semester II'
         );
       }
 
@@ -280,8 +283,8 @@ const MonitoringSemester2Page: React.FC = () => {
 
     setMessage(
       selectedFile
-        ? 'Monitoring Semester I dan Data Dukung berhasil disimpan.'
-        : 'Monitoring Semester I berhasil disimpan.'
+        ? 'Monitoring Semester II dan Data Dukung berhasil disimpan.'
+        : 'Monitoring Semester II berhasil disimpan.'
     );
 
     setSelectedFile(null);
@@ -292,7 +295,7 @@ const MonitoringSemester2Page: React.FC = () => {
           const err = error as Error;
 
           console.error(
-            'ERROR SAVE MONITORING SEMESTER I:',
+            'ERROR SAVE MONITORING SEMESTER II:',
             err
           );
 
@@ -371,365 +374,649 @@ const MonitoringSemester2Page: React.FC = () => {
     }
   };
 
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Monitoring Risiko Semester II
-        </h1>
+  const [search, setSearch] = React.useState('');
+  const [statusFilter, setStatusFilter] =
+    React.useState('Semua');
 
-        <p className="text-sm text-gray-500 mt-1">
-          Form 3.0 Peta Risiko dan Monitoring
+  const filteredData = data
+    .filter((item) => {
+      const keyword = search.trim().toLowerCase();
+
+      const matchSearch =
+        !keyword ||
+        item.kode_risiko
+          ?.toLowerCase()
+          .includes(keyword) ||
+        item.peristiwa_risiko
+          ?.toLowerCase()
+          .includes(keyword) ||
+        item.nama_penanggung_jawab
+          ?.toLowerCase()
+          .includes(keyword);
+
+      const matchStatus =
+        statusFilter === 'Semua' ||
+        (statusFilter === 'Sudah Dimonitor' &&
+          item.monitoring_id !== null) ||
+        (statusFilter === 'Belum Dimonitor' &&
+          item.monitoring_id === null);
+
+      return matchSearch && matchStatus;
+    })
+    .sort((a, b) =>
+      (a.kode_risiko || '').localeCompare(
+        b.kode_risiko || '',
+        undefined,
+        { numeric: true }
+      )
+    );
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-slate-900">
+          Monitoring Risiko Semester II
+        </h2>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Pemantauan pelaksanaan penanganan risiko pada Semester II tahun{' '}
+          {tahunSekarang}.
         </p>
       </div>
 
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-4">
+        <div className="flex items-center">
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko/konteks')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              1
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko/konteks')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Penetapan Konteks
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              2
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Profil & Penilaian Risiko
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              3
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Layanan Digital Prioritas
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              4
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Peta Risiko
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1B2A4A] text-xs font-semibold text-white">
+              5
+            </div>
+
+            <span className="text-xs text-slate-500">
+              Pemantauan dan Pelaporan
+            </span>
+          </div>
+        </div>
+      </div>
+
       {message && (
-        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+        <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           {message}
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-[1600px] w-full border-collapse text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="border border-gray-300 px-3 py-3">
-                  ID Risiko
-                </th>
+      {!editingItem && (
+        <>
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Status Monitoring
+              </label>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Risiko
-                </th>
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value)
+                }
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+              >
+                <option value="Semua">
+                  Semua Status
+                </option>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Besaran/Level Risiko Saat Ini
-                </th>
+                <option value="Sudah Dimonitor">
+                  Sudah Dimonitor
+                </option>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Proyeksi Risiko
-                </th>
+                <option value="Belum Dimonitor">
+                  Belum Dimonitor
+                </option>
+              </select>
+            </div>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Perlakuan Risiko
-                </th>
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Pencarian
+              </label>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Rencana Penanganan
-                </th>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                placeholder="Cari kode risiko, peristiwa risiko, atau PIC..."
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500"
+              />
+            </div>
+          </div>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Penanggung Jawab
-                </th>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full min-w-[1650px] border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-50 text-sm font-semibold text-slate-700">
+                  <th className="w-[120px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Kode Risiko
+                  </th>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Waktu Pelaksanaan
-                </th>
+                  <th className="w-[280px] border-b border-r border-slate-200 px-4 py-3">
+                    Peristiwa Risiko
+                  </th>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Hasil Pelaksanaan
-                </th>
+                  <th className="w-[150px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Risiko Saat Ini
+                  </th>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Data Dukung
-                </th>
+                  <th className="w-[140px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Proyeksi Risiko
+                  </th>
 
-                <th className="border border-gray-300 px-3 py-3">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
+                  <th className="w-[220px] border-b border-r border-slate-200 px-4 py-3">
+                    Perlakuan Risiko
+                  </th>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={11}
-                    className="border border-gray-300 px-4 py-8 text-center text-gray-500"
-                  >
-                    Memuat data...
-                  </td>
+                  <th className="w-[260px] border-b border-r border-slate-200 px-4 py-3">
+                    Rencana Penanganan
+                  </th>
+
+                  <th className="w-[180px] border-b border-r border-slate-200 px-4 py-3">
+                    Penanggung Jawab
+                  </th>
+
+                  <th className="w-[150px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Waktu Pelaksanaan
+                  </th>
+
+                  <th className="w-[240px] border-b border-r border-slate-200 px-4 py-3">
+                    Hasil Pelaksanaan
+                  </th>
+
+                  <th className="w-[220px] border-b border-r border-slate-200 px-4 py-3">
+                    Data Dukung
+                  </th>
+
+                  <th className="w-[140px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                    Status
+                  </th>
+
+                  <th className="w-[120px] border-b border-slate-200 px-4 py-3 text-center">
+                    Aksi
+                  </th>
                 </tr>
-              ) : data.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={11}
-                    className="border border-gray-300 px-4 py-8 text-center text-gray-500"
-                  >
-                    Belum ada data risiko.
-                  </td>
-                </tr>
-              ) : (
-                data.map((item) => (
-                  <tr
-                    key={item.risiko_id}
-                    className="hover:bg-gray-50"
-                  >
-                    <td className="border border-gray-300 px-3 py-3 font-semibold">
-                      {item.kode_risiko}
-                    </td>
+              </thead>
 
-                    <td className="border border-gray-300 px-3 py-3 min-w-[240px]">
-                      {item.peristiwa_risiko}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3 text-center">
-                      {item.risiko_saat_ini ??
-                        item.besaran_risiko ??
-                        '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3 text-center">
-                      {item.proyeksi_risiko ?? '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3">
-                      {item.perlakuan_risiko ?? '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3 min-w-[220px]">
-                      {item.rencana_penanganan ?? '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3">
-                      {item.nama_penanggung_jawab ?? '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3">
-                      {item.waktu_pelaksanaan
-                        ? new Date(
-                            item.waktu_pelaksanaan
-                          ).toLocaleDateString('id-ID')
-                        : '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3 min-w-[220px]">
-                      {item.hasil_pelaksanaan ?? '-'}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3 min-w-[200px]">
-                      {item.dokumen && item.dokumen.length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {item.dokumen.map((dokumen) => (
-                            <button
-                              key={dokumen.id}
-                              type="button"
-                              onClick={() =>
-                                handleDownloadDokumen(
-                                  dokumen.id,
-                                  dokumen.nama_file
-                                )
-                              }
-                              className="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left"
-                            >
-                              {dokumen.nama_file}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-
-                    <td className="border border-gray-300 px-3 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(item)}
-                        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
-                      >
-                        {item.monitoring_id
-                          ? 'Edit'
-                          : 'Lengkapi'}
-                      </button>
+              <tbody className="text-sm text-slate-700">
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={12}
+                      className="px-4 py-10 text-center text-sm text-slate-500"
+                    >
+                      Memuat data monitoring...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ) : filteredData.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={12}
+                      className="px-4 py-10 text-center text-sm text-slate-400"
+                    >
+                      Tidak ada data monitoring yang sesuai.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredData.map((item) => (
+                    <tr
+                      key={item.risiko_id}
+                      className="hover:bg-slate-50"
+                    >
+                      <td className="whitespace-nowrap border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">
+                        {item.kode_risiko}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.peristiwa_risiko || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">
+                        {item.risiko_saat_ini ??
+                          item.besaran_risiko ??
+                          '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                        {item.proyeksi_risiko ?? '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.perlakuan_risiko || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.rencana_penanganan || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.nama_penanggung_jawab || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                        {item.waktu_pelaksanaan
+                          ? new Date(
+                              item.waktu_pelaksanaan
+                            ).toLocaleDateString('id-ID')
+                          : '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.hasil_pelaksanaan || '-'}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                        {item.dokumen &&
+                        item.dokumen.length > 0 ? (
+                          <div className="space-y-1">
+                            {item.dokumen.map(
+                              (dokumen) => (
+                                <button
+                                  key={dokumen.id}
+                                  type="button"
+                                  onClick={() =>
+                                    handleDownloadDokumen(
+                                      dokumen.id,
+                                      dokumen.nama_file
+                                    )
+                                  }
+                                  className="block max-w-[200px] truncate text-left text-xs font-medium text-blue-700 hover:underline"
+                                  title={dokumen.nama_file}
+                                >
+                                  {dokumen.nama_file}
+                                </button>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">
+                            -
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                        {item.monitoring_id ? (
+                          <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            Sudah Dimonitor
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            Belum Dimonitor
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="border-b border-slate-200 px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleEdit(item)
+                          }
+                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                        >
+                          {item.monitoring_id
+                            ? 'Edit'
+                            : 'Lengkapi'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {editingItem && (
-        <div className="mt-6 bg-white border border-gray-200 rounded-xl p-6">
-          <div className="mb-5">
-            <h2 className="text-lg font-bold text-gray-800">
-              {editingItem.monitoring_id
-                ? 'Edit Monitoring Semester I'
-                : 'Lengkapi Monitoring Semester I'}
-            </h2>
+        <div className="rounded-lg border border-slate-200 bg-white">
+          <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                {editingItem.monitoring_id
+                  ? 'Edit Monitoring Semester II'
+                  : 'Lengkapi Monitoring Semester II'}
+              </h3>
 
-            <p className="text-sm text-gray-500 mt-1">
-              {editingItem.kode_risiko} -{' '}
-              {editingItem.peristiwa_risiko}
-            </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {editingItem.kode_risiko}
+                {' - '}
+                {editingItem.peristiwa_risiko}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={saving}
+              className="text-sm font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
+            >
+              Tutup
+            </button>
           </div>
 
           <form
             onSubmit={handleSave}
-            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="p-6"
           >
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Besaran/Level Risiko Saat Ini
-              </label>
+            <section>
+              <div className="mb-4">
+                <h4 className="text-sm font-bold text-slate-900">
+                  Kondisi Risiko
+                </h4>
 
-              <input
-                type="number"
-                min={1}
-                max={25}
-                value={formData.risiko_saat_ini}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    risiko_saat_ini: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Proyeksi Risiko
-              </label>
+                <p className="mt-1 text-sm text-slate-500">
+                  Tentukan kondisi risiko saat ini dan proyeksi risiko.
+                </p>
+              </div>
 
-              <input
-                type="number"
-                min={1}
-                max={25}
-                value={formData.proyeksi_risiko}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    proyeksi_risiko: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Perlakuan Risiko
-              </label>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Besaran/Level Risiko Saat Ini
+                  </label>
 
-              <textarea
-                rows={3}
-                value={formData.perlakuan_risiko}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    perlakuan_risiko: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Rencana Penanganan
-              </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={25}
+                    value={
+                      formData.risiko_saat_ini
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        risiko_saat_ini:
+                          e.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
 
-              <textarea
-                rows={3}
-                value={formData.rencana_penanganan}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    rencana_penanganan: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Penanggung Jawab
-              </label>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Proyeksi Risiko
+                  </label>
 
-              <select
-                value={formData.penanggung_jawab_id}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    penanggung_jawab_id: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              >
-                <option value="">
-                  Pilih Penanggung Jawab
-                </option>
+                  <input
+                    type="number"
+                    min={1}
+                    max={25}
+                    value={
+                      formData.proyeksi_risiko
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        proyeksi_risiko:
+                          e.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </section>
 
-                {picOptions.map((pic) => (
-                  <option
-                    key={pic.id}
-                    value={pic.id}
+            <section className="mt-6 border-t border-slate-200 pt-5">
+              <div className="mb-4">
+                <h4 className="text-sm font-bold text-slate-900">
+                  Penanganan Risiko
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Perlakuan Risiko
+                  </label>
+
+                  <textarea
+                    rows={3}
+                    value={
+                      formData.perlakuan_risiko
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        perlakuan_risiko:
+                          e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan perlakuan risiko"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Rencana Penanganan
+                  </label>
+
+                  <textarea
+                    rows={3}
+                    value={
+                      formData.rencana_penanganan
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        rencana_penanganan:
+                          e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan rencana penanganan"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Penanggung Jawab
+                  </label>
+
+                  <select
+                    value={
+                      formData.penanggung_jawab_id
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        penanggung_jawab_id:
+                          e.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
                   >
-                    {pic.nama}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Waktu Pelaksanaan
-              </label>
+                    <option value="">
+                      Pilih Penanggung Jawab
+                    </option>
 
-              <input
-                type="date"
-                value={formData.waktu_pelaksanaan}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    waktu_pelaksanaan: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">
-                Hasil Pelaksanaan
-              </label>
+                    {picOptions.map((pic) => (
+                      <option
+                        key={pic.id}
+                        value={pic.id}
+                      >
+                        {pic.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-1">
-                Data Dukung
-              </label>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Waktu Pelaksanaan
+                  </label>
 
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setSelectedFile(file);
-                }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
+                  <input
+                    type="date"
+                    value={
+                      formData.waktu_pelaksanaan
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        waktu_pelaksanaan:
+                          e.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </section>
 
-              <p className="text-xs text-gray-500 mt-1">
-                Format: PDF, JPG, PNG, DOC, DOCX. Maksimal 10 MB.
-              </p>
-            </div>
+            <section className="mt-6 border-t border-slate-200 pt-5">
+              <div className="mb-4">
+                <h4 className="text-sm font-bold text-slate-900">
+                  Hasil dan Data Dukung
+                </h4>
+              </div>
 
-              <textarea
-                rows={3}
-                value={formData.hasil_pelaksanaan}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    hasil_pelaksanaan: e.target.value,
-                  })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              />
-            </div>
-            <div className="md:col-span-2 flex justify-end gap-3 mt-2">
+              <div className="grid grid-cols-1 gap-5">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Hasil Pelaksanaan
+                  </label>
+
+                  <textarea
+                    rows={3}
+                    value={
+                      formData.hasil_pelaksanaan
+                    }
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        hasil_pelaksanaan:
+                          e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan hasil pelaksanaan"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Data Dukung
+                  </label>
+
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={(e) => {
+                      const file =
+                        e.target.files?.[0] ??
+                        null;
+
+                      setSelectedFile(file);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                  />
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Format PDF, JPG, JPEG, PNG, DOC, atau DOCX. Maksimal 10 MB.
+                  </p>
+
+                  {selectedFile && (
+                    <p className="mt-2 text-xs font-medium text-slate-700">
+                      File dipilih: {selectedFile.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-5">
               <button
                 type="button"
                 onClick={handleCancel}
                 disabled={saving}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Batal
               </button>
@@ -737,16 +1024,37 @@ const MonitoringSemester2Page: React.FC = () => {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f] disabled:opacity-50"
               >
                 {saving
                   ? 'Menyimpan...'
-                  : 'Simpan'}
+                  : 'Simpan Monitoring'}
               </button>
             </div>
           </form>
         </div>
       )}
+
+      <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
+        <button
+          type="button"
+          onClick={() => navigate('/risiko/peta-risiko')}
+          className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Kembali ke Monitoring Semester I
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/risiko/monitoring/semester-2')}
+          className="rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
+        >
+          Lanjut ke Monitoring Tahunan
+          <span className="ml-2" aria-hidden="true">
+            →
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

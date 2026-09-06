@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React from 'react';
 
 interface RisikoPetaItem {
@@ -11,6 +12,7 @@ interface RisikoPetaItem {
 }
 
 const PetaRisikoPage: React.FC = () => {
+  const navigate =useNavigate();
   const [risikoData, setRisikoData] = React.useState<RisikoPetaItem[]>([]);
 
   const kemungkinan = [
@@ -103,34 +105,130 @@ const PetaRisikoPage: React.FC = () => {
     fetchPetaRisiko();
   }, []);
 
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Form 3.0 Peta Risiko
-        </h1>
+  const totalRisiko = risikoData.length;
 
-        <p className="text-sm text-gray-500 mt-1">
-          Matriks analisis risiko berdasarkan kemungkinan dan
-          dampak/konsekuensi
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-slate-900">
+          Peta Risiko
+        </h2>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Matriks analisis risiko berdasarkan tingkat kemungkinan dan
+          dampak/konsekuensi.
         </p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 overflow-x-auto">
-        <table className="border-collapse w-full min-w-[1000px] text-sm">
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-4">
+        <div className="flex items-center">
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko/konteks')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              1
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko/konteks')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Penetapan Konteks
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              2
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Profil & Penilaian Risiko
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
+            >
+              3
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/risiko')}
+              className="text-xs text-slate-500 hover:text-slate-800"
+            >
+              Layanan Digital Prioritas
+            </button>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1B2A4A] text-xs font-semibold text-white">
+              4
+            </div>
+
+            <span className="text-xs font-semibold text-slate-900">
+              Peta Risiko
+            </span>
+          </div>
+
+          <div className="mx-4 h-px flex-1 bg-slate-300" />
+          <div className="flex min-w-fit items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500">
+              5
+            </div>
+
+            <span className="text-xs text-slate-500">
+              Pemantauan dan Pelaporan
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Total Risiko
+          </p>
+
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {totalRisiko}
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <table className="w-full min-w-[1050px] border-collapse text-sm">
           <thead>
             <tr>
               <th
                 colSpan={3}
                 rowSpan={3}
-                className="border border-gray-500 px-4 py-5 text-center text-lg font-bold"
+                className="border-b border-r border-slate-300 bg-slate-50 px-4 py-5 text-center text-base font-bold text-slate-900"
               >
                 Matrik Analisis Risiko
               </th>
 
               <th
                 colSpan={5}
-                className="border border-gray-500 px-4 py-3 text-center text-lg font-bold"
+                className="border-b border-slate-300 bg-slate-50 px-4 py-3 text-center text-base font-bold text-slate-900"
               >
                 Dampak/Konsekuensi
               </th>
@@ -140,7 +238,7 @@ const PetaRisikoPage: React.FC = () => {
               {dampak.map((item) => (
                 <th
                   key={`label-${item.level}`}
-                  className="border border-gray-500 px-3 py-3 text-center font-bold"
+                  className="border-b border-l border-slate-300 bg-slate-50 px-3 py-3 text-center text-sm font-semibold text-slate-700"
                 >
                   {item.label}
                 </th>
@@ -151,7 +249,7 @@ const PetaRisikoPage: React.FC = () => {
               {dampak.map((item) => (
                 <th
                   key={`level-${item.level}`}
-                  className="border border-gray-500 px-3 py-2 text-center text-base font-bold"
+                  className="border-b border-l border-slate-300 bg-slate-50 px-3 py-2 text-center text-sm font-bold text-slate-900"
                 >
                   {item.level}
                 </th>
@@ -165,7 +263,7 @@ const PetaRisikoPage: React.FC = () => {
                 {index === 0 && (
                   <th
                     rowSpan={5}
-                    className="border border-gray-500 px-4 py-4 text-center font-bold w-[160px]"
+                    className="w-[150px] border-b border-r border-slate-300 bg-slate-50 px-4 py-4 text-center font-bold text-slate-900"
                   >
                     <div className="leading-relaxed">
                       Kemungkinan
@@ -177,48 +275,77 @@ const PetaRisikoPage: React.FC = () => {
                   </th>
                 )}
 
-                <th className="border border-gray-500 px-4 py-4 text-center font-bold w-[180px]">
+                <th className="w-[180px] border-b border-r border-slate-300 bg-white px-4 py-4 text-center font-semibold text-slate-700">
                   {item.label}
                 </th>
 
-                <th className="border border-gray-500 px-4 py-4 text-center text-base font-bold w-[90px]">
+                <th className="w-[80px] border-b border-r border-slate-300 bg-white px-4 py-4 text-center text-base font-bold text-slate-900">
                   {item.level}
                 </th>
 
-                {dampak.map((d) => (
-                  <td
-                    key={`${item.level}-${d.level}`}
-                    className="border border-gray-500 h-[78px] min-w-[130px] p-2 align-top"
-                    style={{
-                      backgroundColor: getRiskColor(
-                        item.level,
-                        d.level
-                      ),
-                    }}
-                  >
-                    <div className="flex flex-wrap gap-1 justify-center">
-                      {risikoData
-                        .filter(
-                          (r) =>
-                            r.kemungkinan === item.level &&
-                            r.nilai_dampak === d.level
-                        )
-                        .map((r) => (
+                {dampak.map((d) => {
+                  const risikoDalamCell = risikoData.filter(
+                    (r) =>
+                      r.kemungkinan === item.level &&
+                      r.nilai_dampak === d.level
+                  );
+
+                  return (
+                    <td
+                      key={`${item.level}-${d.level}`}
+                      className="h-[90px] min-w-[140px] border-b border-r border-slate-300 p-2 align-top"
+                      style={{
+                        backgroundColor: getRiskColor(
+                          item.level,
+                          d.level
+                        ),
+                      }}
+                    >
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {risikoDalamCell.map((r) => (
                           <span
                             key={r.id}
                             title={r.peristiwa_risiko}
-                            className="inline-flex px-2 py-1 text-xs font-bold rounded bg-white/90 text-gray-800 border border-gray-300"
+                            className="inline-flex cursor-default rounded-md border border-slate-300 bg-white/95 px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm"
                           >
                             {r.kode_risiko}
                           </span>
                         ))}
-                    </div>
-                  </td>
-                ))}
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* KETERANGAN */}
+      <div className="mt-4 text-xs text-slate-500">
+        Posisi setiap risiko ditentukan berdasarkan kombinasi tingkat kemungkinan
+        dan nilai dampak.
+      </div>
+
+      <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
+        <button
+          type="button"
+          onClick={() => navigate('/risiko/layanan-prioritas')}
+          className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Kembali ke Layanan Digital Prioritas
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/risiko/monitoring/semester-1')}
+          className="rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
+        >
+          Lanjut ke Monitoring Semester I
+          <span className="ml-2" aria-hidden="true">
+            →
+          </span>
+        </button>
       </div>
     </div>
   );
