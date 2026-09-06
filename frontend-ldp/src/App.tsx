@@ -4,6 +4,8 @@ import RequirePermission from './requirePermission';
 
 import Login from './Login';
 import Dashboard from './Dashboard';
+
+// risiko
 import RisikoPage from './pages/RisikoPage';
 import KonteksRisikoPage from './pages/KonteksRisikoPage';
 import LayananPrioritasPage from './pages/LayananPrioritasRisikoPage';
@@ -11,6 +13,10 @@ import PetaRisikoPage from './pages/PetaRisikoPage';
 import MonitoringSemester1Page from './pages/MonitoringSemester1Page';
 import MonitoringSemester2Page from './pages/MonitoringSemester2Page';
 import MonitoringTahunanPage from './pages/MonitoringTahunanPage';
+
+// perubahan
+import PerencanaanPerubahanPage from './pages/PerencanaanPerubahanPage';
+
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
