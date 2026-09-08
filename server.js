@@ -8,6 +8,7 @@ const bcpRoutes = require('./routes/bcpRoutes');
 const perubahanRoutes = require('./routes/perubahanRoutes'); 
 const tiketingRoutes = require('./routes/tiketingRoutes');
 const konteksRoutes = require('./routes/konteksRoutes');
+const relasiPenggunaRoutes = require('./routes/relasiPenggunaRoutes');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/risiko', risikoRoutes);
 app.use('/api/bcp', bcpRoutes);   
 app.use('/api/perubahan', perubahanRoutes); 
 app.use('/api/tiketing', tiketingRoutes); 
+app.use('/api/relasi-pengguna', relasiPenggunaRoutes);
 
 
 
