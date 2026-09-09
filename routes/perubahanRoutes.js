@@ -1,19 +1,37 @@
 const express = require('express');
 const router = express.Router();
 
-const perubahanController =
-    require('../controllers/perubahanController');
+const perubahanController = require('../controllers/perubahanController');
+const authMiddleware = require('../middleware/auth');
+const requirePermission = require('../middleware/permissionMiddleware');
 
-const authMiddleware =
-    require('../middleware/auth');
+router.get(
+    '/unit-options',
+    authMiddleware,
+    requirePermission('change.view'),
+    perubahanController.getUnitOptions
+);
 
-const requirePermission =
-    require('../middleware/permissionMiddleware');
+router.get(
+    '/user-options',
+    authMiddleware,
+    requirePermission('change.view'),
+    perubahanController.getUserOptions
+);
 
+router.get(
+    '/layanan-options',
+    authMiddleware,
+    requirePermission('change.view'),
+    perubahanController.getLayananOptions
+);
 
-// =====================================================
-// MPR01 - PERENCANAAN PERUBAHAN
-// =====================================================
+router.get(
+    '/layanan-prioritas-options',
+    authMiddleware,
+    requirePermission('change.view'),
+    perubahanController.getLayananPrioritasOptions
+);
 
 router.get(
     '/perencanaan',
@@ -50,11 +68,6 @@ router.delete(
     perubahanController.deletePerencanaan
 );
 
-
-// =====================================================
-// MPR01 - ANALISIS PRIORITAS PERUBAHAN
-// =====================================================
-
 router.get(
     '/perencanaan/:id/analisis-prioritas',
     authMiddleware,
@@ -89,11 +102,6 @@ router.delete(
     requirePermission('change.delete'),
     perubahanController.deleteAnalisisPrioritas
 );
-
-
-// =====================================================
-// MPR02A - ANALISIS DAMPAK TEKNIS
-// =====================================================
 
 router.get(
     '/dampak-teknis/:id',
@@ -130,11 +138,6 @@ router.post(
     perubahanController.createDampakTeknis
 );
 
-
-// =====================================================
-// MPR02A - PERSETUJUAN ANALISIS TEKNIS
-// =====================================================
-
 router.get(
     '/:id/persetujuan/analisis-teknis',
     authMiddleware,
@@ -156,12 +159,6 @@ router.post(
     perubahanController.rejectAnalisisTeknis
 );
 
-
-// =====================================================
-// MPR02B - ANALISIS DAMPAK ORGANISASI
-// =====================================================
-
-// Master indikator
 router.get(
     '/indikator-dampak-organisasi',
     authMiddleware,
@@ -169,7 +166,6 @@ router.get(
     perubahanController.getIndikatorDampakOrganisasi
 );
 
-// Detail berdasarkan ID analisis
 router.get(
     '/analisis-organisasi/:id',
     authMiddleware,
@@ -191,7 +187,6 @@ router.delete(
     perubahanController.deleteAnalisisOrganisasi
 );
 
-// Berdasarkan perubahan
 router.get(
     '/:id/analisis-organisasi',
     authMiddleware,
@@ -205,11 +200,6 @@ router.post(
     requirePermission('change.create'),
     perubahanController.createAnalisisOrganisasi
 );
-
-
-// =====================================================
-// MPR02B - PERSETUJUAN ANALISIS ORGANISASI
-// =====================================================
 
 router.get(
     '/:id/persetujuan/analisis-organisasi',
@@ -232,12 +222,6 @@ router.post(
     perubahanController.rejectAnalisisOrganisasi
 );
 
-
-// =====================================================
-// MPR03 - IMPLEMENTASI PERUBAHAN
-// =====================================================
-
-// Berdasarkan ID implementasi
 router.get(
     '/implementasi/:id',
     authMiddleware,
@@ -259,7 +243,6 @@ router.delete(
     perubahanController.deleteImplementasi
 );
 
-// Berdasarkan ID perubahan
 router.get(
     '/:id/implementasi',
     authMiddleware,
@@ -273,11 +256,6 @@ router.post(
     requirePermission('change.create'),
     perubahanController.createImplementasi
 );
-
-
-// =====================================================
-// MPR03 - SUMBER DAYA
-// =====================================================
 
 router.get(
     '/implementasi/:id/sumber-daya',
@@ -307,11 +285,6 @@ router.delete(
     perubahanController.deleteSumberDaya
 );
 
-
-// =====================================================
-// MPR03 - ANGGARAN
-// =====================================================
-
 router.get(
     '/implementasi/:id/anggaran',
     authMiddleware,
@@ -340,11 +313,6 @@ router.delete(
     perubahanController.deleteAnggaran
 );
 
-
-// =====================================================
-// MPR03 - INDIKATOR KEBERHASILAN
-// =====================================================
-
 router.get(
     '/implementasi/:id/indikator-keberhasilan',
     authMiddleware,
@@ -372,11 +340,6 @@ router.delete(
     requirePermission('change.delete'),
     perubahanController.deleteIndikatorKeberhasilan
 );
-
-
-// =====================================================
-// MPR03 - STRATEGI IMPLEMENTASI
-// =====================================================
 
 router.get(
     '/implementasi/:id/strategi-implementasi',
@@ -413,11 +376,6 @@ router.delete(
     perubahanController.deleteStrategiImplementasi
 );
 
-
-// =====================================================
-// MPR03 - STAKEHOLDER
-// =====================================================
-
 router.get(
     '/implementasi/:id/stakeholder',
     authMiddleware,
@@ -452,11 +410,6 @@ router.delete(
     requirePermission('change.delete'),
     perubahanController.deleteStakeholder
 );
-
-
-// =====================================================
-// MPR03 - KOMUNIKASI & MEDIA KOMUNIKASI
-// =====================================================
 
 router.get(
     '/implementasi/:id/komunikasi',
@@ -493,11 +446,6 @@ router.delete(
     perubahanController.deleteKomunikasi
 );
 
-
-// =====================================================
-// MPR03 - PELATIHAN
-// =====================================================
-
 router.get(
     '/implementasi/:id/pelatihan',
     authMiddleware,
@@ -533,11 +481,6 @@ router.delete(
     perubahanController.deletePelatihan
 );
 
-
-// =====================================================
-// MPR03 - PERSETUJUAN PELAKSANAAN
-// =====================================================
-
 router.get(
     '/:id/persetujuan/pelaksanaan',
     authMiddleware,
@@ -559,12 +502,6 @@ router.post(
     perubahanController.rejectPelaksanaan
 );
 
-
-// =====================================================
-// MPR04 - EVALUASI PERUBAHAN
-// =====================================================
-
-// Berdasarkan implementasi
 router.get(
     '/implementasi/:id/evaluasi',
     authMiddleware,
@@ -579,7 +516,6 @@ router.post(
     perubahanController.createEvaluasi
 );
 
-// Berdasarkan ID evaluasi
 router.get(
     '/evaluasi/:id',
     authMiddleware,
@@ -601,57 +537,6 @@ router.delete(
     perubahanController.deleteEvaluasi
 );
 
-
-// =====================================================
-// MPR01 - DATA PERUBAHAN
-// ROOT + GENERIC ROUTES WAJIB PALING BAWAH
-// =====================================================
-
-// GET semua perubahan
-router.get(
-    '/',
-    authMiddleware,
-    requirePermission('change.view'),
-    perubahanController.getAllPerubahan
-);
-
-// POST perubahan
-router.post(
-    '/',
-    authMiddleware,
-    requirePermission('change.create'),
-    perubahanController.createPerubahan
-);
-
-// GET detail perubahan
-router.get(
-    '/:id',
-    authMiddleware,
-    requirePermission('change.view'),
-    perubahanController.getPerubahanById
-);
-
-// PUT perubahan
-router.put(
-    '/:id',
-    authMiddleware,
-    requirePermission('change.update'),
-    perubahanController.updatePerubahan
-);
-
-// DELETE perubahan
-router.delete(
-    '/:id',
-    authMiddleware,
-    requirePermission('change.delete'),
-    perubahanController.deletePerubahan
-);
-
-// =====================================================
-// MPR05 - PENCATATAN / LOGBOOK PERUBAHAN
-// =====================================================
-
-// GET logbook berdasarkan perubahan
 router.get(
     '/:id/logbook',
     authMiddleware,
@@ -659,7 +544,6 @@ router.get(
     perubahanController.getLogPerubahanByPerubahan
 );
 
-// POST logbook berdasarkan perubahan
 router.post(
     '/:id/logbook',
     authMiddleware,
@@ -667,7 +551,6 @@ router.post(
     perubahanController.createLogPerubahan
 );
 
-// GET detail logbook
 router.get(
     '/logbook/:id',
     authMiddleware,
@@ -675,7 +558,6 @@ router.get(
     perubahanController.getLogPerubahanById
 );
 
-// PUT logbook
 router.put(
     '/logbook/:id',
     authMiddleware,
@@ -683,7 +565,6 @@ router.put(
     perubahanController.updateLogPerubahan
 );
 
-// DELETE logbook
 router.delete(
     '/logbook/:id',
     authMiddleware,
@@ -691,11 +572,6 @@ router.delete(
     perubahanController.deleteLogPerubahan
 );
 
-// =====================================================
-// MPR05 - BUKTI PELAKSANAAN
-// =====================================================
-
-// GET bukti berdasarkan logbook
 router.get(
     '/logbook/:id/bukti',
     authMiddleware,
@@ -703,7 +579,6 @@ router.get(
     perubahanController.getBuktiPelaksanaanByLogbook
 );
 
-// POST bukti berdasarkan logbook
 router.post(
     '/logbook/:id/bukti',
     authMiddleware,
@@ -711,7 +586,6 @@ router.post(
     perubahanController.createBuktiPelaksanaan
 );
 
-// GET detail bukti pelaksanaan
 router.get(
     '/bukti-pelaksanaan/:id',
     authMiddleware,
@@ -719,7 +593,6 @@ router.get(
     perubahanController.getBuktiPelaksanaanById
 );
 
-// PUT bukti pelaksanaan
 router.put(
     '/bukti-pelaksanaan/:id',
     authMiddleware,
@@ -727,12 +600,46 @@ router.put(
     perubahanController.updateBuktiPelaksanaan
 );
 
-// DELETE bukti pelaksanaan
 router.delete(
     '/bukti-pelaksanaan/:id',
     authMiddleware,
     requirePermission('change.delete'),
     perubahanController.deleteBuktiPelaksanaan
+);
+
+router.get(
+    '/',
+    authMiddleware,
+    requirePermission('change.view'),
+    perubahanController.getAllPerubahan
+);
+
+router.post(
+    '/',
+    authMiddleware,
+    requirePermission('change.create'),
+    perubahanController.createPerubahan
+);
+
+router.get(
+    '/:id',
+    authMiddleware,
+    requirePermission('change.view'),
+    perubahanController.getPerubahanById
+);
+
+router.put(
+    '/:id',
+    authMiddleware,
+    requirePermission('change.update'),
+    perubahanController.updatePerubahan
+);
+
+router.delete(
+    '/:id',
+    authMiddleware,
+    requirePermission('change.delete'),
+    perubahanController.deletePerubahan
 );
 
 module.exports = router;

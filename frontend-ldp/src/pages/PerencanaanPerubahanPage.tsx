@@ -64,7 +64,30 @@ type LayananPrioritasOption = {
   kode_prioritas?: string;
   kode_layanan?: string;
   nama_layanan?: string;
-  layanan_prioritas?: string;
+};
+
+type UnitOption = {
+  id: number;
+  instansi_id: number;
+  kode_unit: string;
+  nama_unit: string;
+  status?: string;
+  kode_instansi?: string;
+  nama_instansi?: string;
+};
+
+type LayananOption = {
+  id: number;
+  instansi_id: number;
+  unit_kerja_id?: number | null;
+  kode_layanan: string;
+  nama_layanan: string;
+  jenis_layanan?: string | null;
+  status?: string;
+  kode_instansi?: string;
+  nama_instansi?: string;
+  kode_unit?: string | null;
+  nama_unit?: string | null;
 };
 
 const API = 'http://localhost:5000/api';
@@ -94,8 +117,14 @@ export default function PerencanaanPerubahanPage() {
     LayananPrioritasOption[]
   >([]);
 
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
+  const [layananOptions, setLayananOptions] = useState<LayananOption[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -187,21 +216,61 @@ export default function PerencanaanPerubahanPage() {
     }
   };
 
-  const fetchLayananPrioritasOptions = async () => {
-    try {
-      const result = await request(
-        `${API}/risiko/layanan-prioritas-options`
-      );
+  const fetchUnitOptions = async () => {
+    const result = await request(`${API}/perubahan/unit-options`);
 
-      const data = Array.isArray(result)
-        ? result
-        : Array.isArray(result.data)
+    setUnitOptions(
+      Array.isArray(result.data)
         ? result.data
-        : [];
+        : Array.isArray(result)
+        ? result
+        : []
+    );
+  };
 
-      setLayananPrioritasOptions(data);
+  const fetchLayananOptions = async () => {
+    const result = await request(`${API}/perubahan/layanan-options`);
+
+    setLayananOptions(
+      Array.isArray(result.data)
+        ? result.data
+        : Array.isArray(result)
+        ? result
+        : []
+    );
+  };
+
+  const fetchLayananPrioritasOptions = async () => {
+    const result = await request(
+      `${API}/perubahan/layanan-prioritas-options`
+    );
+
+    setLayananPrioritasOptions(
+      Array.isArray(result.data)
+        ? result.data
+        : Array.isArray(result)
+        ? result
+        : []
+    );
+  };
+
+  const fetchAllOptions = async () => {
+    try {
+      setLoadingOptions(true);
+
+      await Promise.all([
+        fetchUnitOptions(),
+        fetchLayananOptions(),
+        fetchLayananPrioritasOptions(),
+      ]);
     } catch (err) {
-      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal mengambil data pilihan.'
+      );
+    } finally {
+      setLoadingOptions(false);
     }
   };
 
@@ -224,7 +293,8 @@ export default function PerencanaanPerubahanPage() {
 
     setDataPerubahan(
       allData.filter(
-        (item) => Number(item.perencanaan_id) === Number(perencanaanId)
+        (item) =>
+          Number(item.perencanaan_id) === Number(perencanaanId)
       )
     );
   };
@@ -252,7 +322,7 @@ export default function PerencanaanPerubahanPage() {
 
   useEffect(() => {
     fetchPerencanaan();
-    fetchLayananPrioritasOptions();
+    fetchAllOptions();
   }, []);
 
   const filteredPerencanaan = useMemo(() => {
@@ -302,13 +372,17 @@ export default function PerencanaanPerubahanPage() {
     try {
       clearNotification();
 
-      if (
-        !perencanaanForm.unit_terkait_id ||
-        !perencanaanForm.periode_perencanaan.trim()
-      ) {
-        setError('Unit terkait dan periode perencanaan wajib diisi.');
+      if (!perencanaanForm.unit_terkait_id) {
+        setError('OPD / Unit Terkait wajib dipilih.');
         return;
       }
+
+      if (!perencanaanForm.periode_perencanaan.trim()) {
+        setError('Periode perencanaan wajib diisi.');
+        return;
+      }
+
+      setSaving(true);
 
       const payload = {
         unit_terkait_id: Number(perencanaanForm.unit_terkait_id),
@@ -349,10 +423,14 @@ export default function PerencanaanPerubahanPage() {
           ? err.message
           : 'Gagal menyimpan perencanaan.'
       );
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeletePerencanaan = async (item: PerencanaanItem) => {
+  const handleDeletePerencanaan = async (
+    item: PerencanaanItem
+  ) => {
     const confirmed = window.confirm(
       `Hapus perencanaan periode "${item.periode_perencanaan}"?`
     );
@@ -406,16 +484,35 @@ export default function PerencanaanPerubahanPage() {
   const handleTambahAnalisis = () => {
     clearNotification();
     resetAnalisisForm();
+
+    const nextPriority =
+      analisisPrioritas.length > 0
+        ? Math.max(
+            ...analisisPrioritas.map(
+              (item) => Number(item.urutan_prioritas) || 0
+            )
+          ) + 1
+        : 1;
+
+    setAnalisisForm((prev) => ({
+      ...prev,
+      urutan_prioritas: String(nextPriority),
+    }));
+
     setShowAnalisisForm(true);
   };
 
-  const handleEditAnalisis = (item: AnalisisPrioritasItem) => {
+  const handleEditAnalisis = (
+    item: AnalisisPrioritasItem
+  ) => {
     clearNotification();
 
     setEditingAnalisis(item);
 
     setAnalisisForm({
-      layanan_prioritas_id: String(item.layanan_prioritas_id),
+      layanan_prioritas_id: String(
+        item.layanan_prioritas_id
+      ),
       komponen_perubahan: item.komponen_perubahan,
       aspek_pemdi: item.aspek_pemdi,
       indikator_pemdi: item.indikator_pemdi,
@@ -433,6 +530,48 @@ export default function PerencanaanPerubahanPage() {
     try {
       clearNotification();
 
+      if (!analisisForm.layanan_prioritas_id) {
+        setError('Layanan prioritas wajib dipilih.');
+        return;
+      }
+
+      if (!analisisForm.komponen_perubahan.trim()) {
+        setError(
+          'Kondisi / komponen yang perlu mengalami perubahan wajib diisi.'
+        );
+        return;
+      }
+
+      if (!analisisForm.aspek_pemdi.trim()) {
+        setError('Aspek PemDi wajib diisi.');
+        return;
+      }
+
+      if (!analisisForm.indikator_pemdi.trim()) {
+        setError('Indikator PemDi wajib diisi.');
+        return;
+      }
+
+      if (!analisisForm.kondisi_saat_ini.trim()) {
+        setError('As-Is wajib diisi.');
+        return;
+      }
+
+      if (!analisisForm.kondisi_diharapkan.trim()) {
+        setError('To-Be wajib diisi.');
+        return;
+      }
+
+      if (
+        !analisisForm.urutan_prioritas ||
+        Number(analisisForm.urutan_prioritas) < 1
+      ) {
+        setError('Prioritas wajib berupa angka lebih dari 0.');
+        return;
+      }
+
+      setSaving(true);
+
       const payload = {
         layanan_prioritas_id: Number(
           analisisForm.layanan_prioritas_id
@@ -440,7 +579,8 @@ export default function PerencanaanPerubahanPage() {
         komponen_perubahan:
           analisisForm.komponen_perubahan.trim(),
         aspek_pemdi: analisisForm.aspek_pemdi.trim(),
-        indikator_pemdi: analisisForm.indikator_pemdi.trim(),
+        indikator_pemdi:
+          analisisForm.indikator_pemdi.trim(),
         kondisi_saat_ini:
           analisisForm.kondisi_saat_ini.trim(),
         kondisi_diharapkan:
@@ -467,13 +607,17 @@ export default function PerencanaanPerubahanPage() {
       setShowAnalisisForm(false);
       resetAnalisisForm();
 
-      await fetchAnalisisPrioritas(selectedPerencanaan.id);
+      await fetchAnalisisPrioritas(
+        selectedPerencanaan.id
+      );
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : 'Gagal menyimpan analisis prioritas.'
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -503,7 +647,9 @@ export default function PerencanaanPerubahanPage() {
           'Analisis prioritas berhasil dihapus.'
       );
 
-      await fetchAnalisisPrioritas(selectedPerencanaan.id);
+      await fetchAnalisisPrioritas(
+        selectedPerencanaan.id
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -529,10 +675,22 @@ export default function PerencanaanPerubahanPage() {
   const handleTambahPerubahan = () => {
     clearNotification();
     resetPerubahanForm();
+
+    if (selectedPerencanaan) {
+      setPerubahanForm((prev) => ({
+        ...prev,
+        unit_pemohon_id: String(
+          selectedPerencanaan.unit_terkait_id
+        ),
+      }));
+    }
+
     setShowPerubahanForm(true);
   };
 
-  const handleEditPerubahan = (item: PerubahanItem) => {
+  const handleEditPerubahan = (
+    item: PerubahanItem
+  ) => {
     clearNotification();
 
     setEditingPerubahan(item);
@@ -555,9 +713,34 @@ export default function PerencanaanPerubahanPage() {
     try {
       clearNotification();
 
+      if (!perubahanForm.kode_perubahan.trim()) {
+        setError('ID Perubahan wajib diisi.');
+        return;
+      }
+
+      if (!perubahanForm.layanan_id) {
+        setError(
+          'Layanan Digital yang diusulkan perubahan wajib dipilih.'
+        );
+        return;
+      }
+
+      if (!perubahanForm.detail_perubahan.trim()) {
+        setError('Detail perubahan wajib diisi.');
+        return;
+      }
+
+      if (!perubahanForm.unit_pemohon_id) {
+        setError('Unit pemohon perubahan wajib dipilih.');
+        return;
+      }
+
+      setSaving(true);
+
       const payload = {
         perencanaan_id: selectedPerencanaan.id,
-        kode_perubahan: perubahanForm.kode_perubahan.trim(),
+        kode_perubahan:
+          perubahanForm.kode_perubahan.trim(),
         layanan_id: Number(perubahanForm.layanan_id),
         detail_perubahan:
           perubahanForm.detail_perubahan.trim(),
@@ -578,19 +761,24 @@ export default function PerencanaanPerubahanPage() {
       });
 
       setMessage(
-        result.message || 'Data perubahan berhasil disimpan.'
+        result.message ||
+          'Data perubahan berhasil disimpan.'
       );
 
       setShowPerubahanForm(false);
       resetPerubahanForm();
 
-      await fetchPerubahan(selectedPerencanaan.id);
+      await fetchPerubahan(
+        selectedPerencanaan.id
+      );
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : 'Gagal menyimpan data perubahan.'
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -616,10 +804,13 @@ export default function PerencanaanPerubahanPage() {
       );
 
       setMessage(
-        result.message || 'Data perubahan berhasil dihapus.'
+        result.message ||
+          'Data perubahan berhasil dihapus.'
       );
 
-      await fetchPerubahan(selectedPerencanaan.id);
+      await fetchPerubahan(
+        selectedPerencanaan.id
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -647,6 +838,34 @@ export default function PerencanaanPerubahanPage() {
     }
 
     return 'bg-gray-100 text-gray-700';
+  };
+
+  const getPrioritasLabel = (
+    item: AnalisisPrioritasItem
+  ) => {
+    if (item.nama_layanan) {
+      return item.kode_prioritas
+        ? `${item.kode_prioritas} - ${item.nama_layanan}`
+        : item.nama_layanan;
+    }
+
+    const option = layananPrioritasOptions.find(
+      (entry) =>
+        Number(
+          entry.layanan_prioritas_id ?? entry.id
+        ) === Number(item.layanan_prioritas_id)
+    );
+
+    if (!option) {
+      return '-';
+    }
+
+    return [
+      option.kode_prioritas,
+      option.nama_layanan,
+    ]
+      .filter(Boolean)
+      .join(' - ');
   };
 
   const processSteps = [
@@ -683,9 +902,10 @@ export default function PerencanaanPerubahanPage() {
         <h1 className="text-2xl font-bold text-slate-800">
           MPR01 - Perencanaan Perubahan
         </h1>
+
         <p className="mt-1 text-sm text-slate-500">
-          Perencanaan dan identifikasi kebutuhan perubahan Layanan
-          Digital Pemerintah.
+          Perencanaan dan identifikasi kebutuhan perubahan
+          Layanan Digital Pemerintah.
         </p>
       </div>
 
@@ -700,15 +920,7 @@ export default function PerencanaanPerubahanPage() {
                 className="flex flex-1 items-start"
               >
                 <div className="flex min-w-[110px] flex-col items-center text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (active) return;
-
-                      if (step.number === 1) {
-                        navigate(step.route);
-                      }
-                    }}
+                  <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
                       active
                         ? 'border-slate-800 bg-slate-800 text-white'
@@ -716,7 +928,7 @@ export default function PerencanaanPerubahanPage() {
                     }`}
                   >
                     {step.number}
-                  </button>
+                  </div>
 
                   <span
                     className={`mt-2 text-xs ${
@@ -757,8 +969,9 @@ export default function PerencanaanPerubahanPage() {
               <h2 className="text-lg font-semibold text-slate-800">
                 Daftar Perencanaan Perubahan
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
-                Formulir 1.1 identitas perencanaan perubahan.
+                Formulir 1.1 Nama Instansi dan Unit Terkait.
               </p>
             </div>
 
@@ -778,7 +991,9 @@ export default function PerencanaanPerubahanPage() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
                 placeholder="Cari instansi, unit terkait, atau periode..."
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:max-w-md"
               />
@@ -791,18 +1006,23 @@ export default function PerencanaanPerubahanPage() {
                     <th className="px-4 py-3 font-semibold">
                       No
                     </th>
+
                     <th className="px-4 py-3 font-semibold">
                       Nama Instansi
                     </th>
+
                     <th className="px-4 py-3 font-semibold">
-                      OPD / Unit Terkait
+                      Nama OPD Terkait
                     </th>
+
                     <th className="px-4 py-3 font-semibold">
                       Periode Perencanaan
                     </th>
+
                     <th className="px-4 py-3 font-semibold">
                       Dibuat Oleh
                     </th>
+
                     <th className="px-4 py-3 text-center font-semibold">
                       Aksi
                     </th>
@@ -829,63 +1049,76 @@ export default function PerencanaanPerubahanPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredPerencanaan.map((item, index) => (
-                      <tr
-                        key={item.id}
-                        className="border-b border-slate-100 hover:bg-slate-50"
-                      >
-                        <td className="px-4 py-3">
-                          {index + 1}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-slate-800">
-                          {item.nama_instansi}
-                        </td>
-                        <td className="px-4 py-3">
-                          {item.nama_unit}
-                        </td>
-                        <td className="px-4 py-3">
-                          {item.periode_perencanaan}
-                        </td>
-                        <td className="px-4 py-3">
-                          {item.dibuat_oleh}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openDetail(item)}
-                              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                            >
-                              Detail
-                            </button>
+                    filteredPerencanaan.map(
+                      (item, index) => (
+                        <tr
+                          key={item.id}
+                          className="border-b border-slate-100 hover:bg-slate-50"
+                        >
+                          <td className="px-4 py-3">
+                            {index + 1}
+                          </td>
 
-                            {canUpdate && (
+                          <td className="px-4 py-3 font-medium text-slate-800">
+                            {item.nama_instansi}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {item.nama_unit}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {item.periode_perencanaan}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {item.dibuat_oleh}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="flex justify-center gap-2">
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleEditPerencanaan(item)
+                                  openDetail(item)
                                 }
-                                className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                               >
-                                Edit
+                                Detail
                               </button>
-                            )}
 
-                            {canDelete && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeletePerencanaan(item)
-                                }
-                                className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                              >
-                                Hapus
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {canUpdate && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleEditPerencanaan(
+                                      item
+                                    )
+                                  }
+                                  className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                >
+                                  Edit
+                                </button>
+                              )}
+
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeletePerencanaan(
+                                      item
+                                    )
+                                  }
+                                  className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                >
+                                  Hapus
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    )
                   )}
                 </tbody>
               </table>
@@ -898,10 +1131,12 @@ export default function PerencanaanPerubahanPage() {
             <div className="flex items-center justify-between border-b border-slate-200 p-5">
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  Formulir 1.1 - Identitas Perencanaan
+                  Formulir 1.1 - Nama Instansi dan Unit
+                  Terkait
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
-                  Informasi dasar perencanaan perubahan.
+                  Informasi identitas perencanaan perubahan.
                 </p>
               </div>
 
@@ -911,6 +1146,7 @@ export default function PerencanaanPerubahanPage() {
                   setSelectedPerencanaan(null);
                   setAnalisisPrioritas([]);
                   setDataPerubahan([]);
+                  clearNotification();
                 }}
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
@@ -923,6 +1159,7 @@ export default function PerencanaanPerubahanPage() {
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   Nama Instansi
                 </p>
+
                 <p className="mt-1 text-sm font-medium text-slate-800">
                   {selectedPerencanaan.nama_instansi}
                 </p>
@@ -932,6 +1169,7 @@ export default function PerencanaanPerubahanPage() {
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   Nama OPD Terkait
                 </p>
+
                 <p className="mt-1 text-sm font-medium text-slate-800">
                   {selectedPerencanaan.nama_unit}
                 </p>
@@ -941,6 +1179,7 @@ export default function PerencanaanPerubahanPage() {
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   Periode Perencanaan
                 </p>
+
                 <p className="mt-1 text-sm font-medium text-slate-800">
                   {selectedPerencanaan.periode_perencanaan}
                 </p>
@@ -954,9 +1193,10 @@ export default function PerencanaanPerubahanPage() {
                 <h2 className="text-lg font-semibold text-slate-800">
                   Formulir 1.2 - Analisis Prioritas Perubahan
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
-                  Identifikasi kebutuhan dan prioritas perubahan
-                  berdasarkan layanan prioritas.
+                  Analisis kondisi As-Is dan To-Be pada
+                  Layanan Digital Pemerintah prioritas.
                 </p>
               </div>
 
@@ -972,29 +1212,38 @@ export default function PerencanaanPerubahanPage() {
             </div>
 
             <div className="overflow-x-auto p-5">
-              <table className="w-full min-w-[1300px] border-collapse text-left text-sm">
+              <table className="w-full table-fixed border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                    <th className="px-3 py-3">Urutan</th>
-                    <th className="px-3 py-3">
-                      Layanan Prioritas
+                    <th className="w-[7%] px-3 py-3">
+                      Prioritas
                     </th>
-                    <th className="px-3 py-3">
-                      Komponen Perubahan
+
+                    <th className="w-[16%] px-3 py-3">
+                      Nama Layanan Prioritas
                     </th>
-                    <th className="px-3 py-3">
-                      Aspek Pemdi
+
+                    <th className="w-[20%] px-3 py-3">
+                      Kondisi / Komponen yang Perlu Mengalami Perubahan
                     </th>
-                    <th className="px-3 py-3">
-                      Indikator Pemdi
+
+                    <th className="w-[11%] px-3 py-3">
+                      Aspek PemDi
                     </th>
-                    <th className="px-3 py-3">
-                      Kondisi Saat Ini
+
+                    <th className="w-[12%] px-3 py-3">
+                      Indikator PemDi
                     </th>
-                    <th className="px-3 py-3">
-                      Kondisi Diharapkan
+
+                    <th className="w-[13%] px-3 py-3">
+                      As-Is
                     </th>
-                    <th className="px-3 py-3 text-center">
+
+                    <th className="w-[13%] px-3 py-3">
+                      To-Be
+                    </th>
+
+                    <th className="w-[8%] px-3 py-3 text-center">
                       Aksi
                     </th>
                   </tr>
@@ -1020,63 +1269,74 @@ export default function PerencanaanPerubahanPage() {
                       </td>
                     </tr>
                   ) : (
-                    analisisPrioritas.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="border-b border-slate-100 align-top"
-                      >
-                        <td className="px-3 py-3 font-semibold">
-                          {item.urutan_prioritas}
-                        </td>
-                        <td className="px-3 py-3">
-                          {item.nama_layanan ||
-                            item.kode_prioritas ||
-                            `ID ${item.layanan_prioritas_id}`}
-                        </td>
-                        <td className="px-3 py-3">
-                          {item.komponen_perubahan}
-                        </td>
-                        <td className="px-3 py-3">
-                          {item.aspek_pemdi}
-                        </td>
-                        <td className="px-3 py-3">
-                          {item.indikator_pemdi}
-                        </td>
-                        <td className="px-3 py-3">
-                          {item.kondisi_saat_ini}
-                        </td>
-                        <td className="px-3 py-3">
-                          {item.kondisi_diharapkan}
-                        </td>
-                        <td className="px-3 py-3">
-                          <div className="flex justify-center gap-2">
-                            {canUpdate && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleEditAnalisis(item)
-                                }
-                                className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700"
-                              >
-                                Edit
-                              </button>
-                            )}
+                    [...analisisPrioritas]
+                      .sort(
+                        (a, b) =>
+                          Number(a.urutan_prioritas) -
+                          Number(b.urutan_prioritas)
+                      )
+                      .map((item) => (
+                        <tr
+                          key={item.id}
+                          className="border-b border-slate-100 align-top"
+                        >
+                          <td className="break-words px-3 py-3 font-semibold">
+                            {item.urutan_prioritas}
+                          </td>
 
-                            {canDelete && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteAnalisis(item)
-                                }
-                                className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600"
-                              >
-                                Hapus
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          <td className="break-words px-3 py-3">
+                            {getPrioritasLabel(item)}
+                          </td>
+
+                          <td className="whitespace-normal break-words px-3 py-3">
+                            {item.komponen_perubahan}
+                          </td>
+
+                          <td className="whitespace-normal break-words px-3 py-3">
+                            {item.aspek_pemdi}
+                          </td>
+
+                          <td className="whitespace-normal break-words px-3 py-3">
+                            {item.indikator_pemdi}
+                          </td>
+
+                          <td className="whitespace-normal break-words px-3 py-3">
+                            {item.kondisi_saat_ini}
+                          </td>
+
+                          <td className="whitespace-normal break-words px-3 py-3">
+                            {item.kondisi_diharapkan}
+                          </td>
+
+                          <td className="px-3 py-3">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              {canUpdate && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleEditAnalisis(item)
+                                  }
+                                  className="w-full rounded-md border border-blue-200 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                >
+                                  Edit
+                                </button>
+                              )}
+
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteAnalisis(item)
+                                  }
+                                  className="w-full rounded-md border border-red-200 px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                >
+                                  Hapus
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
                   )}
                 </tbody>
               </table>
@@ -1089,9 +1349,10 @@ export default function PerencanaanPerubahanPage() {
                 <h2 className="text-lg font-semibold text-slate-800">
                   Formulir 1.3 - Perencanaan Perubahan
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
-                  Daftar perubahan yang direncanakan untuk periode
-                  ini.
+                  Daftar perubahan yang direncanakan pada
+                  Layanan Digital Pemerintah.
                 </p>
               </div>
 
@@ -1107,31 +1368,38 @@ export default function PerencanaanPerubahanPage() {
             </div>
 
             <div className="overflow-x-auto p-5">
-              <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+              <table className="w-full table-fixed border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                    <th className="px-3 py-3">
-                      Kode Perubahan
+                    <th className="w-[14%] px-3 py-3">
+                      ID Perubahan
                     </th>
-                    <th className="px-3 py-3">
-                      Layanan
+
+                    <th className="w-[17%] px-3 py-3">
+                      Layanan Digital Diusulkan Perubahan
                     </th>
-                    <th className="px-3 py-3">
+
+                    <th className="w-[20%] px-3 py-3">
                       Detail Perubahan
                     </th>
-                    <th className="px-3 py-3">
-                      Unit Pemohon
+
+                    <th className="w-[14%] px-3 py-3">
+                      Unit Pemohon Perubahan
                     </th>
-                    <th className="px-3 py-3">
+
+                    <th className="w-[9%] px-3 py-3">
                       Klasifikasi
                     </th>
-                    <th className="px-3 py-3">
+
+                    <th className="w-[8%] px-3 py-3">
                       Lingkup
                     </th>
-                    <th className="px-3 py-3">
+
+                    <th className="w-[9%] px-3 py-3">
                       Status
                     </th>
-                    <th className="px-3 py-3 text-center">
+
+                    <th className="w-[9%] px-3 py-3 text-center">
                       Aksi
                     </th>
                   </tr>
@@ -1153,44 +1421,59 @@ export default function PerencanaanPerubahanPage() {
                         key={item.id}
                         className="border-b border-slate-100 align-top"
                       >
-                        <td className="px-3 py-3 font-semibold text-slate-800">
-                          {item.kode_perubahan}
+                        <td className="px-3 py-3 align-top font-semibold text-slate-800">
+                          <span className="break-normal">
+                            {item.kode_perubahan}
+                          </span>
                         </td>
-                        <td className="px-3 py-3">
-                          {item.nama_layanan ||
-                            `ID ${item.layanan_id}`}
+
+                        <td className="whitespace-normal break-words px-3 py-3">
+                          <div className="font-medium text-slate-800">
+                            {item.nama_layanan || '-'}
+                          </div>
+
+                          {item.kode_layanan && (
+                            <div className="mt-1 text-xs text-slate-400">
+                              {item.kode_layanan}
+                            </div>
+                          )}
                         </td>
-                        <td className="max-w-[280px] px-3 py-3">
+
+                        <td className="whitespace-normal break-words px-3 py-3">
                           {item.detail_perubahan}
                         </td>
-                        <td className="px-3 py-3">
-                          {item.nama_unit_pemohon ||
-                            `ID ${item.unit_pemohon_id}`}
+
+                        <td className="whitespace-normal break-words px-3 py-3">
+                          {item.nama_unit_pemohon || '-'}
                         </td>
-                        <td className="px-3 py-3">
+
+                        <td className="whitespace-normal break-words px-3 py-3">
                           {item.klasifikasi}
                         </td>
-                        <td className="px-3 py-3">
+
+                        <td className="whitespace-normal break-words px-3 py-3">
                           {item.lingkup}
                         </td>
-                        <td className="px-3 py-3">
+
+                        <td className="px-3 py-3 align-top">
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
+                            className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
                               item.status
                             )}`}
                           >
                             {item.status}
                           </span>
                         </td>
-                        <td className="px-3 py-3">
-                          <div className="flex justify-center gap-2">
+
+                        <td className="px-3 py-3 align-top">
+                          <div className="flex flex-col items-center gap-2">
                             {canUpdate && (
                               <button
                                 type="button"
                                 onClick={() =>
                                   handleEditPerubahan(item)
                                 }
-                                className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700"
+                                className="w-[72px] rounded-md border border-blue-200 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                               >
                                 Edit
                               </button>
@@ -1202,7 +1485,7 @@ export default function PerencanaanPerubahanPage() {
                                 onClick={() =>
                                   handleDeletePerubahan(item)
                                 }
-                                className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600"
+                                className="w-[72px] rounded-md border border-red-200 px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                               >
                                 Hapus
                               </button>
@@ -1219,7 +1502,7 @@ export default function PerencanaanPerubahanPage() {
         </div>
       )}
 
-      {showPerencanaanForm && (
+            {showPerencanaanForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
             <div className="border-b border-slate-200 p-5">
@@ -1228,16 +1511,19 @@ export default function PerencanaanPerubahanPage() {
                   ? 'Edit Perencanaan'
                   : 'Tambah Perencanaan'}
               </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Lengkapi Nama Instansi, OPD terkait, dan periode perencanaan.
+              </p>
             </div>
 
             <div className="space-y-4 p-5">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  ID OPD / Unit Terkait
+                  Nama Instansi dan OPD Terkait
                 </label>
-                <input
-                  type="number"
-                  min="1"
+
+                <select
                   value={perencanaanForm.unit_terkait_id}
                   onChange={(e) =>
                     setPerencanaanForm({
@@ -1245,14 +1531,45 @@ export default function PerencanaanPerubahanPage() {
                       unit_terkait_id: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
-                />
+                  disabled={loadingOptions}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {loadingOptions
+                      ? 'Memuat daftar unit...'
+                      : 'Pilih OPD / Unit Terkait'}
+                  </option>
+
+                  {unitOptions.map((option) => (
+                    <option
+                      key={option.id}
+                      value={option.id}
+                    >
+                      {[
+                        option.nama_instansi,
+                        option.kode_unit
+                          ? `${option.kode_unit} - ${option.nama_unit}`
+                          : option.nama_unit,
+                      ]
+                        .filter(Boolean)
+                        .join(' | ')}
+                    </option>
+                  ))}
+                </select>
+
+                {unitOptions.length === 0 &&
+                  !loadingOptions && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Belum ada unit kerja aktif yang dapat dipilih.
+                    </p>
+                  )}
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
                   Periode Perencanaan
                 </label>
+
                 <input
                   type="text"
                   maxLength={100}
@@ -1260,7 +1577,8 @@ export default function PerencanaanPerubahanPage() {
                   onChange={(e) =>
                     setPerencanaanForm({
                       ...perencanaanForm,
-                      periode_perencanaan: e.target.value,
+                      periode_perencanaan:
+                        e.target.value,
                     })
                   }
                   placeholder="Contoh: Tahun 2026"
@@ -1276,7 +1594,8 @@ export default function PerencanaanPerubahanPage() {
                   setShowPerencanaanForm(false);
                   resetPerencanaanForm();
                 }}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                disabled={saving}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Batal
               </button>
@@ -1284,9 +1603,10 @@ export default function PerencanaanPerubahanPage() {
               <button
                 type="button"
                 onClick={handleSavePerencanaan}
-                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+                disabled={saving || loadingOptions}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Simpan
+                {saving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>
@@ -1299,72 +1619,82 @@ export default function PerencanaanPerubahanPage() {
             <div className="border-b border-slate-200 p-5">
               <h3 className="text-lg font-semibold text-slate-800">
                 {editingAnalisis
-                  ? 'Edit Analisis Prioritas'
-                  : 'Tambah Analisis Prioritas'}
+                  ? 'Edit Analisis Prioritas Perubahan'
+                  : 'Tambah Analisis Prioritas Perubahan'}
               </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Lengkapi analisis kondisi As-Is dan To-Be pada layanan prioritas.
+              </p>
             </div>
 
             <div className="grid gap-4 p-5 md:grid-cols-2">
-              <div>
+              <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Layanan Prioritas
+                  Nama Layanan Prioritas
                 </label>
 
-                {layananPrioritasOptions.length > 0 ? (
-                  <select
-                    value={analisisForm.layanan_prioritas_id}
-                    onChange={(e) =>
-                      setAnalisisForm({
-                        ...analisisForm,
-                        layanan_prioritas_id: e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  >
-                    <option value="">
-                      Pilih layanan prioritas
-                    </option>
+                <select
+                  value={
+                    analisisForm.layanan_prioritas_id
+                  }
+                  onChange={(e) =>
+                    setAnalisisForm({
+                      ...analisisForm,
+                      layanan_prioritas_id:
+                        e.target.value,
+                    })
+                  }
+                  disabled={loadingOptions}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {loadingOptions
+                      ? 'Memuat layanan prioritas...'
+                      : 'Pilih layanan prioritas'}
+                  </option>
 
-                    {layananPrioritasOptions.map(
-                      (option, index) => {
-                        const id =
-                          option.layanan_prioritas_id ??
-                          option.id;
+                  {layananPrioritasOptions.map(
+                    (option, index) => {
+                      const id =
+                        option.layanan_prioritas_id ??
+                        option.id;
 
-                        return (
-                          <option
-                            key={id ?? index}
-                            value={id ?? ''}
-                          >
-                            {option.nama_layanan ||
-                              option.layanan_prioritas ||
-                              option.kode_prioritas ||
-                              `Layanan ${id}`}
-                          </option>
-                        );
-                      }
-                    )}
-                  </select>
-                ) : (
-                  <input
-                    type="number"
-                    min="1"
-                    value={analisisForm.layanan_prioritas_id}
-                    onChange={(e) =>
-                      setAnalisisForm({
-                        ...analisisForm,
-                        layanan_prioritas_id: e.target.value,
-                      })
+                      const label = [
+                        option.kode_prioritas,
+                        option.kode_layanan,
+                        option.nama_layanan,
+                      ]
+                        .filter(Boolean)
+                        .join(' - ');
+
+                      return (
+                        <option
+                          key={id ?? index}
+                          value={id ?? ''}
+                        >
+                          {label ||
+                            `Layanan Prioritas ${id}`}
+                        </option>
+                      );
                     }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                )}
+                  )}
+                </select>
+
+                {layananPrioritasOptions.length ===
+                  0 &&
+                  !loadingOptions && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Belum ada layanan prioritas yang dapat dipilih.
+                    </p>
+                  )}
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Urutan Prioritas
+                  Prioritas
                 </label>
+
                 <input
                   type="number"
                   min="1"
@@ -1372,34 +1702,20 @@ export default function PerencanaanPerubahanPage() {
                   onChange={(e) =>
                     setAnalisisForm({
                       ...analisisForm,
-                      urutan_prioritas: e.target.value,
+                      urutan_prioritas:
+                        e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Komponen Perubahan
-                </label>
-                <textarea
-                  rows={2}
-                  value={analisisForm.komponen_perubahan}
-                  onChange={(e) =>
-                    setAnalisisForm({
-                      ...analisisForm,
-                      komponen_perubahan: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Contoh: 1"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Aspek Pemdi
+                  Aspek PemDi
                 </label>
+
                 <input
                   type="text"
                   maxLength={200}
@@ -1410,14 +1726,38 @@ export default function PerencanaanPerubahanPage() {
                       aspek_pemdi: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Masukkan aspek PemDi"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Indikator Pemdi
+                  Kondisi / Komponen yang Perlu Mengalami Perubahan
                 </label>
+
+                <textarea
+                  rows={3}
+                  value={
+                    analisisForm.komponen_perubahan
+                  }
+                  onChange={(e) =>
+                    setAnalisisForm({
+                      ...analisisForm,
+                      komponen_perubahan:
+                        e.target.value,
+                    })
+                  }
+                  placeholder="Jelaskan kondisi atau komponen yang perlu mengalami perubahan"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Indikator PemDi
+                </label>
+
                 <input
                   type="text"
                   maxLength={200}
@@ -1425,44 +1765,56 @@ export default function PerencanaanPerubahanPage() {
                   onChange={(e) =>
                     setAnalisisForm({
                       ...analisisForm,
-                      indikator_pemdi: e.target.value,
+                      indikator_pemdi:
+                        e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Masukkan indikator PemDi"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Kondisi Saat Ini
+                  As-Is
                 </label>
+
                 <textarea
-                  rows={4}
-                  value={analisisForm.kondisi_saat_ini}
+                  rows={5}
+                  value={
+                    analisisForm.kondisi_saat_ini
+                  }
                   onChange={(e) =>
                     setAnalisisForm({
                       ...analisisForm,
-                      kondisi_saat_ini: e.target.value,
+                      kondisi_saat_ini:
+                        e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Jelaskan kondisi saat ini"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Kondisi Diharapkan
+                  To-Be
                 </label>
+
                 <textarea
-                  rows={4}
-                  value={analisisForm.kondisi_diharapkan}
+                  rows={5}
+                  value={
+                    analisisForm.kondisi_diharapkan
+                  }
                   onChange={(e) =>
                     setAnalisisForm({
                       ...analisisForm,
-                      kondisi_diharapkan: e.target.value,
+                      kondisi_diharapkan:
+                        e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Jelaskan kondisi yang diharapkan"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
             </div>
@@ -1474,7 +1826,8 @@ export default function PerencanaanPerubahanPage() {
                   setShowAnalisisForm(false);
                   resetAnalisisForm();
                 }}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                disabled={saving}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Batal
               </button>
@@ -1482,9 +1835,10 @@ export default function PerencanaanPerubahanPage() {
               <button
                 type="button"
                 onClick={handleSaveAnalisis}
-                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+                disabled={saving || loadingOptions}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Simpan
+                {saving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>
@@ -1500,17 +1854,24 @@ export default function PerencanaanPerubahanPage() {
                   ? 'Edit Perencanaan Perubahan'
                   : 'Tambah Perencanaan Perubahan'}
               </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Lengkapi detail perubahan yang akan direncanakan.
+              </p>
             </div>
 
             <div className="grid gap-4 p-5 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Kode Perubahan
+                  ID Perubahan
                 </label>
+
                 <input
                   type="text"
                   maxLength={50}
-                  value={perubahanForm.kode_perubahan}
+                  value={
+                    perubahanForm.kode_perubahan
+                  }
                   onChange={(e) =>
                     setPerubahanForm({
                       ...perubahanForm,
@@ -1518,17 +1879,16 @@ export default function PerencanaanPerubahanPage() {
                     })
                   }
                   placeholder="Contoh: CHG-001"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  ID Layanan Digital
+                  Layanan Digital Diusulkan Perubahan
                 </label>
-                <input
-                  type="number"
-                  min="1"
+
+                <select
                   value={perubahanForm.layanan_id}
                   onChange={(e) =>
                     setPerubahanForm({
@@ -1536,62 +1896,127 @@ export default function PerencanaanPerubahanPage() {
                       layanan_id: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
+                  disabled={loadingOptions}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {loadingOptions
+                      ? 'Memuat layanan digital...'
+                      : 'Pilih layanan digital'}
+                  </option>
+
+                  {layananOptions.map((option) => (
+                    <option
+                      key={option.id}
+                      value={option.id}
+                    >
+                      {[
+                        option.kode_layanan,
+                        option.nama_layanan,
+                      ]
+                        .filter(Boolean)
+                        .join(' - ')}
+                    </option>
+                  ))}
+                </select>
+
+                {layananOptions.length === 0 &&
+                  !loadingOptions && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Belum ada layanan digital aktif yang dapat dipilih.
+                    </p>
+                  )}
               </div>
 
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
                   Detail Perubahan
                 </label>
+
                 <textarea
                   rows={4}
-                  value={perubahanForm.detail_perubahan}
+                  value={
+                    perubahanForm.detail_perubahan
+                  }
                   onChange={(e) =>
                     setPerubahanForm({
                       ...perubahanForm,
-                      detail_perubahan: e.target.value,
+                      detail_perubahan:
+                        e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Jelaskan perubahan yang akan dilakukan"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  ID Unit Pemohon
+                  Unit Pemohon Perubahan
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={perubahanForm.unit_pemohon_id}
+
+                <select
+                  value={
+                    perubahanForm.unit_pemohon_id
+                  }
                   onChange={(e) =>
                     setPerubahanForm({
                       ...perubahanForm,
-                      unit_pemohon_id: e.target.value,
+                      unit_pemohon_id:
+                        e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
+                  disabled={loadingOptions}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {loadingOptions
+                      ? 'Memuat daftar unit...'
+                      : 'Pilih unit pemohon'}
+                  </option>
+
+                  {unitOptions.map((option) => (
+                    <option
+                      key={option.id}
+                      value={option.id}
+                    >
+                      {[
+                        option.kode_unit,
+                        option.nama_unit,
+                      ]
+                        .filter(Boolean)
+                        .join(' - ')}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
                   Klasifikasi Perubahan
                 </label>
+
                 <select
-                  value={perubahanForm.klasifikasi}
+                  value={
+                    perubahanForm.klasifikasi
+                  }
                   onChange={(e) =>
                     setPerubahanForm({
                       ...perubahanForm,
                       klasifikasi: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
                 >
-                  <option value="Normal">Normal</option>
-                  <option value="Standard">Standard</option>
-                  <option value="Emergency">Emergency</option>
+                  <option value="Normal">
+                    Normal
+                  </option>
+                  <option value="Standard">
+                    Standard
+                  </option>
+                  <option value="Emergency">
+                    Emergency
+                  </option>
                 </select>
               </div>
 
@@ -1599,6 +2024,7 @@ export default function PerencanaanPerubahanPage() {
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
                   Lingkup Perubahan
                 </label>
+
                 <select
                   value={perubahanForm.lingkup}
                   onChange={(e) =>
@@ -1607,10 +2033,14 @@ export default function PerencanaanPerubahanPage() {
                       lingkup: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
                 >
-                  <option value="Teknis">Teknis</option>
-                  <option value="Organisasi">Organisasi</option>
+                  <option value="Teknis">
+                    Teknis
+                  </option>
+                  <option value="Organisasi">
+                    Organisasi
+                  </option>
                   <option value="Teknis & Organisasi">
                     Teknis & Organisasi
                   </option>
@@ -1622,6 +2052,7 @@ export default function PerencanaanPerubahanPage() {
                   <label className="mb-1 block text-sm font-semibold text-slate-700">
                     Status Workflow
                   </label>
+
                   <input
                     type="text"
                     value={editingPerubahan.status}
@@ -1639,7 +2070,8 @@ export default function PerencanaanPerubahanPage() {
                   setShowPerubahanForm(false);
                   resetPerubahanForm();
                 }}
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                disabled={saving}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Batal
               </button>
@@ -1647,9 +2079,10 @@ export default function PerencanaanPerubahanPage() {
               <button
                 type="button"
                 onClick={handleSavePerubahan}
-                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+                disabled={saving || loadingOptions}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Simpan
+                {saving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>

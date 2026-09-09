@@ -1,30 +1,36 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import RequirePermission from './requirePermission';
+import { useState, useEffect } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
-import Login from './Login';
-import Dashboard from './Dashboard';
+import RequirePermission from "./requirePermission";
+import Login from "./Login";
+import Dashboard from "./Dashboard";
+import AppLayout from "./AppLayout";
 
-// risiko
-import RisikoPage from './pages/RisikoPage';
-import KonteksRisikoPage from './pages/KonteksRisikoPage';
-import LayananPrioritasPage from './pages/LayananPrioritasRisikoPage';
-import PetaRisikoPage from './pages/PetaRisikoPage';
-import MonitoringSemester1Page from './pages/MonitoringSemester1Page';
-import MonitoringSemester2Page from './pages/MonitoringSemester2Page';
-import MonitoringTahunanPage from './pages/MonitoringTahunanPage';
-import AppLayout from './AppLayout';
-import RiskOverviewPage from './pages/RiskOverviewPage';
+import RisikoPage from "./pages/RisikoPage";
+import KonteksRisikoPage from "./pages/KonteksRisikoPage";
+import LayananPrioritasPage from "./pages/LayananPrioritasRisikoPage";
+import PetaRisikoPage from "./pages/PetaRisikoPage";
+import MonitoringSemester1Page from "./pages/MonitoringSemester1Page";
+import MonitoringSemester2Page from "./pages/MonitoringSemester2Page";
+import MonitoringTahunanPage from "./pages/MonitoringTahunanPage";
+import RiskOverviewPage from "./pages/RiskOverviewPage";
 
-// perubahan
-import PerencanaanPerubahanPage from './pages/PerencanaanPerubahanPage';
-
+import PerencanaanPerubahanPage from "./pages/PerencanaanPerubahanPage";
+import AnalisisPerubahanPage from "./pages/AnalisisPerubahanPage";
+import ImplementasiPerubahanPage from "./pages/ImplementasiPerubahanPage";
+import EvaluasiPerubahanPage from "./pages/EvaluasiPerubahanPage";
+import LogbookPerubahanPage from "./pages/LogbookPerubahanPage";
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
+    const savedUser = localStorage.getItem("user");
 
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -32,9 +38,9 @@ export default function App() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('rememberMe');
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("rememberMe");
     setUser(null);
   };
 
@@ -46,7 +52,9 @@ export default function App() {
             path="*"
             element={
               <Login
-                onLoginSuccess={(userData: any) => setUser(userData)}
+                onLoginSuccess={(userData: any) =>
+                  setUser(userData)
+                }
               />
             }
           />
@@ -55,33 +63,39 @@ export default function App() {
         <Routes>
           <Route
             path="/dashboard"
-            element={<Dashboard onLogout={handleLogout} />}
+            element={
+              <Dashboard onLogout={handleLogout} />
+            }
           />
-          
-          <Route element={<AppLayout onLogout={handleLogout} />}>
+
+          <Route
+            element={
+              <AppLayout onLogout={handleLogout} />
+            }
+          >
             <Route
-              path="/risiko"
+              path="/risiko/overview"
               element={
                 <RequirePermission permission="risk.view">
-                  <RisikoPage />
+                  <RiskOverviewPage />
                 </RequirePermission>
               }
             />
-
-            <Route
-            path="/risiko/overview"
-            element={
-              <RequirePermission permission="risk.view">
-                <RiskOverviewPage />
-              </RequirePermission>
-            }
-          />
 
             <Route
               path="/risiko/konteks"
               element={
                 <RequirePermission permission="risk.view">
                   <KonteksRisikoPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/risiko"
+              element={
+                <RequirePermission permission="risk.view">
+                  <RisikoPage />
                 </RequirePermission>
               }
             />
@@ -130,11 +144,61 @@ export default function App() {
                 </RequirePermission>
               }
             />
+
+            <Route
+              path="/perubahan/perencanaan"
+              element={
+                <RequirePermission permission="change.view">
+                  <PerencanaanPerubahanPage />
+                </RequirePermission>
+              }
+            />
+          
+            <Route
+              path="/perubahan/analisis"
+              element={
+                <RequirePermission permission="change.view">
+                  <AnalisisPerubahanPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/perubahan/implementasi"
+              element={
+                <RequirePermission permission="change.view">
+                  <ImplementasiPerubahanPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/perubahan/evaluasi"
+              element={
+                <RequirePermission permission="change.view">
+                  <EvaluasiPerubahanPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/perubahan/logbook"
+              element={
+                <RequirePermission permission="change.view">
+                  <LogbookPerubahanPage />
+                </RequirePermission>
+              }
+            />
           </Route>
 
           <Route
             path="*"
-            element={<Navigate to="/dashboard" replace />}
+            element={
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            }
           />
         </Routes>
       )}

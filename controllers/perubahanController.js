@@ -5,6 +5,126 @@ const isPositiveInteger = (value) => {
     return Number.isInteger(number) && number > 0;
 };
 
+exports.getUnitOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                uk.id,
+                uk.instansi_id,
+                uk.kode_unit,
+                uk.nama_unit,
+                uk.status,
+                i.kode_instansi,
+                i.nama_instansi
+            FROM unit_kerja uk
+            JOIN instansi i
+                ON i.id = uk.instansi_id
+            WHERE uk.status = 'Aktif'
+            ORDER BY i.nama_instansi ASC, uk.nama_unit ASC
+        `);
+
+        return res.status(200).json({
+            data: rows
+        });
+    } catch (error) {
+        console.error('getUnitOptions error:', error);
+
+        return res.status(500).json({
+            message: 'Terjadi kesalahan saat mengambil daftar unit kerja.'
+        });
+    }
+};
+
+exports.getUserOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                id,
+                nama,
+                email,
+                role,
+                role_id
+            FROM users
+            ORDER BY nama ASC
+        `);
+
+        return res.status(200).json({
+            data: rows
+        });
+    } catch (error) {
+        console.error('getUserOptions error:', error);
+
+        return res.status(500).json({
+            message: 'Terjadi kesalahan saat mengambil daftar pengguna.'
+        });
+    }
+};
+
+exports.getLayananOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                ld.id,
+                ld.instansi_id,
+                ld.unit_kerja_id,
+                ld.kode_layanan,
+                ld.nama_layanan,
+                ld.jenis_layanan,
+                ld.status,
+                i.kode_instansi,
+                i.nama_instansi,
+                uk.kode_unit,
+                uk.nama_unit
+            FROM layanan_digital ld
+            JOIN instansi i
+                ON i.id = ld.instansi_id
+            LEFT JOIN unit_kerja uk
+                ON uk.id = ld.unit_kerja_id
+            WHERE ld.status = 'Aktif'
+            ORDER BY ld.nama_layanan ASC
+        `);
+
+        return res.status(200).json({
+            data: rows
+        });
+    } catch (error) {
+        console.error('getLayananOptions error:', error);
+
+        return res.status(500).json({
+            message: 'Terjadi kesalahan saat mengambil daftar layanan digital.'
+        });
+    }
+};
+
+exports.getLayananPrioritasOptions = async (req, res) => {
+    try {
+        const [rows] = await db.query(`
+            SELECT
+                lp.id,
+                lp.id AS layanan_prioritas_id,
+                lp.kode_prioritas,
+                lp.layanan_id,
+                ld.kode_layanan,
+                ld.nama_layanan
+            FROM layanan_prioritas lp
+            JOIN layanan_digital ld
+                ON ld.id = lp.layanan_id
+            WHERE ld.status = 'Aktif'
+            ORDER BY lp.kode_prioritas ASC, ld.nama_layanan ASC
+        `);
+
+        return res.status(200).json({
+            data: rows
+        });
+    } catch (error) {
+        console.error('getLayananPrioritasOptions error:', error);
+
+        return res.status(500).json({
+            message: 'Terjadi kesalahan saat mengambil daftar layanan prioritas.'
+        });
+    }
+};
+
 const perencanaanSelectQuery = `
     SELECT
         p.id,
@@ -6442,6 +6562,17 @@ const createKeputusanPelaksanaan = async (
             [result.insertId]
         );
 
+        if (keputusan === 'Disetujui') {
+            await db.query(
+                `
+                UPDATE mpr_perubahan
+                SET status = 'Evaluasi'
+                WHERE id = ?
+                `,
+                [Number(id)]
+            );
+        }
+
         return res.status(201).json({
             message:
                 keputusan === 'Disetujui'
@@ -7231,6 +7362,16 @@ exports.createLogPerubahan = async (
             FROM mpr_perubahan
             WHERE id = ?
             LIMIT 1
+            `,
+            [Number(id)]
+        );
+
+        await db.query(
+            `
+            UPDATE mpr_perubahan
+            SET status = 'Selesai'
+            WHERE id = ?
+            AND status = 'Evaluasi'
             `,
             [Number(id)]
         );

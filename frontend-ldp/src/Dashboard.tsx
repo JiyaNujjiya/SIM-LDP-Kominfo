@@ -8,10 +8,6 @@ import {
   BookOpen,
   ShieldCheck,
   UserRound,
-  Layers3,
-  FileCheck,
-  BarChart3,
-  Settings,
   ArrowLeft,
   Search,
   Bell,
@@ -58,17 +54,28 @@ const menuItems = [
     Icon: ShieldAlert,
     permission: "risk.view",
   },
-
-  // sementara menu lain belum kita pasang permission
-  { id: "bcp", label: "Keberlangsungan (BCP)", Icon: RotateCw },
-  { id: "pengetahuan", label: "Manajemen Pengetahuan", Icon: BookOpen },
-  { id: "keamanan", label: "Keamanan Informasi", Icon: ShieldCheck },
-  { id: "relasi", label: "Relasi Pengguna", Icon: UserRound },
-  { id: "aset", label: "Manajemen Aset", Icon: Layers3 },
-  { id: "kepatuhan", label: "Kepatuhan", Icon: FileCheck },
-  { id: "pelaporan", label: "Pelaporan", Icon: BarChart3 },
-  { id: "pengaturan", label: "Pengaturan", Icon: Settings },
-];
+  {
+    id: "perubahan",
+    label: "Manajemen Perubahan",
+    Icon: RotateCw,
+    permission: "change.view",
+  },
+  {
+    id: "pengetahuan",
+    label: "Manajemen Pengetahuan",
+    Icon: BookOpen,
+  },
+  {
+    id: "bcp",
+    label: "Manajemen Keberlangsungan",
+    Icon: ShieldCheck,
+  },
+  {
+    id: "relasi",
+    label: "Manajemen Relasi Pengguna",
+    Icon: UserRound,
+  },
+]
 
 /* ── KPI data ── */
 const kpis = [
@@ -285,8 +292,9 @@ export default function SimLdpDashboard({
   const [active, setActive] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
-  const[riskOpen, setRiskOpen] = useState(false);
+  const [riskOpen, setRiskOpen] = useState(false);
   const [riskForm3Open, setRiskForm3Open] = useState(false);
+  const [changeOpen, setChangeOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -305,23 +313,27 @@ export default function SimLdpDashboard({
   const handleMenuClick = (id: string) => {
     setActive(id);
 
-    if (id == "dashboard") {
+    if (id === "dashboard") {
       navigate("/dashboard");
     }
 
-    if (id == "risiko") {
+    if (id === "risiko") {
       setRiskOpen((prev) => !prev);
     }
 
-    if (id == "bcp") {
-      navigate("/bcp");
+    if (id === "perubahan") {
+      setChangeOpen((prev) => !prev);
     }
 
-    if (id == "pengetahuan") {
+    if (id === "pengetahuan") {
       navigate("/pengetahuan");
     }
 
-    if (id == "relasi") {
+    if (id === "bcp") {
+      navigate("/keberlangsungan");
+    }
+
+    if (id === "relasi") {
       navigate("/relasi-pengguna");
     }
   };
@@ -644,6 +656,83 @@ export default function SimLdpDashboard({
                     </div>
                   );
                 }
+                if (m.id === "perubahan") {
+                  return (
+                    <div key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActive("perubahan");
+                          setChangeOpen(true);
+                          navigate("/perubahan/perencanaan");
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "12px 16px",
+                          width: "100%",
+                          border: "none",
+                          borderRadius: 6,
+                          background: active.startsWith("perubahan")
+                            ? C.sidebarActive
+                            : "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <RotateCw
+                          size={18}
+                          color={C.sidebarText}
+                          strokeWidth={2}
+                        />
+
+                        <span
+                          style={{
+                            flex: 1,
+                            textAlign: "left",
+                            fontWeight: 500,
+                            fontSize: 13,
+                            color: C.sidebarText,
+                          }}
+                        >
+                          Manajemen Perubahan
+                        </span>
+
+                        {changeOpen ? (
+                          <ChevronDown size={16} color={C.sidebarText} />
+                        ) : (
+                          <ChevronRight size={16} color={C.sidebarText} />
+                        )}
+                      </button>
+
+                      {changeOpen && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            marginLeft: 28,
+                            marginTop: 4,
+                            gap: 2,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActive("perubahan-mpr01");
+                              navigate("/perubahan/perencanaan");
+                            }}
+                            style={subMenuStyle(
+                              active === "perubahan-mpr01"
+                            )}
+                          >
+                            MPR01 Perencanaan Perubahan
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <SidebarItem
                     key={m.id}

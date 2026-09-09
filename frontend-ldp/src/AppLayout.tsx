@@ -12,10 +12,6 @@ import {
   BookOpen,
   ShieldCheck,
   UserRound,
-  Layers3,
-  FileCheck,
-  BarChart3,
-  Settings,
   ArrowLeft,
   Search,
   Bell,
@@ -55,9 +51,10 @@ const menuItems = [
     permission: "risk.view",
   },
   {
-    id: "bcp",
-    label: "Manajemen Keberlangsungan",
+    id: "perubahan",
+    label: "Manajemen Perubahan",
     Icon: RotateCw,
+    permission: "change.view",
   },
   {
     id: "pengetahuan",
@@ -65,34 +62,14 @@ const menuItems = [
     Icon: BookOpen,
   },
   {
-    id: "keamanan",
-    label: "Manajemen Keamanan",
+    id: "bcp",
+    label: "Manajemen Keberlangsungan",
     Icon: ShieldCheck,
   },
   {
     id: "relasi",
     label: "Manajemen Relasi Pengguna",
     Icon: UserRound,
-  },
-  {
-    id: "aset",
-    label: "Layanan Digital",
-    Icon: Layers3,
-  },
-  {
-    id: "kepatuhan",
-    label: "Kertas Kerja",
-    Icon: FileCheck,
-  },
-  {
-    id: "pelaporan",
-    label: "Laporan",
-    Icon: BarChart3,
-  },
-  {
-    id: "pengaturan",
-    label: "Pengaturan",
-    Icon: Settings,
   },
 ];
 
@@ -134,6 +111,12 @@ export default function AppLayout({
         )
     );
 
+  const [changeOpen, setChangeOpen] = useState(
+    location.pathname.startsWith("/perubahan")
+  );
+
+
+
   const savedUser = localStorage.getItem("user");
   const user = savedUser
     ? JSON.parse(savedUser)
@@ -155,6 +138,9 @@ export default function AppLayout({
 
   const risikoActive =
     location.pathname.startsWith("/risiko");
+
+  const perubahanActive =
+    location.pathname.startsWith("/perubahan");
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -226,6 +212,41 @@ export default function AppLayout({
       };
     }
 
+    if (path === "/perubahan/perencanaan") {
+      return {
+        parent: "Manajemen Perubahan",
+        current: "MPR01 - Perencanaan Perubahan",
+      };
+    }
+
+    if (path === "/perubahan/analisis") {
+      return {
+        parent: "Manajemen Perubahan",
+        current: "MPR02 - Analisis Dampak",
+      };
+    }
+
+    if (path === "/perubahan/implementasi") {
+      return {
+        parent: "Manajemen Perubahan",
+        current: "MPR03 - Implementasi Perubahan",
+      };
+    }
+
+    if (path === "/perubahan/evaluasi") {
+      return {
+        parent: "Manajemen Perubahan",
+        current: "Evaluasi Perubahan",
+      };
+    }
+
+    if (path === "/perubahan/logbook") {
+      return {
+        parent: "Manajemen Perubahan",
+        current: "MPR05 - Logbook Perubahan",
+      };
+    }
+
     return {
       parent: "",
       current: "Dashboard",
@@ -233,6 +254,7 @@ export default function AppLayout({
   };
 
   const breadcrumb = getBreadcrumb();
+  
 
   return (
     <div
@@ -245,7 +267,6 @@ export default function AppLayout({
           "Inter, system-ui, sans-serif",
       }}
     >
-      {/* SIDEBAR */}
       <aside
         style={{
           width: sidebarW,
@@ -260,7 +281,6 @@ export default function AppLayout({
           overflow: "hidden",
         }}
       >
-        {/* BRAND */}
         <div
           style={{
             display: "flex",
@@ -318,8 +338,6 @@ export default function AppLayout({
             </div>
           )}
         </div>
-
-        {/* MENU */}
         <nav
           style={{
             display: "flex",
@@ -339,19 +357,12 @@ export default function AppLayout({
                     key={m.id}
                     type="button"
                     onClick={() => {
-                      if (
-                        m.id === "dashboard"
-                      ) {
-                        navigate("/dashboard");
-                      }
-
-                      if (
-                        m.id === "risiko"
-                      ) {
-                        navigate(
-                          "/risiko/overview"
-                        );
-                      }
+                      if (m.id === "dashboard") navigate("/dashboard");
+                      if (m.id === "risiko") navigate("/risiko/overview");
+                      if (m.id === "perubahan") navigate("/perubahan/perencanaan");
+                      if (m.id === "pengetahuan") navigate("/pengetahuan");
+                      if (m.id === "bcp") navigate("/keberlangsungan");
+                      if (m.id === "relasi") navigate("/relasi-pengguna");
                     }}
                     title={m.label}
                     style={{
@@ -369,11 +380,11 @@ export default function AppLayout({
                           ? risikoActive
                             ? C.sidebarActive
                             : "transparent"
-                          : m.id ===
-                              "dashboard" &&
-                            isActive(
-                              "/dashboard"
-                            )
+                          : m.id === "perubahan"
+                          ? perubahanActive
+                            ? C.sidebarActive
+                            : "transparent"
+                          : m.id === "dashboard" && isActive("/dashboard")
                           ? C.sidebarActive
                           : "transparent",
                     }}
@@ -395,8 +406,13 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        navigate("/risiko/overview");
-                        setRiskOpen(true)
+                        if (!risikoActive) {
+                          navigate("/risiko/overview");
+                          setRiskOpen(true);
+                          return;
+                        }
+
+                        setRiskOpen((prev) => !prev);
                       }}
                       style={{
                         display: "flex",
@@ -539,7 +555,7 @@ export default function AppLayout({
                             }}
                           >
                             <span>
-                              3.0 Pemantauan dan Pelaporan
+                              3.0 Peta Risiko dan Monitoring
                             </span>
 
                             {riskForm3Open ? (
@@ -637,19 +653,150 @@ export default function AppLayout({
                 );
               }
 
+
+              if (m.id === "perubahan") {
+                return (
+                  <div key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!perubahanActive) {
+                          navigate("/perubahan/perencanaan");
+                          setChangeOpen(true);
+                          return;
+                        }
+
+                        setChangeOpen((prev) => !prev);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 16px",
+                        width: "100%",
+                        border: "none",
+                        borderRadius: 6,
+                        background: perubahanActive
+                          ? C.sidebarActive
+                          : "transparent",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <RotateCw
+                        size={18}
+                        color={C.sidebarText}
+                        strokeWidth={2}
+                      />
+
+                      <span
+                        style={{
+                          flex: 1,
+                          textAlign: "left",
+                          fontWeight: 500,
+                          fontSize: 13,
+                          color: C.sidebarText,
+                        }}
+                      >
+                        Manajemen Perubahan
+                      </span>
+
+                      {changeOpen ? (
+                        <ChevronDown
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      ) : (
+                        <ChevronRight
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      )}
+                    </button>
+
+                    {changeOpen && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          marginLeft: 28,
+                          marginTop: 4,
+                          gap: 2,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/perubahan/perencanaan")
+                          }
+                          style={subMenuStyle(
+                            isActive("/perubahan/perencanaan")
+                          )}
+                        >
+                          MPR01 Perencanaan Perubahan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/perubahan/analisis")
+                          }
+                          style={subMenuStyle(
+                            isActive("/perubahan/analisis")
+                          )}
+                        >
+                          MPR02 Analisis Dampak
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/perubahan/implementasi")
+                          }
+                          style={subMenuStyle(
+                            isActive("/perubahan/implementasi")
+                          )}
+                        >
+                          MPR03 Implementasi Perubahan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/perubahan/evaluasi")
+                          }
+                          style={subMenuStyle(
+                            isActive("/perubahan/evaluasi")
+                          )}
+                        >
+                          Evaluasi Perubahan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/perubahan/logbook")
+                          }
+                          style={subMenuStyle(
+                            isActive("/perubahan/logbook")
+                          )}
+                        >
+                          MPR05 Logbook Perubahan
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => {
-                    if (
-                      m.id ===
-                      "dashboard"
-                    ) {
-                      navigate(
-                        "/dashboard"
-                      );
-                    }
+                    if (m.id === "dashboard") navigate("/dashboard");
+                    if (m.id === "pengetahuan") navigate("/pengetahuan");
+                    if (m.id === "bcp") navigate("/keberlangsungan");
+                    if (m.id === "relasi") navigate("/relasi-pengguna");
                   }}
                   style={{
                     display: "flex",
@@ -690,8 +837,6 @@ export default function AppLayout({
               );
             })}
         </nav>
-
-        {/* COLLAPSE */}
         <button
           type="button"
           onClick={() =>
@@ -734,13 +879,11 @@ export default function AppLayout({
                   C.sidebarText,
               }}
             >
-              Sembunyikan Menu
+              Kecilkan Menu
             </span>
           )}
         </button>
       </aside>
-
-      {/* WORKSPACE */}
       <div
         style={{
           flex: 1,
@@ -749,7 +892,6 @@ export default function AppLayout({
           minWidth: 0,
         }}
       >
-        {/* TOPBAR */}
         <header
           style={{
             boxSizing: "border-box",
