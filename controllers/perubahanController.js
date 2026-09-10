@@ -7087,40 +7087,6 @@ exports.deleteEvaluasi = async (req, res) => {
             [Number(id)]
         );
 
-        // Jika seluruh evaluasi dihapus,
-        // status kembali ke Implementasi,
-        // tetapi hanya jika saat ini masih Evaluasi.
-        const [remainingRows] = await db.query(
-            `
-            SELECT COUNT(*) AS total
-            FROM mpr_evaluasi
-            WHERE implementasi_id = ?
-            `,
-            [
-                Number(
-                    evaluasi.implementasi_id
-                )
-            ]
-        );
-
-        if (
-            Number(remainingRows[0].total) === 0
-        ) {
-            await db.query(
-                `
-                UPDATE mpr_perubahan
-                SET status = 'Implementasi'
-                WHERE id = ?
-                  AND status = 'Evaluasi'
-                `,
-                [
-                    Number(
-                        evaluasi.perubahan_id
-                    )
-                ]
-            );
-        }
-
         return res.status(200).json({
             message:
                 'Evaluasi perubahan berhasil dihapus.'

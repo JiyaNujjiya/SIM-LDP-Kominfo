@@ -303,15 +303,6 @@ export default function ImplementasiPerubahanPage() {
   const [showImplementasiForm, setShowImplementasiForm] =
     useState(false);
 
-  const [showSumberDayaForm, setShowSumberDayaForm] =
-    useState(false);
-
-  const [showAnggaranForm, setShowAnggaranForm] =
-    useState(false);
-
-  const [showIndikatorForm, setShowIndikatorForm] =
-    useState(false);
-
   const [showStrategiForm, setShowStrategiForm] =
     useState(false);
 
@@ -329,15 +320,6 @@ export default function ImplementasiPerubahanPage() {
     "approve" | "reject" | null
   >(null);
 
-  const [editingSumberDaya, setEditingSumberDaya] =
-    useState<SumberDayaItem | null>(null);
-
-  const [editingAnggaran, setEditingAnggaran] =
-    useState<AnggaranItem | null>(null);
-
-  const [editingIndikator, setEditingIndikator] =
-    useState<IndikatorItem | null>(null);
-
   const [editingStakeholder, setEditingStakeholder] =
     useState<StakeholderItem | null>(null);
 
@@ -352,20 +334,11 @@ export default function ImplementasiPerubahanPage() {
     jangka_waktu_pelaksanaan: "",
     unit_pelaksana_id: "",
     pic_implementasi_id: "",
-  });
-
-  const [sumberDayaForm, setSumberDayaForm] = useState({
-    jenis_sumber_daya: "Manusia",
-    deskripsi: "",
-  });
-
-  const [anggaranForm, setAnggaranForm] = useState({
+    sumber_daya_manusia: "",
+    sumber_daya_tik: "",
     alokasi_anggaran: "",
     skema_pembiayaan: "",
-  });
-
-  const [indikatorForm, setIndikatorForm] = useState({
-    indikator: "",
+    indikator_keberhasilan: [""],
   });
 
   const [strategiForm, setStrategiForm] = useState({
@@ -694,6 +667,11 @@ export default function ImplementasiPerubahanPage() {
       jangka_waktu_pelaksanaan: "",
       unit_pelaksana_id: "",
       pic_implementasi_id: "",
+      sumber_daya_manusia: "",
+      sumber_daya_tik: "",
+      alokasi_anggaran: "",
+      skema_pembiayaan: "",
+      indikator_keberhasilan: [""],
     });
   };
 
@@ -702,6 +680,17 @@ export default function ImplementasiPerubahanPage() {
     setMessage("");
 
     if (implementasi) {
+      const sumberDayaManusia = sumberDaya.find(
+        (item) => item.jenis_sumber_daya === "Manusia"
+      );
+
+      const sumberDayaTIK = sumberDaya.find(
+        (item) => item.jenis_sumber_daya === "TIK"
+      );
+
+      const anggaranUtama =
+        anggaran.length > 0 ? anggaran[0] : null;
+
       setImplementasiForm({
         tanggal_rencana_pelaksanaan:
           implementasi.tanggal_rencana_pelaksanaan?.slice(
@@ -716,6 +705,19 @@ export default function ImplementasiPerubahanPage() {
         pic_implementasi_id: String(
           implementasi.pic_implementasi_id || ""
         ),
+        sumber_daya_manusia:
+          sumberDayaManusia?.deskripsi || "",
+        sumber_daya_tik:
+          sumberDayaTIK?.deskripsi || "",
+        alokasi_anggaran: anggaranUtama
+          ? String(anggaranUtama.alokasi_anggaran ?? "")
+          : "",
+        skema_pembiayaan:
+          anggaranUtama?.skema_pembiayaan || "",
+        indikator_keberhasilan:
+          indikator.length > 0
+            ? indikator.map((item) => item.indikator)
+            : [""],
       });
     } else {
       resetImplementasiForm();
@@ -729,14 +731,25 @@ export default function ImplementasiPerubahanPage() {
       return;
     }
 
+    const indikatorBersih =
+      implementasiForm.indikator_keberhasilan
+        .map((item) => item.trim())
+        .filter(Boolean);
+
     if (
       !implementasiForm.tanggal_rencana_pelaksanaan ||
       !implementasiForm.jangka_waktu_pelaksanaan.trim() ||
       !implementasiForm.unit_pelaksana_id ||
-      !implementasiForm.pic_implementasi_id
+      !implementasiForm.pic_implementasi_id ||
+      !implementasiForm.sumber_daya_manusia.trim() ||
+      !implementasiForm.sumber_daya_tik.trim() ||
+      implementasiForm.alokasi_anggaran === "" ||
+      Number(implementasiForm.alokasi_anggaran) < 0 ||
+      !implementasiForm.skema_pembiayaan.trim() ||
+      indikatorBersih.length === 0
     ) {
       setError(
-        "Tanggal pelaksanaan, jangka waktu, unit pelaksana, dan PIC wajib diisi."
+        "Seluruh data Formulir 3.1 wajib diisi dengan benar."
       );
       return;
     }
@@ -746,7 +759,7 @@ export default function ImplementasiPerubahanPage() {
     setMessage("");
 
     try {
-      const payload = {
+      const payloadImplementasi = {
         tanggal_rencana_pelaksanaan:
           implementasiForm.tanggal_rencana_pelaksanaan,
         jangka_waktu_pelaksanaan:
@@ -759,49 +772,222 @@ export default function ImplementasiPerubahanPage() {
         ),
       };
 
-      let result;
+      let resultImplementasi;
 
       if (implementasi) {
-        result = await request(
+        resultImplementasi = await request(
           `${API}/perubahan/implementasi/${implementasi.id}`,
           {
             method: "PUT",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payloadImplementasi),
           }
         );
       } else {
-        result = await request(
+        resultImplementasi = await request(
           `${API}/perubahan/${selectedPerubahan.id}/implementasi`,
           {
             method: "POST",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payloadImplementasi),
           }
         );
       }
 
-      setImplementasi(result.data || null);
-      setShowImplementasiForm(false);
-      setMessage(
-        result.message ||
-          "Data implementasi berhasil disimpan."
+      const implementasiId =
+        implementasi?.id ||
+        resultImplementasi.data?.id;
+
+      if (!implementasiId) {
+        throw new Error(
+          "ID implementasi tidak ditemukan setelah penyimpanan."
+        );
+      }
+
+      const sumberManusiaLama = sumberDaya.find(
+        (item) =>
+          item.jenis_sumber_daya === "Manusia"
       );
 
-      if (result.data?.id) {
+      const sumberTIKLama = sumberDaya.find(
+        (item) =>
+          item.jenis_sumber_daya === "TIK"
+      );
+
+      if (sumberManusiaLama) {
+        await request(
+          `${API}/perubahan/sumber-daya/${sumberManusiaLama.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              jenis_sumber_daya: "Manusia",
+              deskripsi:
+                implementasiForm.sumber_daya_manusia.trim(),
+            }),
+          }
+        );
+      } else {
+        await request(
+          `${API}/perubahan/implementasi/${implementasiId}/sumber-daya`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              jenis_sumber_daya: "Manusia",
+              deskripsi:
+                implementasiForm.sumber_daya_manusia.trim(),
+            }),
+          }
+        );
+      }
+
+      if (sumberTIKLama) {
+        await request(
+          `${API}/perubahan/sumber-daya/${sumberTIKLama.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              jenis_sumber_daya: "TIK",
+              deskripsi:
+                implementasiForm.sumber_daya_tik.trim(),
+            }),
+          }
+        );
+      } else {
+        await request(
+          `${API}/perubahan/implementasi/${implementasiId}/sumber-daya`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              jenis_sumber_daya: "TIK",
+              deskripsi:
+                implementasiForm.sumber_daya_tik.trim(),
+            }),
+          }
+        );
+      }
+
+      const anggaranLama =
+        anggaran.length > 0
+          ? anggaran[0]
+          : null;
+
+      const payloadAnggaran = {
+        alokasi_anggaran: Number(
+          implementasiForm.alokasi_anggaran
+        ),
+        skema_pembiayaan:
+          implementasiForm.skema_pembiayaan.trim(),
+      };
+
+      if (anggaranLama) {
+        await request(
+          `${API}/perubahan/anggaran/${anggaranLama.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(payloadAnggaran),
+          }
+        );
+      } else {
+        await request(
+          `${API}/perubahan/implementasi/${implementasiId}/anggaran`,
+          {
+            method: "POST",
+            body: JSON.stringify(payloadAnggaran),
+          }
+        );
+      }
+
+      for (
+        let index = 0;
+        index < indikatorBersih.length;
+        index++
+      ) {
+        const indikatorLama =
+          indikator[index];
+
+        if (indikatorLama) {
+          await request(
+            `${API}/perubahan/indikator-keberhasilan/${indikatorLama.id}`,
+            {
+              method: "PUT",
+              body: JSON.stringify({
+                indikator:
+                  indikatorBersih[index],
+              }),
+            }
+          );
+        } else {
+          await request(
+            `${API}/perubahan/implementasi/${implementasiId}/indikator-keberhasilan`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                indikator:
+                  indikatorBersih[index],
+              }),
+            }
+          );
+        }
+      }
+
+      if (
+        indikator.length >
+        indikatorBersih.length
+      ) {
+        const indikatorDihapus =
+          indikator.slice(
+            indikatorBersih.length
+          );
+
+        for (const item of indikatorDihapus) {
+          await request(
+            `${API}/perubahan/indikator-keberhasilan/${item.id}`,
+            {
+              method: "DELETE",
+            }
+          );
+        }
+      }
+
+      const refreshedImplementasi =
+        await fetchImplementasi(
+          selectedPerubahan.id
+        );
+
+      if (refreshedImplementasi?.id) {
         await Promise.all([
-          fetchSumberDaya(result.data.id),
-          fetchAnggaran(result.data.id),
-          fetchIndikator(result.data.id),
-          fetchStrategi(result.data.id),
-          fetchStakeholder(result.data.id),
-          fetchKomunikasi(result.data.id),
-          fetchPelatihan(result.data.id),
+          fetchSumberDaya(
+            refreshedImplementasi.id
+          ),
+          fetchAnggaran(
+            refreshedImplementasi.id
+          ),
+          fetchIndikator(
+            refreshedImplementasi.id
+          ),
+          fetchStrategi(
+            refreshedImplementasi.id
+          ),
+          fetchStakeholder(
+            refreshedImplementasi.id
+          ),
+          fetchKomunikasi(
+            refreshedImplementasi.id
+          ),
+          fetchPelatihan(
+            refreshedImplementasi.id
+          ),
         ]);
       }
+
+      setShowImplementasiForm(false);
+
+      setMessage(
+        "Formulir 3.1 berhasil disimpan."
+      );
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Gagal menyimpan data implementasi."
+          : "Gagal menyimpan Formulir 3.1."
       );
     } finally {
       setSaving(false);
@@ -851,355 +1037,6 @@ export default function ImplementasiPerubahanPage() {
         err instanceof Error
           ? err.message
           : "Gagal menghapus data implementasi."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-    const openSumberDayaForm = (
-    item?: SumberDayaItem
-  ) => {
-    setError("");
-    setMessage("");
-
-    if (item) {
-      setEditingSumberDaya(item);
-      setSumberDayaForm({
-        jenis_sumber_daya: item.jenis_sumber_daya,
-        deskripsi: item.deskripsi,
-      });
-    } else {
-      setEditingSumberDaya(null);
-      setSumberDayaForm({
-        jenis_sumber_daya: "Manusia",
-        deskripsi: "",
-      });
-    }
-
-    setShowSumberDayaForm(true);
-  };
-
-  const handleSaveSumberDaya = async () => {
-    if (!implementasi) {
-      return;
-    }
-
-    if (!sumberDayaForm.deskripsi.trim()) {
-      setError("Deskripsi sumber daya wajib diisi.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const payload = {
-        jenis_sumber_daya:
-          sumberDayaForm.jenis_sumber_daya,
-        deskripsi:
-          sumberDayaForm.deskripsi.trim(),
-      };
-
-      let result;
-
-      if (editingSumberDaya) {
-        result = await request(
-          `${API}/perubahan/sumber-daya/${editingSumberDaya.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(payload),
-          }
-        );
-      } else {
-        result = await request(
-          `${API}/perubahan/implementasi/${implementasi.id}/sumber-daya`,
-          {
-            method: "POST",
-            body: JSON.stringify(payload),
-          }
-        );
-      }
-
-      await fetchSumberDaya(implementasi.id);
-
-      setShowSumberDayaForm(false);
-      setEditingSumberDaya(null);
-
-      setMessage(
-        result.message ||
-          "Sumber daya berhasil disimpan."
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal menyimpan sumber daya."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteSumberDaya = async (
-    id: number
-  ) => {
-    if (!implementasi) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Hapus data sumber daya ini?"
-      )
-    ) {
-      return;
-    }
-
-    setError("");
-    setMessage("");
-
-    try {
-      const result = await request(
-        `${API}/perubahan/sumber-daya/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      await fetchSumberDaya(implementasi.id);
-
-      setMessage(
-        result.message ||
-          "Sumber daya berhasil dihapus."
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal menghapus sumber daya."
-      );
-    }
-  };
-
-  const openAnggaranForm = (
-    item?: AnggaranItem
-  ) => {
-    setError("");
-    setMessage("");
-
-    if (item) {
-      setEditingAnggaran(item);
-      setAnggaranForm({
-        alokasi_anggaran: String(
-          item.alokasi_anggaran ?? ""
-        ),
-        skema_pembiayaan:
-          item.skema_pembiayaan || "",
-      });
-    } else {
-      setEditingAnggaran(null);
-      setAnggaranForm({
-        alokasi_anggaran: "",
-        skema_pembiayaan: "",
-      });
-    }
-
-    setShowAnggaranForm(true);
-  };
-
-  const handleSaveAnggaran = async () => {
-    if (!implementasi) {
-      return;
-    }
-
-    if (
-      anggaranForm.alokasi_anggaran === "" ||
-      Number(anggaranForm.alokasi_anggaran) < 0
-    ) {
-      setError(
-        "Alokasi anggaran wajib berupa angka 0 atau lebih."
-      );
-      return;
-    }
-
-    if (!anggaranForm.skema_pembiayaan.trim()) {
-      setError("Skema pembiayaan wajib diisi.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const payload = {
-        alokasi_anggaran: Number(
-          anggaranForm.alokasi_anggaran
-        ),
-        skema_pembiayaan:
-          anggaranForm.skema_pembiayaan.trim(),
-      };
-
-      let result;
-
-      if (editingAnggaran) {
-        result = await request(
-          `${API}/perubahan/anggaran/${editingAnggaran.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(payload),
-          }
-        );
-      } else {
-        result = await request(
-          `${API}/perubahan/implementasi/${implementasi.id}/anggaran`,
-          {
-            method: "POST",
-            body: JSON.stringify(payload),
-          }
-        );
-      }
-
-      await fetchAnggaran(implementasi.id);
-
-      setShowAnggaranForm(false);
-      setEditingAnggaran(null);
-
-      setMessage(
-        result.message ||
-          "Data anggaran berhasil disimpan."
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal menyimpan anggaran."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteAnggaran = async (
-    id: number
-  ) => {
-    if (!implementasi) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Hapus data anggaran ini?"
-      )
-    ) {
-      return;
-    }
-
-    setError("");
-    setMessage("");
-
-    try {
-      const result = await request(
-        `${API}/perubahan/anggaran/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      await fetchAnggaran(implementasi.id);
-
-      setMessage(
-        result.message ||
-          "Data anggaran berhasil dihapus."
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal menghapus anggaran."
-      );
-    }
-  };
-
-  const openIndikatorForm = (
-    item?: IndikatorItem
-  ) => {
-    setError("");
-    setMessage("");
-
-    if (item) {
-      setEditingIndikator(item);
-      setIndikatorForm({
-        indikator: item.indikator,
-      });
-    } else {
-      setEditingIndikator(null);
-      setIndikatorForm({
-        indikator: "",
-      });
-    }
-
-    setShowIndikatorForm(true);
-  };
-
-  const handleSaveIndikator = async () => {
-    if (!implementasi) {
-      return;
-    }
-
-    if (!indikatorForm.indikator.trim()) {
-      setError(
-        "Indikator keberhasilan wajib diisi."
-      );
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const payload = {
-        indikator:
-          indikatorForm.indikator.trim(),
-      };
-
-      let result;
-
-      if (editingIndikator) {
-        result = await request(
-          `${API}/perubahan/indikator-keberhasilan/${editingIndikator.id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(payload),
-          }
-        );
-      } else {
-        result = await request(
-          `${API}/perubahan/implementasi/${implementasi.id}/indikator-keberhasilan`,
-          {
-            method: "POST",
-            body: JSON.stringify(payload),
-          }
-        );
-      }
-
-      await fetchIndikator(implementasi.id);
-
-      setShowIndikatorForm(false);
-      setEditingIndikator(null);
-
-      setMessage(
-        result.message ||
-          "Indikator keberhasilan berhasil disimpan."
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal menyimpan indikator keberhasilan."
       );
     } finally {
       setSaving(false);
@@ -2020,8 +1857,8 @@ export default function ImplementasiPerubahanPage() {
 
   if (!selectedPerubahan) {
     return (
-      <div className="space-y-6">
-        <div>
+      <div className="p-6">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900">
             MPR03 - Implementasi Perubahan
           </h1>
@@ -2031,8 +1868,57 @@ export default function ImplementasiPerubahanPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-6">
+       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            {[1, 2, 3, 4, 5].map((step, index) => {
+              const labels = [
+                "Perencanaan",
+                "Analisis",
+                "Implementasi",
+                "Evaluasi",
+                "Pencatatan / Logbook",
+              ];
+
+              const active = step === 3;
+
+              return (
+                <div
+                  key={step}
+                  className="flex flex-1 items-start"
+                >
+                  <div className="flex min-w-[110px] flex-col items-center text-center">
+                    <div
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
+                        active
+                          ? "border-slate-800 bg-slate-800 text-white"
+                          : "border-slate-300 bg-white text-slate-500"
+                      }`}
+                    >
+                      {step}
+                    </div>
+
+                    <span
+                      className={`mt-2 text-xs ${
+                        active
+                          ? "font-semibold text-slate-800"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {labels[index]}
+                    </span>
+                  </div>
+
+                  {index < 4 && (
+                    <div className="mt-[18px] h-px flex-1 bg-slate-200" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 p-5">
             <h2 className="text-lg font-semibold text-slate-900">
               Daftar Perubahan
             </h2>
@@ -2042,13 +1928,13 @@ export default function ImplementasiPerubahanPage() {
             </p>
           </div>
 
-          <div className="p-6">
+          <div className="p-5">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari ID perubahan, detail, lingkup, klasifikasi, atau status..."
-              className="mb-5 w-full max-w-xl rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
+              placeholder="Cari ID perubahan, layanan, detail, lingkup, klasifikasi, atau status..."
+              className="mb-5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:max-w-md"
             />
 
             {error && (
@@ -2067,22 +1953,25 @@ export default function ImplementasiPerubahanPage() {
               <table className="w-full table-fixed">
                 <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                   <tr>
-                    <th className="w-[16%] px-4 py-3">
+                    <th className="px-4 py-3 font-semibold">
                       ID Perubahan
                     </th>
-                    <th className="w-[30%] px-4 py-3">
+                    <th className="px-4 py-3 font-semibold">
+                      Layanan Digital
+                    </th>
+                    <th className="px-4 py-3 font-semibold">
                       Detail Perubahan
                     </th>
-                    <th className="w-[14%] px-4 py-3">
+                    <th className="px-4 py-3 font-semibold">
                       Klasifikasi
                     </th>
-                    <th className="w-[16%] px-4 py-3">
+                    <th className="px-4 py-3 font-semibold">
                       Lingkup
                     </th>
-                    <th className="w-[14%] px-4 py-3 text-center">
+                    <th className="px-4 py-3 text-center font-semibold">
                       Status
                     </th>
-                    <th className="w-[10%] px-4 py-3 text-center">
+                    <th className="px-4 py-3 text-center font-semibold">
                       Aksi
                     </th>
                   </tr>
@@ -2092,7 +1981,7 @@ export default function ImplementasiPerubahanPage() {
                   {filteredPerubahan.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-4 py-10 text-center text-sm text-slate-400"
                       >
                         Belum ada perubahan yang dapat masuk tahap implementasi.
@@ -2103,6 +1992,10 @@ export default function ImplementasiPerubahanPage() {
                       <tr key={item.id}>
                         <td className="px-4 py-4 align-top font-semibold text-slate-800">
                           {item.kode_perubahan}
+                        </td>
+
+                        <td className="px-4 py-4 align-top text-sm text-slate-700">
+                          {item.nama_layanan || "-"}
                         </td>
 
                         <td className="px-4 py-4 align-top text-sm text-slate-700">
@@ -2131,7 +2024,7 @@ export default function ImplementasiPerubahanPage() {
                           <button
                             type="button"
                             onClick={() => fetchDetail(item)}
-                            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            className="whitespace-nowrap rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                           >
                             Implementasi
                           </button>
@@ -2284,7 +2177,7 @@ export default function ImplementasiPerubahanPage() {
         </div>
       ) : (
         <>
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 p-6">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">
@@ -2334,327 +2227,285 @@ export default function ImplementasiPerubahanPage() {
                 Data implementasi belum tersedia.
               </div>
             ) : (
-              <div className="grid gap-5 p-6 md:grid-cols-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    Tanggal Pelaksanaan
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {formatDate(
-                      implementasi.tanggal_rencana_pelaksanaan
+              <>
+                <div className="grid gap-5 p-6 md:grid-cols-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">
+                      Tanggal Pelaksanaan
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {formatDate(
+                        implementasi.tanggal_rencana_pelaksanaan
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">
+                      Jangka Waktu
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {implementasi.jangka_waktu_pelaksanaan}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">
+                      Unit Pelaksana
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {implementasi.nama_unit_pelaksana || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-slate-500">
+                      PIC Implementasi
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {implementasi.nama_pic_implementasi || "-"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 p-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Sumber Daya
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Sumber daya manusia dan TIK yang mendukung implementasi.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <table className="w-full table-fixed">
+                        <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
+                          <tr>
+                            <th className="w-[25%] px-4 py-3">
+                              Jenis
+                            </th>
+                            <th className="w-[75%] px-4 py-3">
+                              Deskripsi
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-200">
+                          {sumberDaya.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={2}
+                                className="px-4 py-8 text-center text-sm text-slate-400"
+                              >
+                                Belum ada sumber daya.
+                              </td>
+                            </tr>
+                          ) : (
+                            sumberDaya.map((item) => (
+                              <tr key={item.id}>
+                                <td className="px-4 py-3 text-sm font-semibold text-slate-800">
+                                  {item.jenis_sumber_daya}
+                                </td>
+
+                                <td className="px-4 py-3 text-sm text-slate-700">
+                                  {item.deskripsi}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 p-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Anggaran
+                      </h3>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        Alokasi anggaran dan skema pembiayaan implementasi.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <table className="w-full table-fixed">
+                        <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
+                          <tr>
+                            <th className="w-[40%] px-4 py-3">
+                              Alokasi Anggaran
+                            </th>
+                            <th className="w-[60%] px-4 py-3">
+                              Skema Pembiayaan
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-200">
+                          {anggaran.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={2}
+                                className="px-4 py-8 text-center text-sm text-slate-400"
+                              >
+                                Belum ada data anggaran.
+                              </td>
+                            </tr>
+                          ) : (
+                            anggaran.map((item) => (
+                              <tr key={item.id}>
+                                <td className="px-4 py-3 font-semibold text-slate-800">
+                                  {formatRupiah(
+                                    item.alokasi_anggaran
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3 text-sm text-slate-700">
+                                  {item.skema_pembiayaan}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 p-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Indikator Keberhasilan
+                      </h3>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        Kriteria keberhasilan pelaksanaan perubahan.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    {indikator.length === 0 ? (
+                      <p className="text-center text-sm text-slate-400">
+                        Belum ada indikator keberhasilan.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {indikator.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4"
+                          >
+                            <div className="flex gap-3">
+                              <span className="font-semibold text-slate-500">
+                                {index + 1}.
+                              </span>
+
+                              <span className="text-sm text-slate-800">
+                                {item.indikator}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                  </p>
+                  </div>
                 </div>
+                <div className="border-t border-slate-200 p-6">
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Persetujuan Pelaksanaan
+                      </h3>
 
-                <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    Jangka Waktu
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {implementasi.jangka_waktu_pelaksanaan}
-                  </p>
-                </div>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Keputusan persetujuan pelaksanaan perubahan.
+                      </p>
 
-                <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    Unit Pelaksana
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {implementasi.nama_unit_pelaksana || "-"}
-                  </p>
-                </div>
+                      {latestApproval ? (
+                        <div className="mt-4">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                              latestApproval.keputusan === "Disetujui"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {latestApproval.keputusan}
+                          </span>
 
-                <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    PIC Implementasi
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-800">
-                    {implementasi.nama_pic_implementasi || "-"}
-                  </p>
+                          {latestApproval.nama_pic && (
+                            <div className="mt-4">
+                              <p className="text-xs font-semibold uppercase text-slate-500">
+                                PIC Persetujuan
+                              </p>
+
+                              <p className="mt-1 text-sm font-semibold text-slate-800">
+                                {latestApproval.nama_pic}
+                              </p>
+                            </div>
+                          )}
+
+                          {latestApproval.catatan_keputusan && (
+                            <div className="mt-4">
+                              <p className="text-xs font-semibold uppercase text-slate-500">
+                                Catatan Keputusan
+                              </p>
+
+                              <p className="mt-1 text-sm leading-6 text-slate-700">
+                                {latestApproval.catatan_keputusan}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-sm text-slate-500">
+                          Belum ada keputusan persetujuan pelaksanaan.
+                        </p>
+                      )}
+                    </div>
+
+                    {!latestApproval && (
+                      <div className="flex shrink-0 gap-2">
+                        {canReject && (
+                          <button
+                            type="button"
+                            onClick={() => openApproval("reject")}
+                            className="rounded-md border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                          >
+                            Tolak
+                          </button>
+                        )}
+
+                        {canApprove && (
+                          <button
+                            type="button"
+                            onClick={() => openApproval("approve")}
+                            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                          >
+                            Setujui
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
 
-          {implementasi && (
-            <>
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-200 p-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      Sumber Daya
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Sumber daya manusia dan TIK yang mendukung implementasi.
-                    </p>
-                  </div>
-
-                  {canCreate && (
-                    <button
-                      type="button"
-                      onClick={() => openSumberDayaForm()}
-                      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-                    >
-                      Tambah Sumber Daya
-                    </button>
-                  )}
-                </div>
-
-                <div className="p-6">
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <table className="w-full table-fixed">
-                      <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
-                        <tr>
-                          <th className="w-[20%] px-4 py-3">
-                            Jenis
-                          </th>
-                          <th className="w-[60%] px-4 py-3">
-                            Deskripsi
-                          </th>
-                          <th className="w-[20%] px-4 py-3 text-center">
-                            Aksi
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody className="divide-y divide-slate-200">
-                        {sumberDaya.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={3}
-                              className="px-4 py-8 text-center text-sm text-slate-400"
-                            >
-                              Belum ada sumber daya.
-                            </td>
-                          </tr>
-                        ) : (
-                          sumberDaya.map((item) => (
-                            <tr key={item.id}>
-                              <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                                {item.jenis_sumber_daya}
-                              </td>
-
-                              <td className="px-4 py-3 text-sm text-slate-700">
-                                {item.deskripsi}
-                              </td>
-
-                              <td className="px-4 py-3 text-center">
-                                <div className="flex justify-center gap-2">
-                                  {canUpdate && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        openSumberDayaForm(item)
-                                      }
-                                      className="rounded-md border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-600"
-                                    >
-                                      Edit
-                                    </button>
-                                  )}
-
-                                  {canDelete && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleDeleteSumberDaya(
-                                          item.id
-                                        )
-                                      }
-                                      className="rounded-md border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600"
-                                    >
-                                      Hapus
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-200 p-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      Anggaran
-                    </h3>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      Alokasi anggaran dan skema pembiayaan implementasi.
-                    </p>
-                  </div>
-
-                  {canCreate && (
-                    <button
-                      type="button"
-                      onClick={() => openAnggaranForm()}
-                      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-                    >
-                      Tambah Anggaran
-                    </button>
-                  )}
-                </div>
-
-                <div className="p-6">
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <table className="w-full table-fixed">
-                      <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
-                        <tr>
-                          <th className="w-[30%] px-4 py-3">
-                            Alokasi Anggaran
-                          </th>
-                          <th className="w-[50%] px-4 py-3">
-                            Skema Pembiayaan
-                          </th>
-                          <th className="w-[20%] px-4 py-3 text-center">
-                            Aksi
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody className="divide-y divide-slate-200">
-                        {anggaran.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={3}
-                              className="px-4 py-8 text-center text-sm text-slate-400"
-                            >
-                              Belum ada data anggaran.
-                            </td>
-                          </tr>
-                        ) : (
-                          anggaran.map((item) => (
-                            <tr key={item.id}>
-                              <td className="px-4 py-3 font-semibold text-slate-800">
-                                {formatRupiah(
-                                  item.alokasi_anggaran
-                                )}
-                              </td>
-
-                              <td className="px-4 py-3 text-sm text-slate-700">
-                                {item.skema_pembiayaan}
-                              </td>
-
-                              <td className="px-4 py-3 text-center">
-                                <div className="flex justify-center gap-2">
-                                  {canUpdate && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        openAnggaranForm(item)
-                                      }
-                                      className="rounded-md border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-600"
-                                    >
-                                      Edit
-                                    </button>
-                                  )}
-
-                                  {canDelete && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleDeleteAnggaran(
-                                          item.id
-                                        )
-                                      }
-                                      className="rounded-md border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600"
-                                    >
-                                      Hapus
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-200 p-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      Indikator Keberhasilan
-                    </h3>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      Kriteria keberhasilan pelaksanaan perubahan.
-                    </p>
-                  </div>
-
-                  {canCreate && (
-                    <button
-                      type="button"
-                      onClick={() => openIndikatorForm()}
-                      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-                    >
-                      Tambah Indikator
-                    </button>
-                  )}
-                </div>
-
-                <div className="p-6">
-                  {indikator.length === 0 ? (
-                    <p className="text-center text-sm text-slate-400">
-                      Belum ada indikator keberhasilan.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {indikator.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-4"
-                        >
-                          <div className="flex gap-3">
-                            <span className="font-semibold text-slate-500">
-                              {index + 1}.
-                            </span>
-                            <span className="text-sm text-slate-800">
-                              {item.indikator}
-                            </span>
-                          </div>
-
-                          <div className="flex gap-2">
-                            {canUpdate && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openIndikatorForm(item)
-                                }
-                                className="rounded-md border border-blue-200 px-3 py-1.5 text-sm font-semibold text-blue-600"
-                              >
-                                Edit
-                              </button>
-                            )}
-
-                            {canDelete && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteIndikator(
-                                    item.id
-                                  )
-                                }
-                                className="rounded-md border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600"
-                              >
-                                Hapus
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
+            {implementasi && (
+             <>
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 p-6">
                   <div>
@@ -3111,72 +2962,7 @@ export default function ImplementasiPerubahanPage() {
                     </table>
                   </div>
                 </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">
-                      Persetujuan Pelaksanaan
-                    </h3>
-
-                    {latestApproval ? (
-                      <>
-                        <span
-                          className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            latestApproval.keputusan ===
-                            "Disetujui"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {latestApproval.keputusan}
-                        </span>
-
-                        {latestApproval.catatan_keputusan && (
-                          <p className="mt-3 text-sm text-slate-700">
-                            {
-                              latestApproval.catatan_keputusan
-                            }
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="mt-2 text-sm text-slate-500">
-                        Belum ada keputusan.
-                      </p>
-                    )}
-                  </div>
-
-                  {!latestApproval && (
-                    <div className="flex gap-2">
-                      {canReject && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openApproval("reject")
-                          }
-                          className="rounded-md border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-                        >
-                          Tolak
-                        </button>
-                      )}
-
-                      {canApprove && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openApproval("approve")
-                          }
-                          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
-                        >
-                          Setujui
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              </div>  
             </>
           )}
         </>
@@ -3185,134 +2971,343 @@ export default function ImplementasiPerubahanPage() {
       {showImplementasiForm && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
           <div className="flex min-h-full items-start justify-center p-4">
-            <div className="my-8 w-full max-w-2xl rounded-xl bg-white shadow-xl">
-              <div className="border-b border-slate-200 p-5">
+            <div className="my-8 w-full max-w-4xl rounded-xl bg-white shadow-xl">
+              <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
                 <h3 className="text-lg font-semibold text-slate-900">
                   {implementasi
-                    ? "Edit Informasi Implementasi"
-                    : "Tambah Informasi Implementasi"}
+                    ? "Edit Formulir 3.1 - Informasi Umum Perubahan"
+                    : "Tambah Formulir 3.1 - Informasi Umum Perubahan"}
                 </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Lengkapi seluruh informasi pelaksanaan perubahan dalam satu formulir.
+                </p>
               </div>
 
-              <div className="space-y-4 p-5">
+              <div className="space-y-6 p-5">
                 <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    Tanggal Pelaksanaan
-                  </label>
-                  <input
-                    type="date"
-                    value={
-                      implementasiForm.tanggal_rencana_pelaksanaan
-                    }
-                    onChange={(e) =>
-                      setImplementasiForm({
-                        ...implementasiForm,
-                        tanggal_rencana_pelaksanaan:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
+                  <h4 className="mb-4 text-sm font-semibold text-slate-900">
+                    Informasi Pelaksanaan
+                  </h4>
 
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    Jangka Waktu Pelaksanaan
-                  </label>
-                  <input
-                    type="text"
-                    value={
-                      implementasiForm.jangka_waktu_pelaksanaan
-                    }
-                    onChange={(e) =>
-                      setImplementasiForm({
-                        ...implementasiForm,
-                        jangka_waktu_pelaksanaan:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="Contoh: 30 hari kerja"
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Tanggal Pelaksanaan
+                      </label>
 
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    Unit Pelaksana
-                  </label>
-                  <select
-                    value={
-                      implementasiForm.unit_pelaksana_id
-                    }
-                    onChange={(e) =>
-                      setImplementasiForm({
-                        ...implementasiForm,
-                        unit_pelaksana_id:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-                  >
-                    <option value="">
-                      Pilih unit pelaksana
-                    </option>
+                      <input
+                        type="date"
+                        value={
+                          implementasiForm.tanggal_rencana_pelaksanaan
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            tanggal_rencana_pelaksanaan:
+                              e.target.value,
+                          })
+                        }
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </div>
 
-                    {unitOptions.map((unit) => (
-                      <option
-                        key={unit.id}
-                        value={unit.id}
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Jangka Waktu Pelaksanaan
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          implementasiForm.jangka_waktu_pelaksanaan
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            jangka_waktu_pelaksanaan:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: 30 hari"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Unit Pelaksana
+                      </label>
+
+                      <select
+                        value={
+                          implementasiForm.unit_pelaksana_id
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            unit_pelaksana_id:
+                              e.target.value,
+                          })
+                        }
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
                       >
-                        {unit.kode_unit} -{" "}
-                        {unit.nama_unit}
-                      </option>
-                    ))}
-                  </select>
+                        <option value="">
+                          Pilih unit pelaksana
+                        </option>
+
+                        {unitOptions.map((unit) => (
+                          <option
+                            key={unit.id}
+                            value={unit.id}
+                          >
+                            {unit.kode_unit} -{" "}
+                            {unit.nama_unit}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        PIC Implementasi
+                      </label>
+
+                      <select
+                        value={
+                          implementasiForm.pic_implementasi_id
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            pic_implementasi_id:
+                              e.target.value,
+                          })
+                        }
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                      >
+                        <option value="">
+                          Pilih PIC implementasi
+                        </option>
+
+                        {userOptions.map((user) => (
+                          <option
+                            key={user.id}
+                            value={user.id}
+                          >
+                            {user.nama}
+                            {user.role
+                              ? ` - ${user.role}`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">
-                    PIC Implementasi
-                  </label>
-                  <select
-                    value={
-                      implementasiForm.pic_implementasi_id
-                    }
-                    onChange={(e) =>
-                      setImplementasiForm({
-                        ...implementasiForm,
-                        pic_implementasi_id:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-                  >
-                    <option value="">
-                      Pilih PIC implementasi
-                    </option>
+                <div className="border-t border-slate-200 pt-5">
+                  <h4 className="mb-4 text-sm font-semibold text-slate-900">
+                    Sumber Daya yang Dibutuhkan
+                  </h4>
 
-                    {userOptions.map((user) => (
-                      <option
-                        key={user.id}
-                        value={user.id}
-                      >
-                        {user.nama}
-                        {user.role
-                          ? ` - ${user.role}`
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Sumber Daya Manusia
+                      </label>
+
+                      <textarea
+                        rows={4}
+                        value={
+                          implementasiForm.sumber_daya_manusia
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            sumber_daya_manusia:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Jelaskan sumber daya manusia yang dibutuhkan"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Sumber Daya TIK
+                      </label>
+
+                      <textarea
+                        rows={4}
+                        value={
+                          implementasiForm.sumber_daya_tik
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            sumber_daya_tik:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Jelaskan sumber daya TIK yang dibutuhkan"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-5">
+                  <h4 className="mb-4 text-sm font-semibold text-slate-900">
+                    Anggaran dan Pembiayaan
+                  </h4>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Alokasi Anggaran
+                      </label>
+
+                      <input
+                        type="number"
+                        min="0"
+                        value={
+                          implementasiForm.alokasi_anggaran
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            alokasi_anggaran:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: 6000000"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-semibold text-slate-700">
+                        Skema Pembiayaan
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          implementasiForm.skema_pembiayaan
+                        }
+                        onChange={(e) =>
+                          setImplementasiForm({
+                            ...implementasiForm,
+                            skema_pembiayaan:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: APBD"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-5">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-900">
+                        Indikator Keberhasilan Perubahan
+                      </h4>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Tambahkan minimal satu indikator keberhasilan.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImplementasiForm({
+                          ...implementasiForm,
+                          indikator_keberhasilan: [
+                            ...implementasiForm.indikator_keberhasilan,
+                            "",
+                          ],
+                        })
+                      }
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Tambah Indikator
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {implementasiForm.indikator_keberhasilan.map(
+                      (item, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-3"
+                        >
+                          <div className="pt-2 text-sm font-semibold text-slate-500">
+                            {index + 1}.
+                          </div>
+
+                          <textarea
+                            rows={3}
+                            value={item}
+                            onChange={(e) => {
+                              const next =
+                                [
+                                  ...implementasiForm.indikator_keberhasilan,
+                                ];
+
+                              next[index] =
+                                e.target.value;
+
+                              setImplementasiForm({
+                                ...implementasiForm,
+                                indikator_keberhasilan:
+                                  next,
+                              });
+                            }}
+                            placeholder="Masukkan indikator keberhasilan"
+                            className="flex-1 rounded-md border border-slate-300 px-3 py-2"
+                          />
+
+                          {implementasiForm.indikator_keberhasilan
+                            .length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setImplementasiForm({
+                                  ...implementasiForm,
+                                  indikator_keberhasilan:
+                                    implementasiForm.indikator_keberhasilan.filter(
+                                      (_, currentIndex) =>
+                                        currentIndex !==
+                                        index
+                                    ),
+                                })
+                              }
+                              className="mt-1 rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                            >
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
+              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white p-5">
                 <button
                   type="button"
                   onClick={() =>
                     setShowImplementasiForm(false)
                   }
                   disabled={saving}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Batal
                 </button>
@@ -3321,345 +3316,11 @@ export default function ImplementasiPerubahanPage() {
                   type="button"
                   onClick={handleSaveImplementasi}
                   disabled={saving}
-                  className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+                  className="rounded-md bg-slate-800 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
                 >
                   {saving
                     ? "Menyimpan..."
-                    : "Simpan"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSumberDayaForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
-            <div className="border-b border-slate-200 p-5">
-              <h3 className="text-lg font-semibold">
-                {editingSumberDaya
-                  ? "Edit Sumber Daya"
-                  : "Tambah Sumber Daya"}
-              </h3>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1 block text-sm font-semibold">
-                  Jenis Sumber Daya
-                </label>
-                <select
-                  value={
-                    sumberDayaForm.jenis_sumber_daya
-                  }
-                  onChange={(e) =>
-                    setSumberDayaForm({
-                      ...sumberDayaForm,
-                      jenis_sumber_daya:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-                >
-                  <option value="Manusia">
-                    Manusia
-                  </option>
-                  <option value="TIK">
-                    TIK
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold">
-                  Deskripsi
-                </label>
-                <textarea
-                  rows={4}
-                  value={sumberDayaForm.deskripsi}
-                  onChange={(e) =>
-                    setSumberDayaForm({
-                      ...sumberDayaForm,
-                      deskripsi: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowSumberDayaForm(false)
-                }
-                className="rounded-md border border-slate-300 px-4 py-2"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveSumberDaya}
-                className="rounded-md bg-slate-800 px-4 py-2 font-semibold text-white"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAnggaranForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
-            <div className="border-b border-slate-200 p-5">
-              <h3 className="text-lg font-semibold">
-                {editingAnggaran
-                  ? "Edit Anggaran"
-                  : "Tambah Anggaran"}
-              </h3>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1 block text-sm font-semibold">
-                  Alokasi Anggaran
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={
-                    anggaranForm.alokasi_anggaran
-                  }
-                  onChange={(e) =>
-                    setAnggaranForm({
-                      ...anggaranForm,
-                      alokasi_anggaran:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold">
-                  Skema Pembiayaan
-                </label>
-                <input
-                  type="text"
-                  value={
-                    anggaranForm.skema_pembiayaan
-                  }
-                  onChange={(e) =>
-                    setAnggaranForm({
-                      ...anggaranForm,
-                      skema_pembiayaan:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowAnggaranForm(false)
-                }
-                className="rounded-md border border-slate-300 px-4 py-2"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveAnggaran}
-                className="rounded-md bg-slate-800 px-4 py-2 font-semibold text-white"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showIndikatorForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white shadow-xl">
-            <div className="border-b border-slate-200 p-5">
-              <h3 className="text-lg font-semibold">
-                {editingIndikator
-                  ? "Edit Indikator Keberhasilan"
-                  : "Tambah Indikator Keberhasilan"}
-              </h3>
-            </div>
-
-            <div className="p-5">
-              <textarea
-                rows={4}
-                value={indikatorForm.indikator}
-                onChange={(e) =>
-                  setIndikatorForm({
-                    indikator: e.target.value,
-                  })
-                }
-                placeholder="Masukkan indikator keberhasilan"
-                className="w-full rounded-md border border-slate-300 px-3 py-2"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowIndikatorForm(false)
-                }
-                className="rounded-md border border-slate-300 px-4 py-2"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveIndikator}
-                className="rounded-md bg-slate-800 px-4 py-2 font-semibold text-white"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showStrategiForm && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
-          <div className="flex min-h-full items-start justify-center p-4">
-            <div className="my-8 w-full max-w-3xl rounded-xl bg-white shadow-xl">
-              <div className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
-                <h3 className="text-lg font-semibold">
-                  Informasi Strategi Perubahan
-                </h3>
-              </div>
-
-              <div className="space-y-5 p-5">
-                <div>
-                  <label className="mb-1 block text-sm font-semibold">
-                    Strategi IT Generik
-                  </label>
-                  <input
-                    type="text"
-                    value={
-                      strategiForm.strategi_it_generik
-                    }
-                    onChange={(e) =>
-                      setStrategiForm({
-                        ...strategiForm,
-                        strategi_it_generik:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold">
-                    Deskripsi Strategi IT
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={
-                      strategiForm.deskripsi_strategi_it
-                    }
-                    onChange={(e) =>
-                      setStrategiForm({
-                        ...strategiForm,
-                        deskripsi_strategi_it:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold">
-                    Rollback Plan
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={strategiForm.rollback_plan}
-                    onChange={(e) =>
-                      setStrategiForm({
-                        ...strategiForm,
-                        rollback_plan:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold">
-                    Strategi Organisasi Generik
-                  </label>
-                  <input
-                    type="text"
-                    value={
-                      strategiForm.strategi_organisasi_generik
-                    }
-                    onChange={(e) =>
-                      setStrategiForm({
-                        ...strategiForm,
-                        strategi_organisasi_generik:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold">
-                    Detail Strategi Organisasi
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={
-                      strategiForm.detail_strategi_organisasi
-                    }
-                    onChange={(e) =>
-                      setStrategiForm({
-                        ...strategiForm,
-                        detail_strategi_organisasi:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full rounded-md border border-slate-300 px-3 py-2"
-                  />
-                </div>
-              </div>
-
-              <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white p-5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowStrategiForm(false)
-                  }
-                  className="rounded-md border border-slate-300 px-4 py-2"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveStrategi}
-                  className="rounded-md bg-slate-800 px-4 py-2 font-semibold text-white"
-                >
-                  Simpan
+                    : "Simpan Formulir 3.1"}
                 </button>
               </div>
             </div>

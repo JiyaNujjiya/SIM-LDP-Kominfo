@@ -26,7 +26,7 @@ type PersetujuanItem = {
   perubahan_id?: number;
   tahap?: string;
   keputusan?: string;
-  nama_pemutus?: string;
+  nama_pic?: string;
   diputuskan_at?: string;
   catatan_keputusan?: string | null;
 };
@@ -940,7 +940,7 @@ export default function LogbookPerubahanPage() {
               Kembali
             </button>
 
-            {canCreate && (
+            {canCreate && selectedPerubahan.status !== "Selesai" && (
               <button
                 type="button"
                 onClick={openTambahLogbook}
@@ -1084,7 +1084,7 @@ export default function LogbookPerubahanPage() {
                       PIC yang Menyetujui
                     </p>
                     <p className="mt-1 text-sm font-medium text-slate-800">
-                      {latestApproval?.nama_pemutus || "-"}
+                      {latestApproval?.nama_pic || "-"}
                     </p>
                   </div>
                 </div>
