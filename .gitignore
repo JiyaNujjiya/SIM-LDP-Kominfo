@@ -26,3 +26,4 @@ dist-ssr
 node_modules/
 backend-package-backup/
 uploads/
+/storage/pengetahuan/
