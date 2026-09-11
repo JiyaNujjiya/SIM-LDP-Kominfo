@@ -26,6 +26,11 @@ import ImplementasiPerubahanPage from "./pages/ImplementasiPerubahanPage";
 import EvaluasiPerubahanPage from "./pages/EvaluasiPerubahanPage";
 import LogbookPerubahanPage from "./pages/LogbookPerubahanPage";
 
+import PerencanaanPengetahuanPage from "./pages/PerencanaanPengetahuanPage";
+import PengumpulanPengolahanPengetahuanPage from "./pages/PengumpulanPengolahanPengetahuanPage";
+import PemanfaatanAlihPengetahuanPage from "./pages/PemanfaatanAlihPengetahuanPage";
+import EvaluasiPengetahuanPage from "./pages/EvaluasiPengetahuanPage";
+
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
@@ -186,6 +191,42 @@ export default function App() {
               element={
                 <RequirePermission permission="change.view">
                   <LogbookPerubahanPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/pengetahuan/perencanaan"
+              element={
+                <RequirePermission permission="knowledge.view">
+                  <PerencanaanPengetahuanPage/>
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/pengetahuan/pengumpulan-pengolahan"
+              element={
+                <RequirePermission permission="knowledge.view">
+                  <PengumpulanPengolahanPengetahuanPage/>
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/pengetahuan/pemanfaatan-alih"
+              element={
+                <RequirePermission permission="knowledge.view">
+                  <PemanfaatanAlihPengetahuanPage/>
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/pengetahuan/evaluasi"
+              element={
+                <RequirePermission permission="knowledge.view">
+                  <EvaluasiPengetahuanPage/>
                 </RequirePermission>
               }
             />

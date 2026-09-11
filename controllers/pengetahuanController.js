@@ -3,6 +3,144 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 
+exports.getInstansiOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        kode_instansi,
+        nama_instansi
+      FROM instansi
+      WHERE status = 'Aktif'
+      ORDER BY nama_instansi ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('ERROR GET INSTANSI OPTIONS:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getLayananOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        kode_layanan,
+        nama_layanan,
+        instansi_id,
+        unit_kerja_id
+      FROM layanan_digital
+      WHERE status = 'Aktif'
+      ORDER BY nama_layanan ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('ERROR GET LAYANAN OPTIONS:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getUnitOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        instansi_id,
+        kode_unit,
+        nama_unit
+      FROM unit_kerja
+      WHERE status = 'Aktif'
+      ORDER BY nama_unit ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('ERROR GET UNIT OPTIONS:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getUserOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        nama,
+        email,
+        role,
+        role_id
+      FROM users
+      ORDER BY nama ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('ERROR GET USER OPTIONS:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
+
+exports.getPengetahuanOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        p.id,
+        p.kode_pengetahuan,
+        p.nama_pengetahuan,
+        p.layanan_id,
+        l.nama_layanan,
+        p.jenis_pengetahuan,
+        p.sudah_terdokumentasi,
+        p.aspek_pemdi,
+        p.indikator_pemdi,
+        p.pemilik_instansi_id,
+        i.nama_instansi AS pemilik_instansi,
+        p.pemilik_unit_kerja_id,
+        uk.nama_unit AS pemilik_unit_kerja
+      FROM mpn_pengetahuan p
+      JOIN layanan_digital l
+        ON l.id = p.layanan_id
+      LEFT JOIN instansi i
+        ON i.id = p.pemilik_instansi_id
+      LEFT JOIN unit_kerja uk
+        ON uk.id = p.pemilik_unit_kerja_id
+      ORDER BY p.nama_pengetahuan ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('ERROR GET PENGETAHUAN OPTIONS:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan pada server'
+    });
+  }
+};
 
 exports.getAllPerencanaan = async (req, res) => {
   try {

@@ -60,6 +60,7 @@ const menuItems = [
     id: "pengetahuan",
     label: "Manajemen Pengetahuan",
     Icon: BookOpen,
+    permission: "knowledge.view",
   },
   {
     id: "bcp",
@@ -115,6 +116,9 @@ export default function AppLayout({
     location.pathname.startsWith("/perubahan")
   );
 
+  const [knowledgeOpen, setKnowledgeOpen] = useState(
+  location.pathname.startsWith("/pengetahuan")
+  );
 
 
   const savedUser = localStorage.getItem("user");
@@ -141,6 +145,9 @@ export default function AppLayout({
 
   const perubahanActive =
     location.pathname.startsWith("/perubahan");
+  
+  const pengetahuanActive =
+    location.pathname.startsWith("/pengetahuan");
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -246,6 +253,35 @@ export default function AppLayout({
         current: "MPR05 - Logbook Perubahan",
       };
     }
+
+    if (path === "/pengetahuan/perencanaan") {
+      return {
+        parent: "Manajemen Pengetahuan",
+        current: "MPN01 - Perencanaan Pengetahuan",
+      };
+    }
+
+    if (path === "/pengetahuan/pengumpulan-pengolahan") {
+      return {
+        parent: "Manajemen Pengetahuan",
+        current: "MPN02 - Pengumpulan & Pengolahan Pengetahuan",
+      };
+    }
+
+    if (path === "/pengetahuan/pemanfaatan-alih") {
+      return {
+        parent: "Manajemen Pengetahuan",
+        current: "MPN03 - Pemanfaatan & Alih Pengetahuan",
+      };
+    }
+
+    if (path === "/pengetahuan/evaluasi") {
+      return {
+        parent: "Manajemen Pengetahuan",
+        current: "MPN04 - Evaluasi Pengetahuan",
+      };
+    }
+
 
     return {
       parent: "",
@@ -360,7 +396,7 @@ export default function AppLayout({
                       if (m.id === "dashboard") navigate("/dashboard");
                       if (m.id === "risiko") navigate("/risiko/overview");
                       if (m.id === "perubahan") navigate("/perubahan/perencanaan");
-                      if (m.id === "pengetahuan") navigate("/pengetahuan");
+                      if (m.id === "pengetahuan") navigate("/pengetahuan/perencanaan");;
                       if (m.id === "bcp") navigate("/keberlangsungan");
                       if (m.id === "relasi") navigate("/relasi-pengguna");
                     }}
@@ -382,6 +418,10 @@ export default function AppLayout({
                             : "transparent"
                           : m.id === "perubahan"
                           ? perubahanActive
+                            ? C.sidebarActive
+                            : "transparent"
+                          : m.id === "pengetahuan"
+                          ? pengetahuanActive
                             ? C.sidebarActive
                             : "transparent"
                           : m.id === "dashboard" && isActive("/dashboard")
@@ -788,13 +828,134 @@ export default function AppLayout({
                 );
               }
 
+              if (m.id === "pengetahuan") {
+                return (
+                  <div key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!pengetahuanActive) {
+                          navigate("/pengetahuan/perencanaan");
+                          setKnowledgeOpen(true);
+                          return;
+                        }
+
+                        setKnowledgeOpen((prev) => !prev);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 16px",
+                        width: "100%",
+                        border: "none",
+                        borderRadius: 6,
+                        background: pengetahuanActive
+                          ? C.sidebarActive
+                          : "transparent",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <BookOpen
+                        size={18}
+                        color={C.sidebarText}
+                        strokeWidth={2}
+                      />
+
+                      <span
+                        style={{
+                          flex: 1,
+                          textAlign: "left",
+                          fontWeight: 500,
+                          fontSize: 13,
+                          color: C.sidebarText,
+                        }}
+                      >
+                        Manajemen Pengetahuan
+                      </span>
+
+                      {knowledgeOpen ? (
+                        <ChevronDown
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      ) : (
+                        <ChevronRight
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      )}
+                    </button>
+
+                    {knowledgeOpen && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          marginLeft: 28,
+                          marginTop: 4,
+                          gap: 2,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/pengetahuan/perencanaan")
+                          }
+                          style={subMenuStyle(
+                            isActive("/pengetahuan/perencanaan")
+                          )}
+                        >
+                          MPN01 Perencanaan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/pengetahuan/pengumpulan-pengolahan")
+                          }
+                          style={subMenuStyle(
+                            isActive("/pengetahuan/pengumpulan-pengolahan")
+                          )}
+                        >
+                          MPN02 Pengumpulan & Pengolahan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/pengetahuan/pemanfaatan-alih")
+                          }
+                          style={subMenuStyle(
+                            isActive("/pengetahuan/pemanfaatan-alih")
+                          )}
+                        >
+                          MPN03 Pemanfaatan & Alih Pengetahuan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/pengetahuan/evaluasi")
+                          }
+                          style={subMenuStyle(
+                            isActive("/pengetahuan/evaluasi")
+                          )}
+                        >
+                          MPN04 Evaluasi
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => {
                     if (m.id === "dashboard") navigate("/dashboard");
-                    if (m.id === "pengetahuan") navigate("/pengetahuan");
                     if (m.id === "bcp") navigate("/keberlangsungan");
                     if (m.id === "relasi") navigate("/relasi-pengguna");
                   }}

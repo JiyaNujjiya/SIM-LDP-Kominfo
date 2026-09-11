@@ -6,6 +6,42 @@ const authMiddleware = require('../middleware/auth');
 const requirePermission = require('../middleware/permissionMiddleware');
 const uploadDokumentasi = require('../middleware/pengetahuanUpload');
 
+
+router.get(
+  '/instansi-options',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getInstansiOptions
+);
+
+router.get(
+  '/layanan-options',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getLayananOptions
+);
+
+router.get(
+  '/unit-options',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getUnitOptions
+);
+
+router.get(
+  '/user-options',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getUserOptions
+);
+
+router.get(
+  '/pengetahuan-options',
+  authMiddleware,
+  requirePermission('knowledge.view'),
+  pengetahuanController.getPengetahuanOptions
+);
+
 router.get(
   '/perencanaan',
   authMiddleware,
