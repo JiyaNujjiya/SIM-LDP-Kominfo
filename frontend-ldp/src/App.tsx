@@ -31,6 +31,7 @@ import PengumpulanPengolahanPengetahuanPage from "./pages/PengumpulanPengolahanP
 import PemanfaatanAlihPengetahuanPage from "./pages/PemanfaatanAlihPengetahuanPage";
 import EvaluasiPengetahuanPage from "./pages/EvaluasiPengetahuanPage";
 
+import PenetapanKonteksKeberlangsunganPage from "./pages/PenetapanKonteksKeberlangsunganPage";
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
@@ -227,6 +228,15 @@ export default function App() {
               element={
                 <RequirePermission permission="knowledge.view">
                   <EvaluasiPengetahuanPage/>
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/keberlangsungan/penetapan-konteks"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <PenetapanKonteksKeberlangsunganPage/>
                 </RequirePermission>
               }
             />

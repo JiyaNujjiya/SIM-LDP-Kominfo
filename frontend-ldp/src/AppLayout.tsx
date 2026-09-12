@@ -63,9 +63,10 @@ const menuItems = [
     permission: "knowledge.view",
   },
   {
-    id: "bcp",
-    label: "Manajemen Keberlangsungan",
-    Icon: ShieldCheck,
+  id: "bcp",
+  label: "Manajemen Keberlangsungan",
+  Icon: ShieldCheck,
+  permission: "continuity.view",
   },
   {
     id: "relasi",
@@ -117,9 +118,12 @@ export default function AppLayout({
   );
 
   const [knowledgeOpen, setKnowledgeOpen] = useState(
-  location.pathname.startsWith("/pengetahuan")
+    location.pathname.startsWith("/pengetahuan")
   );
 
+  const [continuityOpen, setContinuityOpen] = useState(
+    location.pathname.startsWith("/keberlangsungan")
+  );
 
   const savedUser = localStorage.getItem("user");
   const user = savedUser
@@ -148,6 +152,9 @@ export default function AppLayout({
   
   const pengetahuanActive =
     location.pathname.startsWith("/pengetahuan");
+
+  const keberlangsunganActive =
+    location.pathname.startsWith("/keberlangsungan");
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -282,6 +289,13 @@ export default function AppLayout({
       };
     }
 
+    if (path === "/keberlangsungan/penetapan-konteks") {
+      return {
+        parent: "Manajemen Keberlangsungan",
+        current: "MKB 01 - Penetapan Konteks",
+      };
+    }
+
 
     return {
       parent: "",
@@ -397,7 +411,7 @@ export default function AppLayout({
                       if (m.id === "risiko") navigate("/risiko/overview");
                       if (m.id === "perubahan") navigate("/perubahan/perencanaan");
                       if (m.id === "pengetahuan") navigate("/pengetahuan/perencanaan");;
-                      if (m.id === "bcp") navigate("/keberlangsungan");
+                      if (m.id === "bcp") navigate("/keberlangsungan/penetapan-konteks");
                       if (m.id === "relasi") navigate("/relasi-pengguna");
                     }}
                     title={m.label}
@@ -422,6 +436,10 @@ export default function AppLayout({
                             : "transparent"
                           : m.id === "pengetahuan"
                           ? pengetahuanActive
+                            ? C.sidebarActive
+                            : "transparent"
+                          : m.id === "bcp"
+                          ? keberlangsunganActive
                             ? C.sidebarActive
                             : "transparent"
                           : m.id === "dashboard" && isActive("/dashboard")
@@ -950,13 +968,103 @@ export default function AppLayout({
                 );
               }
 
+              if (m.id === "bcp") {
+                return (
+                  <div key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!keberlangsunganActive) {
+                          navigate("/keberlangsungan/penetapan-konteks");
+                          setContinuityOpen(true);
+                          return;
+                        }
+
+                        setContinuityOpen((prev) => !prev);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 16px",
+                        width: "100%",
+                        border: "none",
+                        borderRadius: 6,
+                        background: keberlangsunganActive
+                          ? C.sidebarActive
+                          : "transparent",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <ShieldCheck
+                        size={18}
+                        color={C.sidebarText}
+                        strokeWidth={2}
+                      />
+
+                      <span
+                        style={{
+                          flex: 1,
+                          textAlign: "left",
+                          fontWeight: 500,
+                          fontSize: 13,
+                          color: C.sidebarText,
+                        }}
+                      >
+                        Manajemen Keberlangsungan
+                      </span>
+
+                      {continuityOpen ? (
+                        <ChevronDown
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      ) : (
+                        <ChevronRight
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      )}
+                    </button>
+
+                    {continuityOpen && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          marginLeft: 28,
+                          marginTop: 4,
+                          gap: 2,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              "/keberlangsungan/penetapan-konteks"
+                            )
+                          }
+                          style={subMenuStyle(
+                            isActive(
+                              "/keberlangsungan/penetapan-konteks"
+                            )
+                          )}
+                        >
+                          MKB01 Penetapan Konteks
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => {
                     if (m.id === "dashboard") navigate("/dashboard");
-                    if (m.id === "bcp") navigate("/keberlangsungan");
+                    if (m.id === "bcp") navigate("/keberlangsungan/penetapan-konteks");
                     if (m.id === "relasi") navigate("/relasi-pengguna");
                   }}
                   style={{

@@ -6,6 +6,187 @@ const bcpController = require('../controllers/bcpController');
 const authMiddleware = require('../middleware/auth');
 const requirePermission = require('../middleware/permissionMiddleware');
 
+router.get(
+  '/ruang-lingkup',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllRuangLingkup
+);
+
+router.get(
+  '/layanan-prioritas/:id/detail',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getDetailLayananPrioritas
+);
+
+router.get(
+  '/layanan-prioritas/:id/ruang-lingkup',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getRuangLingkupByLayananPrioritas
+);
+
+router.get(
+  '/ruang-lingkup/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getRuangLingkupById
+);
+
+router.post(
+  '/ruang-lingkup',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createRuangLingkup
+);
+
+router.put(
+  '/ruang-lingkup/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateRuangLingkup
+);
+
+router.delete(
+  '/ruang-lingkup/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteRuangLingkup
+);
+
+router.get(
+  '/tim-manajemen',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllTimManajemen
+);
+
+router.get(
+  '/layanan-prioritas/:id/tim-manajemen',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimManajemenByLayananPrioritas
+);
+
+router.get(
+  '/pegawai-options',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getPegawaiOptions
+);
+
+router.get(
+  '/tim-manajemen/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimManajemenById
+);
+
+router.post(
+  '/tim-manajemen',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createTimManajemen
+);
+
+router.put(
+  '/tim-manajemen/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateTimManajemen
+);
+
+router.delete(
+  '/tim-manajemen/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteTimManajemen
+);
+
+router.get(
+  '/tanggap-insiden',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllTimTanggapInsiden
+);
+
+router.get(
+  '/layanan-prioritas/:id/tanggap-insiden',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimTanggapInsidenByLayananPrioritas
+);
+
+router.get(
+  '/tanggap-insiden/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimTanggapInsidenById
+);
+
+router.post(
+  '/tanggap-insiden',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createTimTanggapInsiden
+);
+
+router.put(
+  '/tanggap-insiden/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateTimTanggapInsiden
+);
+
+router.delete(
+  '/tanggap-insiden/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteTimTanggapInsiden
+);
+
+router.get(
+  '/pemulihan-layanan',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllTimPemulihanLayanan
+);
+
+router.get(
+  '/layanan-prioritas/:id/pemulihan-layanan',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimPemulihanLayananByLayananPrioritas
+);
+
+router.get(
+  '/pemulihan-layanan/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimPemulihanLayananById
+);
+
+router.post(
+  '/pemulihan-layanan',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createTimPemulihanLayanan
+);
+
+router.put(
+  '/pemulihan-layanan/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateTimPemulihanLayanan
+);
+
+router.delete(
+  '/pemulihan-layanan/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteTimPemulihanLayanan
+);
 
 // =====================================================
 // PROSES 2 - BUSINESS IMPACT ANALYSIS (BIA)
@@ -13,50 +194,50 @@ const requirePermission = require('../middleware/permissionMiddleware');
 
 // GET semua BIA
 router.get(
-    '/bia',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getAllBia
+  '/bia',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllBia
 );
 
 // GET BIA berdasarkan layanan prioritas
 router.get(
-    '/layanan-prioritas/:id/bia',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getBiaByLayananPrioritas
+  '/layanan-prioritas/:id/bia',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getBiaByLayananPrioritas
 );
 
 // GET detail BIA
 router.get(
-    '/bia/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getBiaById
+  '/bia/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getBiaById
 );
 
 // CREATE BIA
 router.post(
-    '/bia',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createBia
+  '/bia',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createBia
 );
 
 // UPDATE BIA
 router.put(
-    '/bia/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateBia
+  '/bia/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateBia
 );
 
 // DELETE BIA
 router.delete(
-    '/bia/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteBia
+  '/bia/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteBia
 );
 
 
@@ -66,15 +247,15 @@ router.delete(
 // =====================================================
 
 router.post(
-    '/',
-    authMiddleware,
-    bcpController.createBCP
+  '/',
+  authMiddleware,
+  bcpController.createBCP
 );
 
 router.get(
-    '/',
-    authMiddleware,
-    bcpController.getAllBCP
+  '/',
+  authMiddleware,
+  bcpController.getAllBCP
 );
 
 // =====================================================
@@ -83,38 +264,38 @@ router.get(
 // =====================================================
 
 router.get(
-    '/bia/:id/insiden',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getInsidenByBia
+  '/bia/:id/insiden',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getInsidenByBia
 );
 
 router.post(
-    '/bia/:id/insiden',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createInsiden
+  '/bia/:id/insiden',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createInsiden
 );
 
 router.get(
-    '/insiden/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getInsidenById
+  '/insiden/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getInsidenById
 );
 
 router.put(
-    '/insiden/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateInsiden
+  '/insiden/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateInsiden
 );
 
 router.delete(
-    '/insiden/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteInsiden
+  '/insiden/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteInsiden
 );
 
 // =====================================================
@@ -123,38 +304,38 @@ router.delete(
 // =====================================================
 
 router.get(
-    '/insiden/:id/modul',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getModulByInsiden
+  '/insiden/:id/modul',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getModulByInsiden
 );
 
 router.post(
-    '/insiden/:id/modul',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createModulInsiden
+  '/insiden/:id/modul',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createModulInsiden
 );
 
 router.get(
-    '/insiden-modul/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getInsidenModulById
+  '/insiden-modul/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getInsidenModulById
 );
 
 router.put(
-    '/insiden-modul/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateModulInsiden
+  '/insiden-modul/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateModulInsiden
 );
 
 router.delete(
-    '/insiden-modul/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteModulInsiden
+  '/insiden-modul/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteModulInsiden
 );
 
 // =====================================================
@@ -163,38 +344,38 @@ router.delete(
 // =====================================================
 
 router.get(
-    '/bia/:id/ketergantungan',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getKetergantunganByBia
+  '/bia/:id/ketergantungan',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getKetergantunganByBia
 );
 
 router.post(
-    '/bia/:id/ketergantungan',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createKetergantungan
+  '/bia/:id/ketergantungan',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createKetergantungan
 );
 
 router.get(
-    '/ketergantungan/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getKetergantunganById
+  '/ketergantungan/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getKetergantunganById
 );
 
 router.put(
-    '/ketergantungan/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateKetergantungan
+  '/ketergantungan/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateKetergantungan
 );
 
 router.delete(
-    '/ketergantungan/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteKetergantungan
+  '/ketergantungan/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteKetergantungan
 );
 
 // =====================================================
@@ -203,38 +384,38 @@ router.delete(
 // =====================================================
 
 router.get(
-    '/insiden/:id/strategi',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getStrategiByInsiden
+  '/insiden/:id/strategi',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getStrategiByInsiden
 );
 
 router.post(
-    '/insiden/:id/strategi',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createStrategiPemulihan
+  '/insiden/:id/strategi',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createStrategiPemulihan
 );
 
 router.get(
-    '/strategi/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getStrategiById
+  '/strategi/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getStrategiById
 );
 
 router.put(
-    '/strategi/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateStrategiPemulihan
+  '/strategi/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateStrategiPemulihan
 );
 
 router.delete(
-    '/strategi/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteStrategiPemulihan
+  '/strategi/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteStrategiPemulihan
 );
 
 // =====================================================
@@ -243,38 +424,38 @@ router.delete(
 // =====================================================
 
 router.get(
-    '/strategi/:id/langkah',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getLangkahByStrategi
+  '/strategi/:id/langkah',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getLangkahByStrategi
 );
 
 router.post(
-    '/strategi/:id/langkah',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createLangkahPemulihan
+  '/strategi/:id/langkah',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createLangkahPemulihan
 );
 
 router.get(
-    '/langkah-pemulihan/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getLangkahPemulihanById
+  '/langkah-pemulihan/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getLangkahPemulihanById
 );
 
 router.put(
-    '/langkah-pemulihan/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateLangkahPemulihan
+  '/langkah-pemulihan/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateLangkahPemulihan
 );
 
 router.delete(
-    '/langkah-pemulihan/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteLangkahPemulihan
+  '/langkah-pemulihan/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteLangkahPemulihan
 );
 
 // =====================================================
@@ -283,38 +464,38 @@ router.delete(
 // =====================================================
 
 router.get(
-    '/insiden/:id/uji',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getUjiByInsiden
+  '/insiden/:id/uji',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getUjiByInsiden
 );
 
 router.post(
-    '/insiden/:id/uji',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createUji
+  '/insiden/:id/uji',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createUji
 );
 
 router.get(
-    '/uji/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getUjiById
+  '/uji/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getUjiById
 );
 
 router.put(
-    '/uji/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateUji
+  '/uji/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateUji
 );
 
 router.delete(
-    '/uji/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteUji
+  '/uji/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteUji
 );
 
 // =====================================================
@@ -323,38 +504,38 @@ router.delete(
 // =====================================================
 
 router.get(
-    '/uji/:id/evaluasi',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getEvaluasiByUji
+  '/uji/:id/evaluasi',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getEvaluasiByUji
 );
 
 router.post(
-    '/uji/:id/evaluasi',
-    authMiddleware,
-    requirePermission('continuity.create'),
-    bcpController.createEvaluasi
+  '/uji/:id/evaluasi',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createEvaluasi
 );
 
 router.get(
-    '/evaluasi/:id',
-    authMiddleware,
-    requirePermission('continuity.view'),
-    bcpController.getEvaluasiById
+  '/evaluasi/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getEvaluasiById
 );
 
 router.put(
-    '/evaluasi/:id',
-    authMiddleware,
-    requirePermission('continuity.update'),
-    bcpController.updateEvaluasi
+  '/evaluasi/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateEvaluasi
 );
 
 router.delete(
-    '/evaluasi/:id',
-    authMiddleware,
-    requirePermission('continuity.delete'),
-    bcpController.deleteEvaluasi
+  '/evaluasi/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteEvaluasi
 );
 
 module.exports = router;
