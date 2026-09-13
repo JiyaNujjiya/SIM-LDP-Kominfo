@@ -1730,6 +1730,34 @@ const validateTimTanggapInsidenInput = (
   };
 };
 
+exports.getUserOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        u.id,
+        u.nama,
+        u.email,
+        u.role,
+        u.pegawai_id,
+        p.nip,
+        p.jabatan
+      FROM users u
+      LEFT JOIN pegawai p ON p.id = u.pegawai_id
+      ORDER BY u.nama ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getUserOptions error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil daftar pengguna.'
+    });
+  }
+};
+
 exports.getAllTimTanggapInsiden = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -2896,6 +2924,3464 @@ exports.deleteTimPemulihanLayanan = async (req, res) => {
   }
 };
 
+const timOperasionalSelectQuery = `
+  SELECT
+    top.id,
+    top.layanan_prioritas_id,
+    top.pegawai_id,
+    top.peran_operasional,
+    top.tanggung_jawab,
+    top.urutan,
+    top.created_by,
+    top.created_at,
+    top.updated_at,
+
+    lp.kode_prioritas,
+
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+
+    p.nip,
+    p.nama AS nama_pegawai,
+    p.email AS email_pegawai,
+    p.jabatan,
+
+    uk.id AS unit_kerja_id,
+    uk.kode_unit,
+    uk.nama_unit,
+
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+
+    u.nama AS dibuat_oleh
+
+  FROM mkb_tim_operasional top
+
+  JOIN layanan_prioritas lp
+    ON lp.id = top.layanan_prioritas_id
+
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+
+  JOIN pegawai p
+    ON p.id = top.pegawai_id
+
+  JOIN unit_kerja uk
+    ON uk.id = p.unit_kerja_id
+
+  JOIN instansi i
+    ON i.id = uk.instansi_id
+
+  LEFT JOIN users u
+    ON u.id = top.created_by
+`;
+
+const validateTimOperasionalInput = (
+  body,
+  {
+    requireLayananPrioritas = false,
+    requirePegawai = false,
+    requirePeran = false
+  } = {}
+) => {
+  const {
+    layanan_prioritas_id,
+    pegawai_id,
+    peran_operasional,
+    tanggung_jawab,
+    urutan
+  } = body;
+
+  if (
+    requireLayananPrioritas &&
+    !isPositiveInteger(layanan_prioritas_id)
+  ) {
+    return {
+      valid: false,
+      message: 'layanan_prioritas_id wajib berupa ID yang valid.'
+    };
+  }
+
+  if (
+    requirePegawai &&
+    !isPositiveInteger(pegawai_id)
+  ) {
+    return {
+      valid: false,
+      message: 'pegawai_id wajib berupa ID yang valid.'
+    };
+  }
+
+  if (
+    requirePeran &&
+    (
+      typeof peran_operasional !== 'string' ||
+      !peran_operasional.trim()
+    )
+  ) {
+    return {
+      valid: false,
+      message: 'peran_operasional wajib diisi.'
+    };
+  }
+
+  if (
+    peran_operasional !== undefined &&
+    peran_operasional !== null &&
+    typeof peran_operasional !== 'string'
+  ) {
+    return {
+      valid: false,
+      message: 'peran_operasional harus berupa teks.'
+    };
+  }
+
+  if (
+    typeof peran_operasional === 'string' &&
+    peran_operasional.trim().length > 150
+  ) {
+    return {
+      valid: false,
+      message: 'peran_operasional maksimal 150 karakter.'
+    };
+  }
+
+  if (
+    tanggung_jawab !== undefined &&
+    tanggung_jawab !== null &&
+    typeof tanggung_jawab !== 'string'
+  ) {
+    return {
+      valid: false,
+      message: 'tanggung_jawab harus berupa teks.'
+    };
+  }
+
+  if (
+    urutan !== undefined &&
+    urutan !== null &&
+    urutan !== '' &&
+    (
+      !Number.isInteger(Number(urutan)) ||
+      Number(urutan) <= 0
+    )
+  ) {
+    return {
+      valid: false,
+      message: 'urutan harus berupa bilangan bulat lebih dari 0.'
+    };
+  }
+
+  return {
+    valid: true
+  };
+};
+
+exports.getAllTimOperasional = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `
+      ${timOperasionalSelectQuery}
+      ORDER BY
+        top.layanan_prioritas_id ASC,
+        top.urutan IS NULL,
+        top.urutan ASC,
+        top.id ASC
+      `
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getAllTimOperasional error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil data pelaksana operasional.'
+    });
+  }
+};
+
+exports.getTimOperasionalByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [layananRows] = await db.query(
+      `
+      SELECT id
+      FROM layanan_prioritas
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (layananRows.length === 0) {
+      return res.status(404).json({
+        message: 'Layanan prioritas tidak ditemukan.'
+      });
+    }
+
+    const [rows] = await db.query(
+      `
+      ${timOperasionalSelectQuery}
+      WHERE top.layanan_prioritas_id = ?
+      ORDER BY
+        top.urutan IS NULL,
+        top.urutan ASC,
+        top.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getTimOperasionalByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil pelaksana operasional.'
+    });
+  }
+};
+
+exports.getTimOperasionalById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID pelaksana operasional tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${timOperasionalSelectQuery}
+      WHERE top.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message:
+          'Data pelaksana operasional tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'getTimOperasionalById error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil detail pelaksana operasional.'
+    });
+  }
+};
+
+exports.createTimOperasional = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    pegawai_id,
+    peran_operasional,
+    tanggung_jawab,
+    urutan
+  } = req.body;
+
+  const validation = validateTimOperasionalInput(
+    req.body,
+    {
+      requireLayananPrioritas: true,
+      requirePegawai: true,
+      requirePeran: true
+    }
+  );
+
+  if (!validation.valid) {
+    return res.status(400).json({
+      message: validation.message
+    });
+  }
+
+  try {
+    const [layananRows] = await db.query(
+      `
+      SELECT id
+      FROM layanan_prioritas
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(layanan_prioritas_id)]
+    );
+
+    if (layananRows.length === 0) {
+      return res.status(404).json({
+        message: 'Layanan prioritas tidak ditemukan.'
+      });
+    }
+
+    const [pegawaiRows] = await db.query(
+      `
+      SELECT id
+      FROM pegawai
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(pegawai_id)]
+    );
+
+    if (pegawaiRows.length === 0) {
+      return res.status(404).json({
+        message: 'Pegawai tidak ditemukan.'
+      });
+    }
+
+    const [existingRows] = await db.query(
+      `
+      SELECT id
+      FROM mkb_tim_operasional
+      WHERE layanan_prioritas_id = ?
+        AND pegawai_id = ?
+        AND peran_operasional = ?
+      LIMIT 1
+      `,
+      [
+        Number(layanan_prioritas_id),
+        Number(pegawai_id),
+        peran_operasional.trim()
+      ]
+    );
+
+    if (existingRows.length > 0) {
+      return res.status(409).json({
+        message:
+          'Pegawai dengan peran tersebut sudah terdaftar sebagai pelaksana operasional.'
+      });
+    }
+
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_tim_operasional (
+        layanan_prioritas_id,
+        pegawai_id,
+        peran_operasional,
+        tanggung_jawab,
+        urutan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        Number(pegawai_id),
+        peran_operasional.trim(),
+        normalizeOptionalText(tanggung_jawab),
+        urutan === undefined ||
+        urutan === null ||
+        urutan === ''
+          ? null
+          : Number(urutan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${timOperasionalSelectQuery}
+      WHERE top.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message:
+        'Pelaksana operasional berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'createTimOperasional error:',
+      error
+    );
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        message:
+          'Pegawai dengan peran tersebut sudah terdaftar sebagai pelaksana operasional.'
+      });
+    }
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat menyimpan pelaksana operasional.'
+    });
+  }
+};
+
+exports.updateTimOperasional = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID pelaksana operasional tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message:
+        'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  const validation = validateTimOperasionalInput(
+    req.body
+  );
+
+  if (!validation.valid) {
+    return res.status(400).json({
+      message: validation.message
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_tim_operasional
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message:
+          'Data pelaksana operasional tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const pegawaiBaru =
+      req.body.pegawai_id !== undefined
+        ? Number(req.body.pegawai_id)
+        : existing.pegawai_id;
+
+    if (!isPositiveInteger(pegawaiBaru)) {
+      return res.status(400).json({
+        message:
+          'pegawai_id harus berupa ID yang valid.'
+      });
+    }
+
+    const [pegawaiRows] = await db.query(
+      `
+      SELECT id
+      FROM pegawai
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [pegawaiBaru]
+    );
+
+    if (pegawaiRows.length === 0) {
+      return res.status(404).json({
+        message: 'Pegawai tidak ditemukan.'
+      });
+    }
+
+    const peranBaru =
+      req.body.peran_operasional !== undefined
+        ? (
+            typeof req.body.peran_operasional === 'string'
+              ? req.body.peran_operasional.trim()
+              : ''
+          )
+        : existing.peran_operasional;
+
+    if (!peranBaru) {
+      return res.status(400).json({
+        message: 'peran_operasional wajib diisi.'
+      });
+    }
+
+    const tanggungJawabBaru =
+      req.body.tanggung_jawab !== undefined
+        ? normalizeOptionalText(
+            req.body.tanggung_jawab
+          )
+        : existing.tanggung_jawab;
+
+    const urutanBaru =
+      req.body.urutan !== undefined
+        ? (
+            req.body.urutan === null ||
+            req.body.urutan === ''
+              ? null
+              : Number(req.body.urutan)
+          )
+        : existing.urutan;
+
+    const [duplicateRows] = await db.query(
+      `
+      SELECT id
+      FROM mkb_tim_operasional
+      WHERE layanan_prioritas_id = ?
+        AND pegawai_id = ?
+        AND peran_operasional = ?
+        AND id <> ?
+      LIMIT 1
+      `,
+      [
+        existing.layanan_prioritas_id,
+        pegawaiBaru,
+        peranBaru,
+        Number(id)
+      ]
+    );
+
+    if (duplicateRows.length > 0) {
+      return res.status(409).json({
+        message:
+          'Pegawai dengan peran tersebut sudah terdaftar sebagai pelaksana operasional.'
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mkb_tim_operasional
+      SET
+        pegawai_id = ?,
+        peran_operasional = ?,
+        tanggung_jawab = ?,
+        urutan = ?
+      WHERE id = ?
+      `,
+      [
+        pegawaiBaru,
+        peranBaru,
+        tanggungJawabBaru,
+        urutanBaru,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${timOperasionalSelectQuery}
+      WHERE top.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message:
+        'Pelaksana operasional berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'updateTimOperasional error:',
+      error
+    );
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        message:
+          'Pegawai dengan peran tersebut sudah terdaftar sebagai pelaksana operasional.'
+      });
+    }
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat memperbarui pelaksana operasional.'
+    });
+  }
+};
+
+exports.deleteTimOperasional = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID pelaksana operasional tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_tim_operasional
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message:
+          'Data pelaksana operasional tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message:
+        'Pelaksana operasional berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error(
+      'deleteTimOperasional error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat menghapus pelaksana operasional.'
+    });
+  }
+};
+
+const rencanaKomunikasiSelectQuery = `
+  SELECT
+    rk.id,
+    rk.layanan_prioritas_id,
+    rk.informasi_disampaikan,
+    rk.kategori_komunikasi,
+    rk.pengirim,
+    rk.penerima,
+    rk.media_komunikasi,
+    rk.waktu_frekuensi,
+    rk.aktivitas,
+    rk.tujuan,
+    rk.created_by,
+    rk.created_at,
+    rk.updated_at,
+
+    lp.kode_prioritas,
+
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+
+    u.nama AS dibuat_oleh
+
+  FROM mkb_rencana_komunikasi rk
+
+  JOIN layanan_prioritas lp
+    ON lp.id = rk.layanan_prioritas_id
+
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+
+  LEFT JOIN users u
+    ON u.id = rk.created_by
+`;
+
+exports.getAllRencanaKomunikasi = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `
+      ${rencanaKomunikasiSelectQuery}
+      ORDER BY rk.layanan_prioritas_id ASC, rk.id ASC
+      `
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getAllRencanaKomunikasi error:', error);
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil rencana komunikasi.'
+    });
+  }
+};
+
+exports.getRencanaKomunikasiByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${rencanaKomunikasiSelectQuery}
+      WHERE rk.layanan_prioritas_id = ?
+      ORDER BY rk.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getRencanaKomunikasiByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil rencana komunikasi.'
+    });
+  }
+};
+
+exports.getRencanaKomunikasiById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID rencana komunikasi tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${rencanaKomunikasiSelectQuery}
+      WHERE rk.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Rencana komunikasi tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'getRencanaKomunikasiById error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil detail rencana komunikasi.'
+    });
+  }
+};
+
+exports.createRencanaKomunikasi = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    informasi_disampaikan,
+    kategori_komunikasi,
+    pengirim,
+    penerima,
+    media_komunikasi,
+    waktu_frekuensi,
+    aktivitas,
+    tujuan
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof informasi_disampaikan !== 'string' ||
+    !informasi_disampaikan.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Informasi yang disampaikan wajib diisi.'
+    });
+  }
+
+  if (
+    typeof kategori_komunikasi !== 'string' ||
+    !kategori_komunikasi.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Kategori komunikasi wajib diisi.'
+    });
+  }
+
+  if (
+    typeof pengirim !== 'string' ||
+    !pengirim.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Pengirim wajib diisi.'
+    });
+  }
+
+  if (
+    typeof penerima !== 'string' ||
+    !penerima.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Penerima wajib diisi.'
+    });
+  }
+
+  if (
+    typeof media_komunikasi !== 'string' ||
+    !media_komunikasi.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Media komunikasi wajib diisi.'
+    });
+  }
+
+  try {
+    const [layananRows] = await db.query(
+      `
+      SELECT id
+      FROM layanan_prioritas
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(layanan_prioritas_id)]
+    );
+
+    if (layananRows.length === 0) {
+      return res.status(404).json({
+        message: 'Layanan prioritas tidak ditemukan.'
+      });
+    }
+
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_rencana_komunikasi (
+        layanan_prioritas_id,
+        informasi_disampaikan,
+        kategori_komunikasi,
+        pengirim,
+        penerima,
+        media_komunikasi,
+        waktu_frekuensi,
+        aktivitas,
+        tujuan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        informasi_disampaikan.trim(),
+        kategori_komunikasi.trim(),
+        pengirim.trim(),
+        penerima.trim(),
+        media_komunikasi.trim(),
+        normalizeOptionalText(waktu_frekuensi),
+        normalizeOptionalText(aktivitas),
+        normalizeOptionalText(tujuan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${rencanaKomunikasiSelectQuery}
+      WHERE rk.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message:
+        'Rencana komunikasi berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'createRencanaKomunikasi error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat menyimpan rencana komunikasi.'
+    });
+  }
+};
+
+exports.updateRencanaKomunikasi = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID rencana komunikasi tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message:
+        'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_rencana_komunikasi
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Rencana komunikasi tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const informasiDisampaikan =
+      req.body.informasi_disampaikan !== undefined
+        ? String(req.body.informasi_disampaikan).trim()
+        : existing.informasi_disampaikan;
+
+    const kategoriKomunikasi =
+      req.body.kategori_komunikasi !== undefined
+        ? String(req.body.kategori_komunikasi).trim()
+        : existing.kategori_komunikasi;
+
+    const pengirim =
+      req.body.pengirim !== undefined
+        ? String(req.body.pengirim).trim()
+        : existing.pengirim;
+
+    const penerima =
+      req.body.penerima !== undefined
+        ? String(req.body.penerima).trim()
+        : existing.penerima;
+
+    const mediaKomunikasi =
+      req.body.media_komunikasi !== undefined
+        ? String(req.body.media_komunikasi).trim()
+        : existing.media_komunikasi;
+
+    if (
+      !informasiDisampaikan ||
+      !kategoriKomunikasi ||
+      !pengirim ||
+      !penerima ||
+      !mediaKomunikasi
+    ) {
+      return res.status(400).json({
+        message:
+          'Informasi, kategori, pengirim, penerima, dan media komunikasi wajib diisi.'
+      });
+    }
+
+    const waktuFrekuensi =
+      req.body.waktu_frekuensi !== undefined
+        ? normalizeOptionalText(
+            req.body.waktu_frekuensi
+          )
+        : existing.waktu_frekuensi;
+
+    const aktivitas =
+      req.body.aktivitas !== undefined
+        ? normalizeOptionalText(
+            req.body.aktivitas
+          )
+        : existing.aktivitas;
+
+    const tujuan =
+      req.body.tujuan !== undefined
+        ? normalizeOptionalText(
+            req.body.tujuan
+          )
+        : existing.tujuan;
+
+    await db.query(
+      `
+      UPDATE mkb_rencana_komunikasi
+      SET
+        informasi_disampaikan = ?,
+        kategori_komunikasi = ?,
+        pengirim = ?,
+        penerima = ?,
+        media_komunikasi = ?,
+        waktu_frekuensi = ?,
+        aktivitas = ?,
+        tujuan = ?
+      WHERE id = ?
+      `,
+      [
+        informasiDisampaikan,
+        kategoriKomunikasi,
+        pengirim,
+        penerima,
+        mediaKomunikasi,
+        waktuFrekuensi,
+        aktivitas,
+        tujuan,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${rencanaKomunikasiSelectQuery}
+      WHERE rk.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message:
+        'Rencana komunikasi berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'updateRencanaKomunikasi error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat memperbarui rencana komunikasi.'
+    });
+  }
+};
+
+exports.deleteRencanaKomunikasi = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID rencana komunikasi tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_rencana_komunikasi
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Rencana komunikasi tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message:
+        'Rencana komunikasi berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error(
+      'deleteRencanaKomunikasi error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat menghapus rencana komunikasi.'
+    });
+  }
+};
+
+const daftarKontakSelectQuery = `
+  SELECT
+    dk.id,
+    dk.layanan_prioritas_id,
+    dk.nama,
+    dk.jabatan,
+    dk.organisasi,
+    dk.alamat,
+    dk.telepon,
+    dk.email,
+    dk.created_by,
+    dk.created_at,
+    dk.updated_at,
+
+    lp.kode_prioritas,
+
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+
+    u.nama AS dibuat_oleh
+
+  FROM mkb_daftar_kontak dk
+
+  JOIN layanan_prioritas lp
+    ON lp.id = dk.layanan_prioritas_id
+
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+
+  LEFT JOIN users u
+    ON u.id = dk.created_by
+`;
+
+exports.getAllDaftarKontak = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `
+      ${daftarKontakSelectQuery}
+      ORDER BY
+        dk.layanan_prioritas_id ASC,
+        dk.nama ASC,
+        dk.id ASC
+      `
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getAllDaftarKontak error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil daftar kontak.'
+    });
+  }
+};
+
+exports.getDaftarKontakByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${daftarKontakSelectQuery}
+      WHERE dk.layanan_prioritas_id = ?
+      ORDER BY dk.nama ASC, dk.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getDaftarKontakByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil daftar kontak.'
+    });
+  }
+};
+
+exports.getDaftarKontakById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID daftar kontak tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${daftarKontakSelectQuery}
+      WHERE dk.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data kontak tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'getDaftarKontakById error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat mengambil detail kontak.'
+    });
+  }
+};
+
+exports.createDaftarKontak = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    nama,
+    jabatan,
+    organisasi,
+    alamat,
+    telepon,
+    email
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof nama !== 'string' ||
+    !nama.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Nama wajib diisi.'
+    });
+  }
+
+  try {
+    const [layananRows] = await db.query(
+      `
+      SELECT id
+      FROM layanan_prioritas
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(layanan_prioritas_id)]
+    );
+
+    if (layananRows.length === 0) {
+      return res.status(404).json({
+        message: 'Layanan prioritas tidak ditemukan.'
+      });
+    }
+
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_daftar_kontak (
+        layanan_prioritas_id,
+        nama,
+        jabatan,
+        organisasi,
+        alamat,
+        telepon,
+        email,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        nama.trim(),
+        normalizeOptionalText(jabatan),
+        normalizeOptionalText(organisasi),
+        normalizeOptionalText(alamat),
+        normalizeOptionalText(telepon),
+        normalizeOptionalText(email),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${daftarKontakSelectQuery}
+      WHERE dk.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message:
+        'Daftar kontak berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'createDaftarKontak error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat menyimpan daftar kontak.'
+    });
+  }
+};
+
+exports.updateDaftarKontak = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID daftar kontak tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message:
+        'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_daftar_kontak
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Data kontak tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const namaBaru =
+      req.body.nama !== undefined
+        ? String(req.body.nama).trim()
+        : existing.nama;
+
+    if (!namaBaru) {
+      return res.status(400).json({
+        message: 'Nama wajib diisi.'
+      });
+    }
+
+    const jabatanBaru =
+      req.body.jabatan !== undefined
+        ? normalizeOptionalText(req.body.jabatan)
+        : existing.jabatan;
+
+    const organisasiBaru =
+      req.body.organisasi !== undefined
+        ? normalizeOptionalText(req.body.organisasi)
+        : existing.organisasi;
+
+    const alamatBaru =
+      req.body.alamat !== undefined
+        ? normalizeOptionalText(req.body.alamat)
+        : existing.alamat;
+
+    const teleponBaru =
+      req.body.telepon !== undefined
+        ? normalizeOptionalText(req.body.telepon)
+        : existing.telepon;
+
+    const emailBaru =
+      req.body.email !== undefined
+        ? normalizeOptionalText(req.body.email)
+        : existing.email;
+
+    await db.query(
+      `
+      UPDATE mkb_daftar_kontak
+      SET
+        nama = ?,
+        jabatan = ?,
+        organisasi = ?,
+        alamat = ?,
+        telepon = ?,
+        email = ?
+      WHERE id = ?
+      `,
+      [
+        namaBaru,
+        jabatanBaru,
+        organisasiBaru,
+        alamatBaru,
+        teleponBaru,
+        emailBaru,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${daftarKontakSelectQuery}
+      WHERE dk.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message:
+        'Daftar kontak berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'updateDaftarKontak error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat memperbarui daftar kontak.'
+    });
+  }
+};
+
+exports.deleteDaftarKontak = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID daftar kontak tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_daftar_kontak
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Data kontak tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message:
+        'Daftar kontak berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error(
+      'deleteDaftarKontak error:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Terjadi kesalahan saat menghapus daftar kontak.'
+    });
+  }
+};
+
+const sumberDayaManusiaSelectQuery = `
+  SELECT
+    sdm.id,
+    sdm.layanan_prioritas_id,
+    sdm.kebutuhan_personel,
+    sdm.jumlah_minimum,
+    sdm.kompetensi,
+    sdm.sumber_penyedia_sdm,
+    sdm.personel_pengganti,
+    sdm.keterangan,
+    sdm.created_by,
+    sdm.created_at,
+    sdm.updated_at,
+    lp.kode_prioritas,
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+    u.nama AS dibuat_oleh
+  FROM mkb_sumber_daya_manusia sdm
+  JOIN layanan_prioritas lp
+    ON lp.id = sdm.layanan_prioritas_id
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+  LEFT JOIN users u
+    ON u.id = sdm.created_by
+`;
+
+exports.getAllSumberDayaManusia = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      ${sumberDayaManusiaSelectQuery}
+      ORDER BY sdm.layanan_prioritas_id ASC, sdm.id ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getAllSumberDayaManusia error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil sumber daya manusia.'
+    });
+  }
+};
+
+exports.getSumberDayaManusiaByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${sumberDayaManusiaSelectQuery}
+      WHERE sdm.layanan_prioritas_id = ?
+      ORDER BY sdm.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getSumberDayaManusiaByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil sumber daya manusia.'
+    });
+  }
+};
+
+exports.getSumberDayaManusiaById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya manusia tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${sumberDayaManusiaSelectQuery}
+      WHERE sdm.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya manusia tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('getSumberDayaManusiaById error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil detail sumber daya manusia.'
+    });
+  }
+};
+
+exports.createSumberDayaManusia = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    kebutuhan_personel,
+    jumlah_minimum,
+    kompetensi,
+    sumber_penyedia_sdm,
+    personel_pengganti,
+    keterangan
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof kebutuhan_personel !== 'string' ||
+    !kebutuhan_personel.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Kebutuhan personel wajib diisi.'
+    });
+  }
+
+  if (
+    jumlah_minimum !== undefined &&
+    jumlah_minimum !== null &&
+    jumlah_minimum !== '' &&
+    (
+      !Number.isInteger(Number(jumlah_minimum)) ||
+      Number(jumlah_minimum) < 0
+    )
+  ) {
+    return res.status(400).json({
+      message: 'Jumlah minimum harus berupa bilangan bulat minimal 0.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_sumber_daya_manusia (
+        layanan_prioritas_id,
+        kebutuhan_personel,
+        jumlah_minimum,
+        kompetensi,
+        sumber_penyedia_sdm,
+        personel_pengganti,
+        keterangan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        kebutuhan_personel.trim(),
+        jumlah_minimum === undefined ||
+        jumlah_minimum === null ||
+        jumlah_minimum === ''
+          ? null
+          : Number(jumlah_minimum),
+        normalizeOptionalText(kompetensi),
+        normalizeOptionalText(sumber_penyedia_sdm),
+        normalizeOptionalText(personel_pengganti),
+        normalizeOptionalText(keterangan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${sumberDayaManusiaSelectQuery}
+      WHERE sdm.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message: 'Sumber daya manusia berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('createSumberDayaManusia error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menyimpan sumber daya manusia.'
+    });
+  }
+};
+
+exports.updateSumberDayaManusia = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya manusia tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message: 'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_sumber_daya_manusia
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya manusia tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const kebutuhanPersonel =
+      req.body.kebutuhan_personel !== undefined
+        ? String(req.body.kebutuhan_personel).trim()
+        : existing.kebutuhan_personel;
+
+    if (!kebutuhanPersonel) {
+      return res.status(400).json({
+        message: 'Kebutuhan personel wajib diisi.'
+      });
+    }
+
+    const jumlahMinimum =
+      req.body.jumlah_minimum !== undefined
+        ? (
+            req.body.jumlah_minimum === null ||
+            req.body.jumlah_minimum === ''
+              ? null
+              : Number(req.body.jumlah_minimum)
+          )
+        : existing.jumlah_minimum;
+
+    if (
+      jumlahMinimum !== null &&
+      (
+        !Number.isInteger(jumlahMinimum) ||
+        jumlahMinimum < 0
+      )
+    ) {
+      return res.status(400).json({
+        message: 'Jumlah minimum harus berupa bilangan bulat minimal 0.'
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mkb_sumber_daya_manusia
+      SET
+        kebutuhan_personel = ?,
+        jumlah_minimum = ?,
+        kompetensi = ?,
+        sumber_penyedia_sdm = ?,
+        personel_pengganti = ?,
+        keterangan = ?
+      WHERE id = ?
+      `,
+      [
+        kebutuhanPersonel,
+        jumlahMinimum,
+        req.body.kompetensi !== undefined
+          ? normalizeOptionalText(req.body.kompetensi)
+          : existing.kompetensi,
+        req.body.sumber_penyedia_sdm !== undefined
+          ? normalizeOptionalText(req.body.sumber_penyedia_sdm)
+          : existing.sumber_penyedia_sdm,
+        req.body.personel_pengganti !== undefined
+          ? normalizeOptionalText(req.body.personel_pengganti)
+          : existing.personel_pengganti,
+        req.body.keterangan !== undefined
+          ? normalizeOptionalText(req.body.keterangan)
+          : existing.keterangan,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${sumberDayaManusiaSelectQuery}
+      WHERE sdm.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message: 'Sumber daya manusia berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('updateSumberDayaManusia error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat memperbarui sumber daya manusia.'
+    });
+  }
+};
+
+exports.deleteSumberDayaManusia = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya manusia tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_sumber_daya_manusia
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya manusia tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Sumber daya manusia berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error('deleteSumberDayaManusia error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menghapus sumber daya manusia.'
+    });
+  }
+};
+
+const fasilitasOperasionalSelectQuery = `
+  SELECT
+    fo.id,
+    fo.layanan_prioritas_id,
+    fo.nama_fasilitas,
+    fo.jenis_fasilitas,
+    fo.jumlah_minimum,
+    fo.lokasi,
+    fo.fungsi,
+    fo.alternatif,
+    fo.keterangan,
+    fo.created_by,
+    fo.created_at,
+    fo.updated_at,
+    lp.kode_prioritas,
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+    u.nama AS dibuat_oleh
+  FROM mkb_fasilitas_operasional fo
+  JOIN layanan_prioritas lp
+    ON lp.id = fo.layanan_prioritas_id
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+  LEFT JOIN users u
+    ON u.id = fo.created_by
+`;
+
+exports.getAllFasilitasOperasional = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      ${fasilitasOperasionalSelectQuery}
+      ORDER BY fo.layanan_prioritas_id ASC, fo.id ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getAllFasilitasOperasional error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil fasilitas operasional.'
+    });
+  }
+};
+
+exports.getFasilitasOperasionalByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${fasilitasOperasionalSelectQuery}
+      WHERE fo.layanan_prioritas_id = ?
+      ORDER BY fo.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getFasilitasOperasionalByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil fasilitas operasional.'
+    });
+  }
+};
+
+exports.getFasilitasOperasionalById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID fasilitas operasional tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${fasilitasOperasionalSelectQuery}
+      WHERE fo.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Fasilitas operasional tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('getFasilitasOperasionalById error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil detail fasilitas operasional.'
+    });
+  }
+};
+
+exports.createFasilitasOperasional = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    nama_fasilitas,
+    jenis_fasilitas,
+    jumlah_minimum,
+    lokasi,
+    fungsi,
+    alternatif,
+    keterangan
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof nama_fasilitas !== 'string' ||
+    !nama_fasilitas.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Nama fasilitas wajib diisi.'
+    });
+  }
+
+  if (
+    jumlah_minimum !== undefined &&
+    jumlah_minimum !== null &&
+    jumlah_minimum !== '' &&
+    (
+      !Number.isInteger(Number(jumlah_minimum)) ||
+      Number(jumlah_minimum) < 0
+    )
+  ) {
+    return res.status(400).json({
+      message: 'Jumlah minimum harus berupa bilangan bulat minimal 0.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_fasilitas_operasional (
+        layanan_prioritas_id,
+        nama_fasilitas,
+        jenis_fasilitas,
+        jumlah_minimum,
+        lokasi,
+        fungsi,
+        alternatif,
+        keterangan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        nama_fasilitas.trim(),
+        normalizeOptionalText(jenis_fasilitas),
+        jumlah_minimum === undefined ||
+        jumlah_minimum === null ||
+        jumlah_minimum === ''
+          ? null
+          : Number(jumlah_minimum),
+        normalizeOptionalText(lokasi),
+        normalizeOptionalText(fungsi),
+        normalizeOptionalText(alternatif),
+        normalizeOptionalText(keterangan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${fasilitasOperasionalSelectQuery}
+      WHERE fo.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message: 'Fasilitas operasional berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('createFasilitasOperasional error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menyimpan fasilitas operasional.'
+    });
+  }
+};
+
+exports.updateFasilitasOperasional = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID fasilitas operasional tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message: 'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_fasilitas_operasional
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Fasilitas operasional tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const namaFasilitas =
+      req.body.nama_fasilitas !== undefined
+        ? String(req.body.nama_fasilitas).trim()
+        : existing.nama_fasilitas;
+
+    if (!namaFasilitas) {
+      return res.status(400).json({
+        message: 'Nama fasilitas wajib diisi.'
+      });
+    }
+
+    const jumlahMinimum =
+      req.body.jumlah_minimum !== undefined
+        ? (
+            req.body.jumlah_minimum === null ||
+            req.body.jumlah_minimum === ''
+              ? null
+              : Number(req.body.jumlah_minimum)
+          )
+        : existing.jumlah_minimum;
+
+    if (
+      jumlahMinimum !== null &&
+      (
+        !Number.isInteger(jumlahMinimum) ||
+        jumlahMinimum < 0
+      )
+    ) {
+      return res.status(400).json({
+        message: 'Jumlah minimum harus berupa bilangan bulat minimal 0.'
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mkb_fasilitas_operasional
+      SET
+        nama_fasilitas = ?,
+        jenis_fasilitas = ?,
+        jumlah_minimum = ?,
+        lokasi = ?,
+        fungsi = ?,
+        alternatif = ?,
+        keterangan = ?
+      WHERE id = ?
+      `,
+      [
+        namaFasilitas,
+        req.body.jenis_fasilitas !== undefined
+          ? normalizeOptionalText(req.body.jenis_fasilitas)
+          : existing.jenis_fasilitas,
+        jumlahMinimum,
+        req.body.lokasi !== undefined
+          ? normalizeOptionalText(req.body.lokasi)
+          : existing.lokasi,
+        req.body.fungsi !== undefined
+          ? normalizeOptionalText(req.body.fungsi)
+          : existing.fungsi,
+        req.body.alternatif !== undefined
+          ? normalizeOptionalText(req.body.alternatif)
+          : existing.alternatif,
+        req.body.keterangan !== undefined
+          ? normalizeOptionalText(req.body.keterangan)
+          : existing.keterangan,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${fasilitasOperasionalSelectQuery}
+      WHERE fo.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message: 'Fasilitas operasional berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('updateFasilitasOperasional error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat memperbarui fasilitas operasional.'
+    });
+  }
+};
+
+exports.deleteFasilitasOperasional = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID fasilitas operasional tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_fasilitas_operasional
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Fasilitas operasional tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Fasilitas operasional berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error('deleteFasilitasOperasional error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menghapus fasilitas operasional.'
+    });
+  }
+};
+
+const sumberDayaTikSelectQuery = `
+  SELECT
+    sdt.id,
+    sdt.layanan_prioritas_id,
+    sdt.jenis_sumber_daya,
+    sdt.nama_sumber_daya,
+    sdt.jumlah_minimum,
+    sdt.spesifikasi,
+    sdt.lokasi,
+    sdt.sumber_cadangan,
+    sdt.keterangan,
+    sdt.created_by,
+    sdt.created_at,
+    sdt.updated_at,
+    lp.kode_prioritas,
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+    u.nama AS dibuat_oleh
+  FROM mkb_sumber_daya_tik sdt
+  JOIN layanan_prioritas lp
+    ON lp.id = sdt.layanan_prioritas_id
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+  LEFT JOIN users u
+    ON u.id = sdt.created_by
+`;
+
+exports.getAllSumberDayaTik = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      ${sumberDayaTikSelectQuery}
+      ORDER BY sdt.layanan_prioritas_id ASC, sdt.id ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getAllSumberDayaTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil sumber daya TIK.'
+    });
+  }
+};
+
+exports.getSumberDayaTikByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${sumberDayaTikSelectQuery}
+      WHERE sdt.layanan_prioritas_id = ?
+      ORDER BY sdt.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getSumberDayaTikByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil sumber daya TIK.'
+    });
+  }
+};
+
+exports.getSumberDayaTikById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya TIK tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${sumberDayaTikSelectQuery}
+      WHERE sdt.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya TIK tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('getSumberDayaTikById error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil detail sumber daya TIK.'
+    });
+  }
+};
+
+exports.createSumberDayaTik = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    jenis_sumber_daya,
+    nama_sumber_daya,
+    jumlah_minimum,
+    spesifikasi,
+    lokasi,
+    sumber_cadangan,
+    keterangan
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof jenis_sumber_daya !== 'string' ||
+    !jenis_sumber_daya.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Jenis sumber daya wajib diisi.'
+    });
+  }
+
+  if (
+    typeof nama_sumber_daya !== 'string' ||
+    !nama_sumber_daya.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Nama sumber daya wajib diisi.'
+    });
+  }
+
+  if (
+    jumlah_minimum !== undefined &&
+    jumlah_minimum !== null &&
+    jumlah_minimum !== '' &&
+    (
+      !Number.isInteger(Number(jumlah_minimum)) ||
+      Number(jumlah_minimum) < 0
+    )
+  ) {
+    return res.status(400).json({
+      message: 'Jumlah minimum harus berupa bilangan bulat minimal 0.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_sumber_daya_tik (
+        layanan_prioritas_id,
+        jenis_sumber_daya,
+        nama_sumber_daya,
+        jumlah_minimum,
+        spesifikasi,
+        lokasi,
+        sumber_cadangan,
+        keterangan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        jenis_sumber_daya.trim(),
+        nama_sumber_daya.trim(),
+        jumlah_minimum === undefined ||
+        jumlah_minimum === null ||
+        jumlah_minimum === ''
+          ? null
+          : Number(jumlah_minimum),
+        normalizeOptionalText(spesifikasi),
+        normalizeOptionalText(lokasi),
+        normalizeOptionalText(sumber_cadangan),
+        normalizeOptionalText(keterangan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${sumberDayaTikSelectQuery}
+      WHERE sdt.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message: 'Sumber daya TIK berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('createSumberDayaTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menyimpan sumber daya TIK.'
+    });
+  }
+};
+
+exports.updateSumberDayaTik = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya TIK tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message: 'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_sumber_daya_tik
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya TIK tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const jenisSumberDaya =
+      req.body.jenis_sumber_daya !== undefined
+        ? String(req.body.jenis_sumber_daya).trim()
+        : existing.jenis_sumber_daya;
+
+    const namaSumberDaya =
+      req.body.nama_sumber_daya !== undefined
+        ? String(req.body.nama_sumber_daya).trim()
+        : existing.nama_sumber_daya;
+
+    if (!jenisSumberDaya || !namaSumberDaya) {
+      return res.status(400).json({
+        message: 'Jenis dan nama sumber daya wajib diisi.'
+      });
+    }
+
+    const jumlahMinimum =
+      req.body.jumlah_minimum !== undefined
+        ? (
+            req.body.jumlah_minimum === null ||
+            req.body.jumlah_minimum === ''
+              ? null
+              : Number(req.body.jumlah_minimum)
+          )
+        : existing.jumlah_minimum;
+
+    if (
+      jumlahMinimum !== null &&
+      (
+        !Number.isInteger(jumlahMinimum) ||
+        jumlahMinimum < 0
+      )
+    ) {
+      return res.status(400).json({
+        message: 'Jumlah minimum harus berupa bilangan bulat minimal 0.'
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mkb_sumber_daya_tik
+      SET
+        jenis_sumber_daya = ?,
+        nama_sumber_daya = ?,
+        jumlah_minimum = ?,
+        spesifikasi = ?,
+        lokasi = ?,
+        sumber_cadangan = ?,
+        keterangan = ?
+      WHERE id = ?
+      `,
+      [
+        jenisSumberDaya,
+        namaSumberDaya,
+        jumlahMinimum,
+        req.body.spesifikasi !== undefined
+          ? normalizeOptionalText(req.body.spesifikasi)
+          : existing.spesifikasi,
+        req.body.lokasi !== undefined
+          ? normalizeOptionalText(req.body.lokasi)
+          : existing.lokasi,
+        req.body.sumber_cadangan !== undefined
+          ? normalizeOptionalText(req.body.sumber_cadangan)
+          : existing.sumber_cadangan,
+        req.body.keterangan !== undefined
+          ? normalizeOptionalText(req.body.keterangan)
+          : existing.keterangan,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${sumberDayaTikSelectQuery}
+      WHERE sdt.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message: 'Sumber daya TIK berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('updateSumberDayaTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat memperbarui sumber daya TIK.'
+    });
+  }
+};
+
+exports.deleteSumberDayaTik = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya TIK tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_sumber_daya_tik
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya TIK tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Sumber daya TIK berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error('deleteSumberDayaTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menghapus sumber daya TIK.'
+    });
+  }
+};
+
+const aksesSistemTikSelectQuery = `
+  SELECT
+    ast.id,
+    ast.layanan_prioritas_id,
+    ast.nama_sistem,
+    ast.jenis_sistem,
+    ast.jenis_akses,
+    ast.personel_berwenang,
+    ast.mekanisme_akses,
+    ast.akses_darurat,
+    ast.keterangan,
+    ast.created_by,
+    ast.created_at,
+    ast.updated_at,
+    lp.kode_prioritas,
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+    u.nama AS dibuat_oleh
+  FROM mkb_akses_sistem_tik ast
+  JOIN layanan_prioritas lp
+    ON lp.id = ast.layanan_prioritas_id
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+  LEFT JOIN users u
+    ON u.id = ast.created_by
+`;
+
+exports.getAllAksesSistemTik = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      ${aksesSistemTikSelectQuery}
+      ORDER BY ast.layanan_prioritas_id ASC, ast.id ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getAllAksesSistemTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil akses sistem TIK.'
+    });
+  }
+};
+
+exports.getAksesSistemTikByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${aksesSistemTikSelectQuery}
+      WHERE ast.layanan_prioritas_id = ?
+      ORDER BY ast.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getAksesSistemTikByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil akses sistem TIK.'
+    });
+  }
+};
+
+exports.getAksesSistemTikById = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID akses sistem TIK tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${aksesSistemTikSelectQuery}
+      WHERE ast.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Akses sistem TIK tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('getAksesSistemTikById error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil detail akses sistem TIK.'
+    });
+  }
+};
+
+exports.createAksesSistemTik = async (req, res) => {
+  const {
+    layanan_prioritas_id,
+    nama_sistem,
+    jenis_sistem,
+    jenis_akses,
+    personel_berwenang,
+    mekanisme_akses,
+    akses_darurat,
+    keterangan
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof nama_sistem !== 'string' ||
+    !nama_sistem.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Nama sistem wajib diisi.'
+    });
+  }
+
+  if (
+    typeof jenis_akses !== 'string' ||
+    !jenis_akses.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Jenis akses wajib diisi.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_akses_sistem_tik (
+        layanan_prioritas_id,
+        nama_sistem,
+        jenis_sistem,
+        jenis_akses,
+        personel_berwenang,
+        mekanisme_akses,
+        akses_darurat,
+        keterangan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        nama_sistem.trim(),
+        normalizeOptionalText(jenis_sistem),
+        jenis_akses.trim(),
+        normalizeOptionalText(personel_berwenang),
+        normalizeOptionalText(mekanisme_akses),
+        normalizeOptionalText(akses_darurat),
+        normalizeOptionalText(keterangan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${aksesSistemTikSelectQuery}
+      WHERE ast.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message: 'Akses sistem TIK berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('createAksesSistemTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menyimpan akses sistem TIK.'
+    });
+  }
+};
+
+exports.updateAksesSistemTik = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID akses sistem TIK tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message: 'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_akses_sistem_tik
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Akses sistem TIK tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const namaSistem =
+      req.body.nama_sistem !== undefined
+        ? String(req.body.nama_sistem).trim()
+        : existing.nama_sistem;
+
+    const jenisAkses =
+      req.body.jenis_akses !== undefined
+        ? String(req.body.jenis_akses).trim()
+        : existing.jenis_akses;
+
+    if (!namaSistem || !jenisAkses) {
+      return res.status(400).json({
+        message: 'Nama sistem dan jenis akses wajib diisi.'
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mkb_akses_sistem_tik
+      SET
+        nama_sistem = ?,
+        jenis_sistem = ?,
+        jenis_akses = ?,
+        personel_berwenang = ?,
+        mekanisme_akses = ?,
+        akses_darurat = ?,
+        keterangan = ?
+      WHERE id = ?
+      `,
+      [
+        namaSistem,
+        req.body.jenis_sistem !== undefined
+          ? normalizeOptionalText(req.body.jenis_sistem)
+          : existing.jenis_sistem,
+        jenisAkses,
+        req.body.personel_berwenang !== undefined
+          ? normalizeOptionalText(req.body.personel_berwenang)
+          : existing.personel_berwenang,
+        req.body.mekanisme_akses !== undefined
+          ? normalizeOptionalText(req.body.mekanisme_akses)
+          : existing.mekanisme_akses,
+        req.body.akses_darurat !== undefined
+          ? normalizeOptionalText(req.body.akses_darurat)
+          : existing.akses_darurat,
+        req.body.keterangan !== undefined
+          ? normalizeOptionalText(req.body.keterangan)
+          : existing.keterangan,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${aksesSistemTikSelectQuery}
+      WHERE ast.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message: 'Akses sistem TIK berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error('updateAksesSistemTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat memperbarui akses sistem TIK.'
+    });
+  }
+};
+
+exports.deleteAksesSistemTik = async (req, res) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID akses sistem TIK tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_akses_sistem_tik
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Akses sistem TIK tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Akses sistem TIK berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error('deleteAksesSistemTik error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menghapus akses sistem TIK.'
+    });
+  }
+};
+
+const sumberDayaEksternalTikSelectQuery = `
+  SELECT
+    setik.id,
+    setik.layanan_prioritas_id,
+    setik.nama_vendor_mitra,
+    setik.jenis_sumber_daya,
+    setik.deskripsi_sumber_daya,
+    setik.kontak_dukungan,
+    setik.mekanisme_aktivasi,
+    setik.alternatif_penyedia,
+    setik.keterangan,
+    setik.created_by,
+    setik.created_at,
+    setik.updated_at,
+    lp.kode_prioritas,
+    ld.id AS layanan_id,
+    ld.kode_layanan,
+    ld.nama_layanan,
+    i.id AS instansi_id,
+    i.kode_instansi,
+    i.nama_instansi,
+    u.nama AS dibuat_oleh
+  FROM mkb_sumber_daya_eksternal_tik setik
+  JOIN layanan_prioritas lp
+    ON lp.id = setik.layanan_prioritas_id
+  JOIN layanan_digital ld
+    ON ld.id = lp.layanan_id
+  JOIN instansi i
+    ON i.id = ld.instansi_id
+  LEFT JOIN users u
+    ON u.id = setik.created_by
+`;
+
+exports.getAllSumberDayaEksternalTik = async (
+  req,
+  res
+) => {
+  try {
+    const [rows] = await db.query(`
+      ${sumberDayaEksternalTikSelectQuery}
+      ORDER BY setik.layanan_prioritas_id ASC, setik.id ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getAllSumberDayaEksternalTik error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil sumber daya eksternal TIK.'
+    });
+  }
+};
+
+exports.getSumberDayaEksternalTikByLayananPrioritas = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID layanan prioritas tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${sumberDayaEksternalTikSelectQuery}
+      WHERE setik.layanan_prioritas_id = ?
+      ORDER BY setik.id ASC
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error(
+      'getSumberDayaEksternalTikByLayananPrioritas error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil sumber daya eksternal TIK.'
+    });
+  }
+};
+
+exports.getSumberDayaEksternalTikById = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya eksternal TIK tidak valid.'
+    });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      ${sumberDayaEksternalTikSelectQuery}
+      WHERE setik.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya eksternal TIK tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'getSumberDayaEksternalTikById error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil detail sumber daya eksternal TIK.'
+    });
+  }
+};
+
+exports.createSumberDayaEksternalTik = async (
+  req,
+  res
+) => {
+  const {
+    layanan_prioritas_id,
+    nama_vendor_mitra,
+    jenis_sumber_daya,
+    deskripsi_sumber_daya,
+    kontak_dukungan,
+    mekanisme_aktivasi,
+    alternatif_penyedia,
+    keterangan
+  } = req.body;
+
+  if (!isPositiveInteger(layanan_prioritas_id)) {
+    return res.status(400).json({
+      message: 'Layanan prioritas wajib dipilih.'
+    });
+  }
+
+  if (
+    typeof nama_vendor_mitra !== 'string' ||
+    !nama_vendor_mitra.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Nama vendor atau mitra wajib diisi.'
+    });
+  }
+
+  if (
+    typeof jenis_sumber_daya !== 'string' ||
+    !jenis_sumber_daya.trim()
+  ) {
+    return res.status(400).json({
+      message: 'Jenis sumber daya wajib diisi.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO mkb_sumber_daya_eksternal_tik (
+        layanan_prioritas_id,
+        nama_vendor_mitra,
+        jenis_sumber_daya,
+        deskripsi_sumber_daya,
+        kontak_dukungan,
+        mekanisme_aktivasi,
+        alternatif_penyedia,
+        keterangan,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(layanan_prioritas_id),
+        nama_vendor_mitra.trim(),
+        jenis_sumber_daya.trim(),
+        normalizeOptionalText(deskripsi_sumber_daya),
+        normalizeOptionalText(kontak_dukungan),
+        normalizeOptionalText(mekanisme_aktivasi),
+        normalizeOptionalText(alternatif_penyedia),
+        normalizeOptionalText(keterangan),
+        req.user.id
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${sumberDayaEksternalTikSelectQuery}
+      WHERE setik.id = ?
+      LIMIT 1
+      `,
+      [result.insertId]
+    );
+
+    return res.status(201).json({
+      message: 'Sumber daya eksternal TIK berhasil disimpan.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'createSumberDayaEksternalTik error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menyimpan sumber daya eksternal TIK.'
+    });
+  }
+};
+
+exports.updateSumberDayaEksternalTik = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya eksternal TIK tidak valid.'
+    });
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      req.body,
+      'layanan_prioritas_id'
+    )
+  ) {
+    return res.status(400).json({
+      message: 'layanan_prioritas_id tidak dapat diubah.'
+    });
+  }
+
+  try {
+    const [existingRows] = await db.query(
+      `
+      SELECT *
+      FROM mkb_sumber_daya_eksternal_tik
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya eksternal TIK tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    const namaVendorMitra =
+      req.body.nama_vendor_mitra !== undefined
+        ? String(req.body.nama_vendor_mitra).trim()
+        : existing.nama_vendor_mitra;
+
+    const jenisSumberDaya =
+      req.body.jenis_sumber_daya !== undefined
+        ? String(req.body.jenis_sumber_daya).trim()
+        : existing.jenis_sumber_daya;
+
+    if (!namaVendorMitra || !jenisSumberDaya) {
+      return res.status(400).json({
+        message: 'Nama vendor atau mitra dan jenis sumber daya wajib diisi.'
+      });
+    }
+
+    await db.query(
+      `
+      UPDATE mkb_sumber_daya_eksternal_tik
+      SET
+        nama_vendor_mitra = ?,
+        jenis_sumber_daya = ?,
+        deskripsi_sumber_daya = ?,
+        kontak_dukungan = ?,
+        mekanisme_aktivasi = ?,
+        alternatif_penyedia = ?,
+        keterangan = ?
+      WHERE id = ?
+      `,
+      [
+        namaVendorMitra,
+        jenisSumberDaya,
+        req.body.deskripsi_sumber_daya !== undefined
+          ? normalizeOptionalText(req.body.deskripsi_sumber_daya)
+          : existing.deskripsi_sumber_daya,
+        req.body.kontak_dukungan !== undefined
+          ? normalizeOptionalText(req.body.kontak_dukungan)
+          : existing.kontak_dukungan,
+        req.body.mekanisme_aktivasi !== undefined
+          ? normalizeOptionalText(req.body.mekanisme_aktivasi)
+          : existing.mekanisme_aktivasi,
+        req.body.alternatif_penyedia !== undefined
+          ? normalizeOptionalText(req.body.alternatif_penyedia)
+          : existing.alternatif_penyedia,
+        req.body.keterangan !== undefined
+          ? normalizeOptionalText(req.body.keterangan)
+          : existing.keterangan,
+        Number(id)
+      ]
+    );
+
+    const [rows] = await db.query(
+      `
+      ${sumberDayaEksternalTikSelectQuery}
+      WHERE setik.id = ?
+      LIMIT 1
+      `,
+      [Number(id)]
+    );
+
+    return res.status(200).json({
+      message: 'Sumber daya eksternal TIK berhasil diperbarui.',
+      data: rows[0]
+    });
+  } catch (error) {
+    console.error(
+      'updateSumberDayaEksternalTik error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat memperbarui sumber daya eksternal TIK.'
+    });
+  }
+};
+
+exports.deleteSumberDayaEksternalTik = async (
+  req,
+  res
+) => {
+  const { id } = req.params;
+
+  if (!isPositiveInteger(id)) {
+    return res.status(400).json({
+      message: 'ID sumber daya eksternal TIK tidak valid.'
+    });
+  }
+
+  try {
+    const [result] = await db.query(
+      `
+      DELETE FROM mkb_sumber_daya_eksternal_tik
+      WHERE id = ?
+      `,
+      [Number(id)]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Sumber daya eksternal TIK tidak ditemukan.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Sumber daya eksternal TIK berhasil dihapus.'
+    });
+  } catch (error) {
+    console.error(
+      'deleteSumberDayaEksternalTik error:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat menghapus sumber daya eksternal TIK.'
+    });
+  }
+};
+
 // =====================================================
 // PROSES 2 - BUSINESS IMPACT ANALYSIS (BIA)
 // =====================================================
@@ -3621,6 +7107,31 @@ exports.deleteBia = async (req, res) => {
     return res.status(500).json({
       message:
         'Terjadi kesalahan saat menghapus BIA.'
+    });
+  }
+};
+
+exports.getModuleOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        kode_modul,
+        nama_modul,
+        deskripsi
+      FROM modules
+      WHERE aktif = 1
+      ORDER BY nama_modul ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getModuleOptions error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil daftar modul.'
     });
   }
 };

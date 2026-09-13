@@ -32,6 +32,10 @@ import PemanfaatanAlihPengetahuanPage from "./pages/PemanfaatanAlihPengetahuanPa
 import EvaluasiPengetahuanPage from "./pages/EvaluasiPengetahuanPage";
 
 import PenetapanKonteksKeberlangsunganPage from "./pages/PenetapanKonteksKeberlangsunganPage";
+import AnalisisDampakBisnisPage from './pages/AnalisisDampakBisnisPage';
+import StrategiKeberlangsunganPage from "./pages/StrategiKeberlangsunganPage";
+import UjiEvaluasiKeberlangsunganPage from "./pages/UjiEvaluasiKeberlangsunganPage";
+
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
@@ -237,6 +241,33 @@ export default function App() {
               element={
                 <RequirePermission permission="continuity.view">
                   <PenetapanKonteksKeberlangsunganPage/>
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/keberlangsungan/analisis-dampak-bisnis"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <AnalisisDampakBisnisPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/keberlangsungan/strategi"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <StrategiKeberlangsunganPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/keberlangsungan/uji-evaluasi"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <UjiEvaluasiKeberlangsunganPage />
                 </RequirePermission>
               }
             />

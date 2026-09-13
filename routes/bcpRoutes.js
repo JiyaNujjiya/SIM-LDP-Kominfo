@@ -70,6 +70,13 @@ router.get(
 );
 
 router.get(
+  '/user-options',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getUserOptions
+);
+
+router.get(
   '/pegawai-options',
   authMiddleware,
   requirePermission('continuity.view'),
@@ -188,6 +195,342 @@ router.delete(
   bcpController.deleteTimPemulihanLayanan
 );
 
+router.get(
+  '/operasional',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllTimOperasional
+);
+
+router.get(
+  '/layanan-prioritas/:id/operasional',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimOperasionalByLayananPrioritas
+);
+
+router.get(
+  '/operasional/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getTimOperasionalById
+);
+
+router.post(
+  '/operasional',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createTimOperasional
+);
+
+router.put(
+  '/operasional/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateTimOperasional
+);
+
+router.delete(
+  '/operasional/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteTimOperasional
+);
+
+router.get(
+  '/rencana-komunikasi',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllRencanaKomunikasi
+);
+
+router.get(
+  '/layanan-prioritas/:id/rencana-komunikasi',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getRencanaKomunikasiByLayananPrioritas
+);
+
+router.get(
+  '/rencana-komunikasi/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getRencanaKomunikasiById
+);
+
+router.post(
+  '/rencana-komunikasi',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createRencanaKomunikasi
+);
+
+router.put(
+  '/rencana-komunikasi/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateRencanaKomunikasi
+);
+
+router.delete(
+  '/rencana-komunikasi/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteRencanaKomunikasi
+);
+
+router.get(
+  '/daftar-kontak',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllDaftarKontak
+);
+
+router.get(
+  '/layanan-prioritas/:id/daftar-kontak',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getDaftarKontakByLayananPrioritas
+);
+
+router.get(
+  '/daftar-kontak/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getDaftarKontakById
+);
+
+router.post(
+  '/daftar-kontak',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createDaftarKontak
+);
+
+router.put(
+  '/daftar-kontak/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateDaftarKontak
+);
+
+router.delete(
+  '/daftar-kontak/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteDaftarKontak
+);
+
+router.get(
+  '/sumber-daya-manusia',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllSumberDayaManusia
+);
+
+router.get(
+  '/layanan-prioritas/:id/sumber-daya-manusia',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getSumberDayaManusiaByLayananPrioritas
+);
+
+router.get(
+  '/sumber-daya-manusia/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getSumberDayaManusiaById
+);
+
+router.post(
+  '/sumber-daya-manusia',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createSumberDayaManusia
+);
+
+router.put(
+  '/sumber-daya-manusia/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateSumberDayaManusia
+);
+
+router.delete(
+  '/sumber-daya-manusia/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteSumberDayaManusia
+);
+
+router.get(
+  '/fasilitas-operasional',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllFasilitasOperasional
+);
+
+router.get(
+  '/layanan-prioritas/:id/fasilitas-operasional',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getFasilitasOperasionalByLayananPrioritas
+);
+
+router.get(
+  '/fasilitas-operasional/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getFasilitasOperasionalById
+);
+
+router.post(
+  '/fasilitas-operasional',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createFasilitasOperasional
+);
+
+router.put(
+  '/fasilitas-operasional/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateFasilitasOperasional
+);
+
+router.delete(
+  '/fasilitas-operasional/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteFasilitasOperasional
+);
+
+router.get(
+  '/sumber-daya-tik',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllSumberDayaTik
+);
+
+router.get(
+  '/layanan-prioritas/:id/sumber-daya-tik',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getSumberDayaTikByLayananPrioritas
+);
+
+router.get(
+  '/sumber-daya-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getSumberDayaTikById
+);
+
+router.post(
+  '/sumber-daya-tik',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createSumberDayaTik
+);
+
+router.put(
+  '/sumber-daya-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateSumberDayaTik
+);
+
+router.delete(
+  '/sumber-daya-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteSumberDayaTik
+);
+
+router.get(
+  '/akses-sistem-tik',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllAksesSistemTik
+);
+
+router.get(
+  '/layanan-prioritas/:id/akses-sistem-tik',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAksesSistemTikByLayananPrioritas
+);
+
+router.get(
+  '/akses-sistem-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAksesSistemTikById
+);
+
+router.post(
+  '/akses-sistem-tik',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createAksesSistemTik
+);
+
+router.put(
+  '/akses-sistem-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateAksesSistemTik
+);
+
+router.delete(
+  '/akses-sistem-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteAksesSistemTik
+);
+
+router.get(
+  '/sumber-daya-eksternal-tik',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllSumberDayaEksternalTik
+);
+
+router.get(
+  '/layanan-prioritas/:id/sumber-daya-eksternal-tik',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getSumberDayaEksternalTikByLayananPrioritas
+);
+
+router.get(
+  '/sumber-daya-eksternal-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getSumberDayaEksternalTikById
+);
+
+router.post(
+  '/sumber-daya-eksternal-tik',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createSumberDayaEksternalTik
+);
+
+router.put(
+  '/sumber-daya-eksternal-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateSumberDayaEksternalTik
+);
+
+router.delete(
+  '/sumber-daya-eksternal-tik/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteSumberDayaEksternalTik
+);
+
 // =====================================================
 // PROSES 2 - BUSINESS IMPACT ANALYSIS (BIA)
 // =====================================================
@@ -262,6 +605,13 @@ router.get(
 // PROSES 2 - FORM 10
 // DAFTAR INSIDEN / GANGGUAN POTENSIAL
 // =====================================================
+
+router.get(
+  '/module-options',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getModuleOptions
+);
 
 router.get(
   '/bia/:id/insiden',

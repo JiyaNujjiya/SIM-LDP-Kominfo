@@ -216,10 +216,7 @@ export default function AppLayout({
       };
     }
 
-    if (
-      path ===
-      "/risiko/monitoring/tahunan"
-    ) {
+    if (path === "/risiko/monitoring/tahunan") {
       return {
         parent: "Manajemen Risiko",
         current: "Monitoring Tahunan",
@@ -292,10 +289,30 @@ export default function AppLayout({
     if (path === "/keberlangsungan/penetapan-konteks") {
       return {
         parent: "Manajemen Keberlangsungan",
-        current: "MKB 01 - Penetapan Konteks",
+        current: "MKB01 - Penetapan Konteks",
       };
     }
 
+    if (path === "/keberlangsungan/analisis-dampak-bisnis") {
+      return {
+        parent: "Manajemen Keberlangsungan",
+        current: "MKB02 - Business Impact Analysis (BIA)",
+      };
+    }
+
+    if (path === "/keberlangsungan/strategi") {
+      return {
+        parent: "Manajemen Keberlangsungan",
+        current: "MKB03 - Strategi Keberlangsungan Bisnis (BCS)",
+      };
+    }
+
+    if (path === "/keberlangsungan/uji-evaluasi") {
+      return {
+        parent: "Manajemen Keberlangsungan",
+        current: "MKB04 Ujicoba & Evaluasi",
+      };
+    }
 
     return {
       parent: "",
@@ -1051,6 +1068,54 @@ export default function AppLayout({
                           )}
                         >
                           MKB01 Penetapan Konteks
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              "/keberlangsungan/analisis-dampak-bisnis"
+                            )
+                          }
+                          style={subMenuStyle(
+                            isActive(
+                              "/keberlangsungan/analisis-dampak-bisnis"
+                            )
+                          )}
+                        >
+                          MKB02 Business Impact Analysis (BIA)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              "/keberlangsungan/strategi"
+                            )
+                          }
+                          style={subMenuStyle(
+                            isActive(
+                              "/keberlangsungan/strategi"
+                            )
+                          )}
+                        >
+                          MKB03 Strategi Keberlangsungan Bisnis
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              "/keberlangsungan/uji-evaluasi"
+                            )
+                          }
+                          style={subMenuStyle(
+                            isActive(
+                              "/keberlangsungan/uji-evaluasi"
+                            )
+                          )}
+                        >
+                          MKB04 Ujicoba & Evaluasi
                         </button>
                       </div>
                     )}
