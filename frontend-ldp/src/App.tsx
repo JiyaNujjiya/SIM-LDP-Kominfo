@@ -36,6 +36,11 @@ import AnalisisDampakBisnisPage from './pages/AnalisisDampakBisnisPage';
 import StrategiKeberlangsunganPage from "./pages/StrategiKeberlangsunganPage";
 import UjiEvaluasiKeberlangsunganPage from "./pages/UjiEvaluasiKeberlangsunganPage";
 
+import PerencanaanRelasiPenggunaPage from "./pages/PerencanaanRelasiPenggunaPage";
+import PermintaanRelasiPenggunaPage from "./pages/PermintaanRelasiPenggunaPage";
+import PenangananRelasiPenggunaPage from "./pages/PenangananRelasiPenggunaPage";
+import EvaluasiRelasiPenggunaPage from "./pages/EvaluasiRelasiPenggunaPage";
+
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
@@ -268,6 +273,42 @@ export default function App() {
               element={
                 <RequirePermission permission="continuity.view">
                   <UjiEvaluasiKeberlangsunganPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/relasi-pengguna/perencanaan"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <PerencanaanRelasiPenggunaPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/relasi-pengguna/permintaan"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <PermintaanRelasiPenggunaPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/relasi-pengguna/penanganan"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <PenangananRelasiPenggunaPage />
+                </RequirePermission>
+              }
+            />
+
+            <Route
+              path="/relasi-pengguna/evaluasi"
+              element={
+                <RequirePermission permission="continuity.view">
+                  <EvaluasiRelasiPenggunaPage />
                 </RequirePermission>
               }
             />

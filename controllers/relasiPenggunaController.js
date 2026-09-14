@@ -82,6 +82,54 @@ const isValidDateString = (value) => {
     );
 };
 
+exports.getLayananOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        kode_layanan,
+        nama_layanan,
+        jenis_layanan,
+        deskripsi
+      FROM layanan_digital
+      ORDER BY nama_layanan ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getLayananOptions error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil daftar layanan.'
+    });
+  }
+};
+
+exports.getUserOptions = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        id,
+        nama,
+        email,
+        role
+      FROM users
+      ORDER BY nama ASC
+    `);
+
+    return res.status(200).json({
+      data: rows
+    });
+  } catch (error) {
+    console.error('getUserOptions error:', error);
+
+    return res.status(500).json({
+      message: 'Terjadi kesalahan saat mengambil daftar pengguna.'
+    });
+  }
+};
 
 // =====================================================
 // COMPATIBILITY / OVERVIEW HELPDESK

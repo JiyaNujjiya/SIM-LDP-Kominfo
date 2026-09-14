@@ -63,15 +63,16 @@ const menuItems = [
     permission: "knowledge.view",
   },
   {
-  id: "bcp",
-  label: "Manajemen Keberlangsungan",
-  Icon: ShieldCheck,
-  permission: "continuity.view",
+    id: "bcp",
+    label: "Manajemen Keberlangsungan",
+    Icon: ShieldCheck,
+    permission: "continuity.view",
   },
   {
-    id: "relasi",
+    id: "relasi-pengguna",
     label: "Manajemen Relasi Pengguna",
     Icon: UserRound,
+    permission: "user_relation.view",
   },
 ];
 
@@ -125,6 +126,10 @@ export default function AppLayout({
     location.pathname.startsWith("/keberlangsungan")
   );
 
+  const [userRelationOpen, setUserRelationOpen] = useState(
+    location.pathname.startsWith("/relasi-pengguna")
+  );
+
   const savedUser = localStorage.getItem("user");
   const user = savedUser
     ? JSON.parse(savedUser)
@@ -155,6 +160,9 @@ export default function AppLayout({
 
   const keberlangsunganActive =
     location.pathname.startsWith("/keberlangsungan");
+
+  const relasiPenggunaActive =
+    location.pathname.startsWith("/relasi-pengguna");
 
   const getBreadcrumb = () => {
     const path = location.pathname;
@@ -314,6 +322,34 @@ export default function AppLayout({
       };
     }
 
+    if (path === "/relasi-pengguna/perencanaan") {
+      return {
+        parent: "Manajemen Relasi Pengguna",
+        current: "MRP01 - Perencanaan Layanan",
+      };
+    }
+
+    if (path === "/relasi-pengguna/permintaan") {
+      return {
+        parent: "Manajemen Relasi Pengguna",
+        current: "MRP02 - Permintaan Layanan",
+      };
+    }
+
+    if (path === "/relasi-pengguna/penanganan") {
+      return {
+        parent: "Manajemen Relasi Pengguna",
+        current: "MRP03 - Penanganan Kueri",
+      };
+    }
+
+    if (path === "/relasi-pengguna/evaluasi") {
+      return {
+        parent: "Manajemen Relasi Pengguna",
+        current: "MRP04 - Evaluasi",
+      };
+    }
+
     return {
       parent: "",
       current: "Dashboard",
@@ -429,7 +465,7 @@ export default function AppLayout({
                       if (m.id === "perubahan") navigate("/perubahan/perencanaan");
                       if (m.id === "pengetahuan") navigate("/pengetahuan/perencanaan");;
                       if (m.id === "bcp") navigate("/keberlangsungan/penetapan-konteks");
-                      if (m.id === "relasi") navigate("/relasi-pengguna");
+                      if (m.id === "relasi-pengguna") navigate("/relasi-pengguna/perencanaan");
                     }}
                     title={m.label}
                     style={{
@@ -459,10 +495,14 @@ export default function AppLayout({
                           ? keberlangsunganActive
                             ? C.sidebarActive
                             : "transparent"
+                          : m.id === "relasi-pengguna"
+                          ? relasiPenggunaActive
+                            ? C.sidebarActive
+                            : "transparent"
                           : m.id === "dashboard" && isActive("/dashboard")
                           ? C.sidebarActive
                           : "transparent",
-                    }}
+                      }}
                   >
                     <m.Icon
                       size={18}
@@ -1123,6 +1163,128 @@ export default function AppLayout({
                 );
               }
 
+              if (m.id === "relasi-pengguna") {
+                return (
+                  <div key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!relasiPenggunaActive) {
+                          navigate("/relasi-pengguna/perencanaan");
+                          setUserRelationOpen(true);
+                          return;
+                        }
+
+                        setUserRelationOpen((prev) => !prev);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 16px",
+                        width: "100%",
+                        border: "none",
+                        borderRadius: 6,
+                        background: relasiPenggunaActive
+                          ? C.sidebarActive
+                          : "transparent",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <UserRound
+                        size={18}
+                        color={C.sidebarText}
+                        strokeWidth={2}
+                      />
+
+                      <span
+                        style={{
+                          flex: 1,
+                          textAlign: "left",
+                          fontWeight: 500,
+                          fontSize: 13,
+                          color: C.sidebarText,
+                        }}
+                      >
+                        Manajemen Relasi Pengguna
+                      </span>
+
+                      {userRelationOpen ? (
+                        <ChevronDown
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      ) : (
+                        <ChevronRight
+                          size={16}
+                          color={C.sidebarText}
+                        />
+                      )}
+                    </button>
+
+                    {userRelationOpen && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          marginLeft: 28,
+                          marginTop: 4,
+                          gap: 2,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/relasi-pengguna/perencanaan")
+                          }
+                          style={subMenuStyle(
+                            isActive("/relasi-pengguna/perencanaan")
+                          )}
+                        >
+                          MRP01 Perencanaan Layanan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/relasi-pengguna/permintaan")
+                          }
+                          style={subMenuStyle(
+                            isActive("/relasi-pengguna/permintaan")
+                          )}
+                        >
+                          MRP02 Permintaan Layanan
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/relasi-pengguna/penanganan")
+                          }
+                          style={subMenuStyle(
+                            isActive("/relasi-pengguna/penanganan")
+                          )}
+                        >
+                          MRP03 Penanganan Kueri
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/relasi-pengguna/evaluasi")
+                          }
+                          style={subMenuStyle(
+                            isActive("/relasi-pengguna/evaluasi")
+                          )}
+                        >
+                          MRP04 Evaluasi
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={m.id}
@@ -1130,7 +1292,7 @@ export default function AppLayout({
                   onClick={() => {
                     if (m.id === "dashboard") navigate("/dashboard");
                     if (m.id === "bcp") navigate("/keberlangsungan/penetapan-konteks");
-                    if (m.id === "relasi") navigate("/relasi-pengguna");
+                    if (m.id === "relasi-pengguna") navigate("/relasi-pengguna/perencanaan");
                   }}
                   style={{
                     display: "flex",

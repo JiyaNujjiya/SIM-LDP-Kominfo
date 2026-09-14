@@ -16,6 +16,20 @@ const requirePermission =
 // =====================================================
 
 router.get(
+  '/layanan-options',
+  authMiddleware,
+  requirePermission('user_relation.view'),
+  relasiPenggunaController.getLayananOptions
+);
+
+router.get(
+  '/user-options',
+  authMiddleware,
+  requirePermission('user_relation.view'),
+  relasiPenggunaController.getUserOptions
+);
+
+router.get(
     '/',
     authMiddleware,
     requirePermission('user_relation.view'),
