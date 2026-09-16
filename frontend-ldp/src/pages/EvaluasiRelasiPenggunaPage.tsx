@@ -242,7 +242,7 @@ const EvaluasiRelasiPenggunaPage = () => {
     const response = await fetch(url, {
       ...options,
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
+        Authorization: `Bearer ${sessionStorage.getItem('token')}`,
         'Content-Type': 'application/json',
         ...(options.headers || {}),
       },

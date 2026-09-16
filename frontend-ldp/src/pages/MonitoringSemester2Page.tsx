@@ -68,7 +68,7 @@ const MonitoringSemester2Page: React.FC = () => {
       setLoading(true);
       setMessage('');
 
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/monitoring/semester-2?tahun=${tahunSekarang}`,
@@ -111,7 +111,7 @@ const MonitoringSemester2Page: React.FC = () => {
   React.useEffect(() => {
     const fetchPicOptions = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
 
         const response = await fetch(
           'http://localhost:5000/api/risiko/penanggung-jawab-options',
@@ -183,7 +183,7 @@ const MonitoringSemester2Page: React.FC = () => {
       setSaving(true);
       setMessage('');
 
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/monitoring/semester-2/${editingItem.risiko_id}`,
@@ -325,7 +325,7 @@ const MonitoringSemester2Page: React.FC = () => {
     namaFile: string
   ) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/monitoring/dokumen/${dokumenId}/download`,

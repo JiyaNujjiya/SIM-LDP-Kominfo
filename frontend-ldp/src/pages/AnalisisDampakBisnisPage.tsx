@@ -249,7 +249,7 @@ const AnalisisDampakBisnisPage = () => {
       setError('');
 
       const token =
-        localStorage.getItem('token');
+        sessionStorage.getItem('token');
 
       const response = await fetch(
         'http://localhost:5000/api/bcp/bia',
@@ -291,7 +291,7 @@ const AnalisisDampakBisnisPage = () => {
   const fetchLayananOptions = async () => {
       try {
         const token =
-          localStorage.getItem('token');
+          sessionStorage.getItem('token');
 
         const response = await fetch(
           'http://localhost:5000/api/risiko/layanan-prioritas-options',
@@ -333,7 +333,7 @@ const AnalisisDampakBisnisPage = () => {
 
     const fetchModuleOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch('http://localhost:5000/api/bcp/module-options', {
         headers: {
@@ -356,7 +356,7 @@ const AnalisisDampakBisnisPage = () => {
 
   const fetchInsidenModul = async () => {
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const results = await Promise.all(
       insiden.map(async (item) => {
@@ -547,7 +547,7 @@ useEffect(() => {
       setError('');
 
       const token =
-        localStorage.getItem('token');
+        sessionStorage.getItem('token');
 
       const payload: Record<
         string,
@@ -640,7 +640,7 @@ useEffect(() => {
       setError('');
 
       const token =
-        localStorage.getItem('token');
+        sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/bcp/bia/${item.id}`,
@@ -681,7 +681,7 @@ useEffect(() => {
 
   const fetchInsiden = async () => {
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const results = await Promise.all(
       data.map(async (bia) => {
         const response = await fetch(`http://localhost:5000/api/bcp/bia/${bia.id}/insiden`, {
@@ -758,7 +758,7 @@ const handleSubmitInsiden = async (event: FormEvent) => {
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload = {
       nama_insiden: insidenForm.nama_insiden.trim(),
@@ -801,7 +801,7 @@ const handleDeleteInsiden = async (item: InsidenItem) => {
   if (!window.confirm(`Hapus insiden "${item.nama_insiden}"?`)) return;
 
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(`http://localhost:5000/api/bcp/insiden/${item.id}`, {
       method: 'DELETE',
@@ -826,7 +826,7 @@ const handleDeleteInsiden = async (item: InsidenItem) => {
 
 const fetchKetergantungan = async () => {
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const results = await Promise.all(
       data.map(async (bia) => {
@@ -902,7 +902,7 @@ const handleSubmitKetergantungan = async (event: FormEvent) => {
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload = {
       jenis_ketergantungan: ketergantunganForm.jenis_ketergantungan,
@@ -990,7 +990,7 @@ const handleSubmitTarget = async (event: FormEvent) => {
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(`http://localhost:5000/api/bcp/bia/${selectedTargetBia.id}`, {
       method: 'PUT',
@@ -1029,7 +1029,7 @@ const handleDeleteKetergantungan = async (item: KetergantunganItem) => {
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(`http://localhost:5000/api/bcp/ketergantungan/${item.id}`, {
       method: 'DELETE',
@@ -1096,7 +1096,7 @@ const handleSubmitInsidenModul = async (event: FormEvent) => {
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload = {
       module_id: Number(insidenModulForm.module_id),
@@ -1140,7 +1140,7 @@ const handleDeleteInsidenModul = async (item: InsidenModulItem) => {
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(`http://localhost:5000/api/bcp/insiden-modul/${item.id}`, {
       method: 'DELETE',

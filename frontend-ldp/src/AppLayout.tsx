@@ -130,7 +130,16 @@ export default function AppLayout({
     location.pathname.startsWith("/relasi-pengguna")
   );
 
-  const savedUser = localStorage.getItem("user");
+  const closeAllMenus = () => {
+    setRiskOpen(false);
+    setChangeOpen(false);
+    setKnowledgeOpen(false);
+    setContinuityOpen(false);
+    setUserRelationOpen(false);
+  };
+
+  const savedUser = sessionStorage.getItem("user");
+
   const user = savedUser
     ? JSON.parse(savedUser)
     : null;
@@ -521,13 +530,9 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!risikoActive) {
-                          navigate("/risiko/overview");
-                          setRiskOpen(true);
-                          return;
-                        }
-
-                        setRiskOpen((prev) => !prev);
+                        closeAllMenus();
+                        setRiskOpen(true);
+                        navigate("/risiko/overview");
                       }}
                       style={{
                         display: "flex",
@@ -775,13 +780,9 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!perubahanActive) {
-                          navigate("/perubahan/perencanaan");
-                          setChangeOpen(true);
-                          return;
-                        }
-
-                        setChangeOpen((prev) => !prev);
+                        closeAllMenus();
+                        setChangeOpen(true);
+                        navigate("/perubahan/perencanaan");
                       }}
                       style={{
                         display: "flex",
@@ -909,13 +910,9 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!pengetahuanActive) {
-                          navigate("/pengetahuan/perencanaan");
-                          setKnowledgeOpen(true);
-                          return;
-                        }
-
-                        setKnowledgeOpen((prev) => !prev);
+                        closeAllMenus();
+                        setKnowledgeOpen(true);
+                        navigate("/pengetahuan/perencanaan");
                       }}
                       style={{
                         display: "flex",
@@ -1031,13 +1028,9 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!keberlangsunganActive) {
-                          navigate("/keberlangsungan/penetapan-konteks");
-                          setContinuityOpen(true);
-                          return;
-                        }
-
-                        setContinuityOpen((prev) => !prev);
+                        closeAllMenus();
+                        setContinuityOpen(true);
+                        navigate("/keberlangsungan/penetapan-konteks");
                       }}
                       style={{
                         display: "flex",
@@ -1169,15 +1162,11 @@ export default function AppLayout({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!relasiPenggunaActive) {
-                          navigate("/relasi-pengguna/perencanaan");
-                          setUserRelationOpen(true);
-                          return;
-                        }
-
-                        setUserRelationOpen((prev) => !prev);
+                        closeAllMenus();
+                        setUserRelationOpen(true);
+                        navigate("/relasi-pengguna/perencanaan");
                       }}
-                      style={{
+                      style={{                                                                                                                                                      
                         display: "flex",
                         alignItems: "center",
                         gap: 12,

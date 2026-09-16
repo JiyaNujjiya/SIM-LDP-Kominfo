@@ -119,7 +119,7 @@ type ApprovalItem = {
   diputuskan_at?: string;
 };
 
-const getToken = () => localStorage.getItem("token") || "";
+const getToken = () => sessionStorage.getItem("token") || "";
 
 const getUser = () => {
   const raw = localStorage.getItem("user");

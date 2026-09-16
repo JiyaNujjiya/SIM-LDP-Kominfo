@@ -42,7 +42,7 @@ const MonitoringTahunanPage: React.FC = () => {
       setLoading(true);
       setMessage('');
 
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/monitoring/tahunan?tahun=${tahunSekarang}`,
@@ -112,7 +112,7 @@ const MonitoringTahunanPage: React.FC = () => {
         setSaving(true);
         setMessage('');
 
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
 
         const response = await fetch(
         `http://localhost:5000/api/risiko/monitoring/tahunan/${editingItem.risiko_id}`,

@@ -94,7 +94,7 @@ export default function EvaluasiPengetahuanPage() {
     pelaksana_terkait: "",
   });
 
-  const getToken = () => localStorage.getItem("token");
+  const getToken = () => sessionStorage.getItem("token");
 
   const request = async (
     url: string,

@@ -150,7 +150,7 @@ export default function RisikoPage() {
 
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     fetch('http://localhost:5000/api/risiko/penanggung-jawab-options', {
       method: 'GET',
@@ -181,7 +181,7 @@ export default function RisikoPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     fetch('http://localhost:5000/api/risiko', {
       method: 'GET',
@@ -212,7 +212,7 @@ export default function RisikoPage() {
   }, []);
 
   useEffect (() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     fetch('http://localhost:5000/api/risiko/layanan-prioritas-options', {
       method: 'GET',
@@ -243,7 +243,7 @@ export default function RisikoPage() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     fetch('http://localhost:5000/api/risiko/ippd-options', {
       method: 'GET',
@@ -274,7 +274,7 @@ export default function RisikoPage() {
   }, []);
 
   const handleDetail = async (id: number) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     try {
       setLoadingDetail(true);
@@ -316,7 +316,7 @@ export default function RisikoPage() {
   };
 
   const handleEdit = async (id: number) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     try {
       setLoadingDetail(true);
@@ -419,7 +419,7 @@ export default function RisikoPage() {
 };
 
   const handleDelete = async (id: number) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const confirmDelete = window.confirm(
       'Yakin ingin menghapus data risiko ini?'
@@ -470,7 +470,7 @@ export default function RisikoPage() {
   };
 
   const handleSubmitRisiko = async (id: number) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const confirmSubmit = window.confirm(
       'Yakin ingin mengajukan risiko ini? Setelah diajukan, risiko akan menunggu persetujuan.'
@@ -530,7 +530,7 @@ export default function RisikoPage() {
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     try {
       setSaving(true);
@@ -673,7 +673,7 @@ export default function RisikoPage() {
   };
 
   const handleApproveRisiko = async (id: number) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const confirmApprove = window.confirm(
       'Yakin ingin menyetujui risiko ini?'
@@ -727,7 +727,7 @@ export default function RisikoPage() {
   };
 
   const handleRejectRisiko = async (id: number) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const confirmReject = window.confirm(
       'Yakin ingin menolak risiko ini?'
@@ -782,7 +782,7 @@ export default function RisikoPage() {
 
   const fetchKonteksOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         'http://localhost:5000/api/risiko/konteks',
@@ -810,7 +810,7 @@ export default function RisikoPage() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     fetch('http://localhost:5000/api/risiko/layanan-options', {
       method: 'GET',

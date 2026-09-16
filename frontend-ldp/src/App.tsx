@@ -8,6 +8,8 @@ import {
 
 import RequirePermission from "./requirePermission";
 import Login from "./Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./Dashboard";
 import AppLayout from "./AppLayout";
 
@@ -32,7 +34,7 @@ import PemanfaatanAlihPengetahuanPage from "./pages/PemanfaatanAlihPengetahuanPa
 import EvaluasiPengetahuanPage from "./pages/EvaluasiPengetahuanPage";
 
 import PenetapanKonteksKeberlangsunganPage from "./pages/PenetapanKonteksKeberlangsunganPage";
-import AnalisisDampakBisnisPage from './pages/AnalisisDampakBisnisPage';
+import AnalisisDampakBisnisPage from "./pages/AnalisisDampakBisnisPage";
 import StrategiKeberlangsunganPage from "./pages/StrategiKeberlangsunganPage";
 import UjiEvaluasiKeberlangsunganPage from "./pages/UjiEvaluasiKeberlangsunganPage";
 
@@ -45,7 +47,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
+    const savedUser = sessionStorage.getItem("user");
 
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -53,9 +55,14 @@ export default function App() {
   }, []);
 
   const handleLogout = () => {
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+
+    // Bersihkan sisa login lama dari localStorage
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     localStorage.removeItem("rememberMe");
+
     setUser(null);
   };
 
@@ -64,7 +71,7 @@ export default function App() {
       {!user ? (
         <Routes>
           <Route
-            path="*"
+            path="/login"
             element={
               <Login
                 onLoginSuccess={(userData: any) =>
@@ -73,21 +80,38 @@ export default function App() {
               />
             }
           />
+
+          <Route
+            path="/forgot-password"
+            element={<ForgotPassword />}
+          />
+
+          <Route
+            path="/reset-password"
+            element={<ResetPassword />}
+          />
+
+          <Route
+            path="*"
+            element={<Navigate to="/login" replace />}
+          />
         </Routes>
       ) : (
         <Routes>
-          <Route
-            path="/dashboard"
-            element={
-              <Dashboard onLogout={handleLogout} />
-            }
-          />
-
           <Route
             element={
               <AppLayout onLogout={handleLogout} />
             }
           >
+            {/* ================= DASHBOARD ================= */}
+
+            <Route
+              path="/dashboard"
+              element={<Dashboard />}
+            />
+
+            {/* ================= RISIKO ================= */}
+
             <Route
               path="/risiko/overview"
               element={
@@ -160,6 +184,8 @@ export default function App() {
               }
             />
 
+            {/* ================= PERUBAHAN ================= */}
+
             <Route
               path="/perubahan/perencanaan"
               element={
@@ -168,7 +194,7 @@ export default function App() {
                 </RequirePermission>
               }
             />
-          
+
             <Route
               path="/perubahan/analisis"
               element={
@@ -205,11 +231,13 @@ export default function App() {
               }
             />
 
+            {/* ================= PENGETAHUAN ================= */}
+
             <Route
               path="/pengetahuan/perencanaan"
               element={
                 <RequirePermission permission="knowledge.view">
-                  <PerencanaanPengetahuanPage/>
+                  <PerencanaanPengetahuanPage />
                 </RequirePermission>
               }
             />
@@ -218,7 +246,7 @@ export default function App() {
               path="/pengetahuan/pengumpulan-pengolahan"
               element={
                 <RequirePermission permission="knowledge.view">
-                  <PengumpulanPengolahanPengetahuanPage/>
+                  <PengumpulanPengolahanPengetahuanPage />
                 </RequirePermission>
               }
             />
@@ -227,7 +255,7 @@ export default function App() {
               path="/pengetahuan/pemanfaatan-alih"
               element={
                 <RequirePermission permission="knowledge.view">
-                  <PemanfaatanAlihPengetahuanPage/>
+                  <PemanfaatanAlihPengetahuanPage />
                 </RequirePermission>
               }
             />
@@ -236,16 +264,18 @@ export default function App() {
               path="/pengetahuan/evaluasi"
               element={
                 <RequirePermission permission="knowledge.view">
-                  <EvaluasiPengetahuanPage/>
+                  <EvaluasiPengetahuanPage />
                 </RequirePermission>
               }
             />
+
+            {/* ================= KEBERLANGSUNGAN ================= */}
 
             <Route
               path="/keberlangsungan/penetapan-konteks"
               element={
                 <RequirePermission permission="continuity.view">
-                  <PenetapanKonteksKeberlangsunganPage/>
+                  <PenetapanKonteksKeberlangsunganPage />
                 </RequirePermission>
               }
             />
@@ -277,10 +307,12 @@ export default function App() {
               }
             />
 
+            {/* ================= RELASI PENGGUNA ================= */}
+
             <Route
               path="/relasi-pengguna/perencanaan"
               element={
-                <RequirePermission permission="continuity.view">
+                <RequirePermission permission="user_relation.view">
                   <PerencanaanRelasiPenggunaPage />
                 </RequirePermission>
               }
@@ -289,7 +321,7 @@ export default function App() {
             <Route
               path="/relasi-pengguna/permintaan"
               element={
-                <RequirePermission permission="continuity.view">
+                <RequirePermission permission="user_relation.view">
                   <PermintaanRelasiPenggunaPage />
                 </RequirePermission>
               }
@@ -298,7 +330,7 @@ export default function App() {
             <Route
               path="/relasi-pengguna/penanganan"
               element={
-                <RequirePermission permission="continuity.view">
+                <RequirePermission permission="user_relation.view">
                   <PenangananRelasiPenggunaPage />
                 </RequirePermission>
               }
@@ -307,12 +339,14 @@ export default function App() {
             <Route
               path="/relasi-pengguna/evaluasi"
               element={
-                <RequirePermission permission="continuity.view">
+                <RequirePermission permission="user_relation.view">
                   <EvaluasiRelasiPenggunaPage />
                 </RequirePermission>
               }
             />
           </Route>
+
+          {/* ================= FALLBACK ================= */}
 
           <Route
             path="*"

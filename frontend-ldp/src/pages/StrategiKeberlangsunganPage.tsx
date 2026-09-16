@@ -144,7 +144,7 @@ const StrategiKeberlangsunganPage = () => {
   const inputClass = 'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500 focus:ring-1 focus:ring-slate-500';
   const labelClass = 'text-sm font-medium text-slate-700';
 
-  const getToken = () => localStorage.getItem('token');
+  const getToken = () => sessionStorage.getItem('token');
 
   const request = async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {

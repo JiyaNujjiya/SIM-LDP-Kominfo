@@ -152,7 +152,7 @@ export default function LogbookPerubahanPage() {
     url: string,
     options: RequestInit = {}
   ) => {
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
 
     const response = await fetch(url, {
       ...options,

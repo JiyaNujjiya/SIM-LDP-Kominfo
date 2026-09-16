@@ -1,29 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-
 import {
-  LayoutDashboard,
-  ShieldAlert,
-  RotateCw,
-  BookOpen,
-  ShieldCheck,
-  UserRound,
-  ArrowLeft,
-  Search,
-  Bell,
   Award,
-  Layers,
-  XCircle,
   CalendarCheck,
-  ChevronDown,
-  ChevronRight,
+  Layers,
+  ShieldAlert,
+  XCircle,
 } from "lucide-react";
 
-/* ── colour tokens (from Figma) ── */
 const C = {
-  sidebar: "#1B2A4A",
-  sidebarActive: "#2C3E6B",
-  sidebarText: "#E8F0FE",
   bg: "#F9FAFB",
   white: "#FFFFFF",
   border: "#D1D5DB",
@@ -40,44 +23,6 @@ const C = {
   amberLight: "#FEF3C7",
 };
 
-/* ── sidebar menu data ── */
-const menuItems = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    Icon: LayoutDashboard,
-    permission: "dashboard.view",
-  },
-  {
-    id: "risiko",
-    label: "Manajemen Risiko",
-    Icon: ShieldAlert,
-    permission: "risk.view",
-  },
-  {
-    id: "perubahan",
-    label: "Manajemen Perubahan",
-    Icon: RotateCw,
-    permission: "change.view",
-  },
-  {
-    id: "pengetahuan",
-    label: "Manajemen Pengetahuan",
-    Icon: BookOpen,
-  },
-  {
-    id: "bcp",
-    label: "Manajemen Keberlangsungan",
-    Icon: ShieldCheck,
-  },
-  {
-    id: "relasi",
-    label: "Manajemen Relasi Pengguna",
-    Icon: UserRound,
-  },
-]
-
-/* ── KPI data ── */
 const kpis = [
   {
     label: "Total Layanan Digital",
@@ -131,7 +76,6 @@ const kpis = [
   },
 ];
 
-/* ── domain scores ── */
 const domains = [
   { label: "Kebijakan Internal", score: 4.2, max: 5 },
   { label: "Tata Kelola", score: 3.5, max: 5 },
@@ -140,56 +84,66 @@ const domains = [
   { label: "Keamanan Informasi", score: 3.8, max: 5 },
 ];
 
-/* ── risk table data ── */
 const risks = [
-  { id: "RSK-001", service: "Portal Layanan Publik", desc: "Kerentanan keamanan sistem", level: "Tinggi", levelColor: C.red, levelBg: C.redLight, status: "Mitigasi" },
-  { id: "RSK-002", service: "Sistem Kependudukan", desc: "Gangguan konektivitas jaringan", level: "Sedang", levelColor: C.amber, levelBg: C.amberLight, status: "Monitoring" },
-  { id: "RSK-003", service: "E-Procurement", desc: "Ketidaksesuaian data vendor", level: "Rendah", levelColor: C.green, levelBg: C.greenLight, status: "Selesai" },
-  { id: "RSK-004", service: "Sistem Perizinan Online", desc: "Overload server saat peak", level: "Tinggi", levelColor: C.red, levelBg: C.redLight, status: "Tindakan" },
-  { id: "RSK-005", service: "Dashboard Analitik", desc: "Inkonsistensi data laporan", level: "Sedang", levelColor: C.amber, levelBg: C.amberLight, status: "Monitoring" },
+  {
+    id: "RSK-001",
+    service: "Portal Layanan Publik",
+    desc: "Kerentanan keamanan sistem",
+    level: "Tinggi",
+    levelColor: C.red,
+    levelBg: C.redLight,
+    status: "Mitigasi",
+  },
+  {
+    id: "RSK-002",
+    service: "Sistem Kependudukan",
+    desc: "Gangguan konektivitas jaringan",
+    level: "Sedang",
+    levelColor: C.amber,
+    levelBg: C.amberLight,
+    status: "Monitoring",
+  },
+  {
+    id: "RSK-003",
+    service: "E-Procurement",
+    desc: "Ketidaksesuaian data vendor",
+    level: "Rendah",
+    levelColor: C.green,
+    levelBg: C.greenLight,
+    status: "Selesai",
+  },
+  {
+    id: "RSK-004",
+    service: "Sistem Perizinan Online",
+    desc: "Overload server saat peak",
+    level: "Tinggi",
+    levelColor: C.red,
+    levelBg: C.redLight,
+    status: "Tindakan",
+  },
+  {
+    id: "RSK-005",
+    service: "Dashboard Analitik",
+    desc: "Inkonsistensi data laporan",
+    level: "Sedang",
+    levelColor: C.amber,
+    levelBg: C.amberLight,
+    status: "Monitoring",
+  },
 ];
 
-/* ═══════════════════════════════════════════
-   COMPONENTS
-   ═══════════════════════════════════════════ */
-
-function SidebarItem({ Icon, label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 16px",
-        width: "100%",
-        border: "none",
-        borderRadius: 6,
-        background: active ? C.sidebarActive : "transparent",
-        cursor: "pointer",
-        transition: "background 0.15s",
-      }}
-      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "rgba(44,62,107,.45)"; }}
-      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
-    >
-      <Icon size={18} color={active ? "#FFF" : C.sidebarText} strokeWidth={2} />
-      <span
-        style={{
-          fontFamily: "Inter, system-ui, sans-serif",
-          fontWeight: active ? 600 : 500,
-          fontSize: 13,
-          lineHeight: "16px",
-          color: active ? "#FFF" : C.sidebarText,
-        }}
-      >
-        {label}
-      </span>
-    </button>
-  );
-}
-
 function KpiCard({ kpi }) {
-  const { label, value, trend, trendText, trendColor, iconBg, iconColor, Icon } = kpi;
+  const {
+    label,
+    value,
+    trend,
+    trendText,
+    trendColor,
+    iconBg,
+    iconColor,
+    Icon,
+  } = kpi;
+
   return (
     <div
       style={{
@@ -205,23 +159,90 @@ function KpiCard({ kpi }) {
         minWidth: 0,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 600, fontSize: 12, color: C.body }}>{label}</span>
-        <div
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span
           style={{
-            width: 36, height: 36,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: iconBg, borderRadius: 6,
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontWeight: 600,
+            fontSize: 12,
+            color: C.body,
           }}
         >
-          <Icon size={18} color={iconColor} strokeWidth={2} />
+          {label}
+        </span>
+
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: iconBg,
+            borderRadius: 6,
+          }}
+        >
+          <Icon
+            size={18}
+            color={iconColor}
+            strokeWidth={2}
+          />
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 700, fontSize: 28, lineHeight: "34px", color: C.title }}>{value}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 600, fontSize: 11, color: trendColor }}>{trend}</span>
-          <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 400, fontSize: 11, color: C.muted }}>{trendText}</span>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: 28,
+            lineHeight: "34px",
+            color: C.title,
+          }}
+        >
+          {value}
+        </span>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "Inter, system-ui, sans-serif",
+              fontWeight: 600,
+              fontSize: 11,
+              color: trendColor,
+            }}
+          >
+            {trend}
+          </span>
+
+          <span
+            style={{
+              fontFamily: "Inter, system-ui, sans-serif",
+              fontWeight: 400,
+              fontSize: 11,
+              color: C.muted,
+            }}
+          >
+            {trendText}
+          </span>
         </div>
       </div>
     </div>
@@ -230,14 +251,62 @@ function KpiCard({ kpi }) {
 
 function ProgressRow({ label, score, max }) {
   const pct = (score / max) * 100;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 500, fontSize: 13, color: C.title }}>{label}</span>
-        <span style={{ fontFamily: "Inter, system-ui, sans-serif", fontWeight: 700, fontSize: 13, color: C.title }}>{score.toFixed(1)} / {max.toFixed(1)}</span>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontWeight: 500,
+            fontSize: 13,
+            color: C.title,
+          }}
+        >
+          {label}
+        </span>
+
+        <span
+          style={{
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontWeight: 700,
+            fontSize: 13,
+            color: C.title,
+          }}
+        >
+          {score.toFixed(1)} / {max.toFixed(1)}
+        </span>
       </div>
-      <div style={{ width: "100%", height: 8, background: C.border, borderRadius: 4 }}>
-        <div style={{ width: `${pct}%`, height: 8, background: C.title, borderRadius: 4, transition: "width .4s ease" }} />
+
+      <div
+        style={{
+          width: "100%",
+          height: 8,
+          background: C.border,
+          borderRadius: 4,
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: 8,
+            background: C.title,
+            borderRadius: 4,
+            transition: "width .4s ease",
+          }}
+        />
       </div>
     </div>
   );
@@ -262,799 +331,411 @@ function RiskBadge({ level, color, bg }) {
   );
 }
 
-/* MAIN DASHBOARD */
-
-type DashboardProps = {
-  onLogout: () => void;
-};
-
-const subMenuStyle = (active: boolean) => ({
-  width: "100%",
-  border: "none",
-  background: active
-    ? "rgba(255,255,255,0.12)"
-    : "transparent",
-  color: "#E8F0FE",
-  padding: "9px 12px",
-  borderRadius: 6,
-  textAlign: "left" as const,
-  fontSize: 11,
-  lineHeight: "15px",
-  cursor: "pointer",
-  fontWeight: active ? 600 : 400,
-});
-
-
-     
-export default function SimLdpDashboard({
-  onLogout,
-}: DashboardProps) {
-  const [active, setActive] = useState("dashboard");
-  const [collapsed, setCollapsed] = useState(false);
-
-  const [riskOpen, setRiskOpen] = useState(false);
-  const [riskForm3Open, setRiskForm3Open] = useState(false);
-  const [changeOpen, setChangeOpen] = useState(false);
-
-  const navigate = useNavigate();
-
-  const savedUser = localStorage.getItem("user");
-  const user = savedUser ? JSON.parse(savedUser) : null;
-
-  const permissions: string[] = user?.permissions || [];
-  
-
-  const can = (permission?: string) => {
-    if (!permission) return true;
-
-    return permissions.includes(permission);
-  };
-
-  const handleMenuClick = (id: string) => {
-    setActive(id);
-
-    if (id === "dashboard") {
-      navigate("/dashboard");
-    }
-
-    if (id === "risiko") {
-      setRiskOpen((prev) => !prev);
-    }
-
-    if (id === "perubahan") {
-      setChangeOpen((prev) => !prev);
-    }
-
-    if (id === "pengetahuan") {
-      navigate("/pengetahuan");
-    }
-
-    if (id === "bcp") {
-      navigate("/keberlangsungan");
-    }
-
-    if (id === "relasi") {
-      navigate("/relasi-pengguna");
-    }
-  };
-
-  const sidebarW = collapsed ? 64 : 220;
-
+export default function SimLdpDashboard() {
   return (
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
+        gap: 24,
         width: "100%",
-        minHeight: "100vh",
-        background: C.bg,
         fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
-      {/* ─── LEFT SIDEBAR ─── */}
-      <aside
+      <div
         style={{
-          width: sidebarW,
-          minHeight: "100vh",
-          background: C.sidebar,
           display: "flex",
           flexDirection: "column",
-          padding: 16,
-          gap: 24,
-          transition: "width .25s ease",
-          flexShrink: 0,
-          overflow: "hidden",
+          gap: 4,
         }}
       >
-        {/* brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 31 }}>
-          {!collapsed && (
-            <>
-              <div
-                style={{
-                  width: 32, height: 32, borderRadius: 6,
-                  background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#FFF", fontWeight: 800, fontSize: 14, flexShrink: 0,
-                }}
-              >
-                S
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontWeight: 700, fontSize: 14, color: "#FFF" }}>SIM-LDP</span>
-                <span style={{ fontWeight: 500, fontSize: 10, color: C.sidebarText }}>Layanan Digital Pemerintah</span>
-              </div>
-            </>
-          )}
-          {collapsed && (
-            <div
-              style={{
-                width: 32, height: 32, borderRadius: 6,
-                background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#FFF", fontWeight: 800, fontSize: 14,
-              }}
-            >
-              S
-            </div>
-          )}
-        </div>
-
-        {/* menu */}
-          <nav
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 4,
-              flex: 1,
-            }}
-          >
-            {menuItems
-              .filter((m) => can(m.permission))
-              .map((m) => {
-                if (collapsed) {
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => handleMenuClick(m.id)}
-                      title={m.label}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 32,
-                        height: 42,
-                        border: "none",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        background:
-                          active === m.id
-                            ? C.sidebarActive
-                            : "transparent",
-                      }}
-                    >
-                      <m.Icon
-                        size={18}
-                        color={
-                          active === m.id
-                            ? "#FFF"
-                            : C.sidebarText
-                        }
-                        strokeWidth={2}
-                      />
-                    </button>
-                  );
-                }
-
-                if (m.id === "risiko") {
-                  return (
-                    <div key={m.id}>
-                      <button
-                        onClick={() => {
-                          setActive("risiko");
-                          setRiskOpen(true);
-                          navigate("/risiko/overview")
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: "12px 16px",
-                          width: "100%",
-                          border: "none",
-                          borderRadius: 6,
-                          background:
-                            active.startsWith("risiko")
-                              ? C.sidebarActive
-                              : "transparent",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <ShieldAlert
-                          size={18}
-                          color={C.sidebarText}
-                          strokeWidth={2}
-                        />
-
-                        <span
-                          style={{
-                            flex: 1,
-                            textAlign: "left",
-                            fontWeight: 500,
-                            fontSize: 13,
-                            color: C.sidebarText,
-                          }}
-                        >
-                          Manajemen Risiko
-                        </span>
-
-                        {riskOpen ? (
-                          <ChevronDown
-                            size={16}
-                            color={C.sidebarText}
-                          />
-                        ) : (
-                          <ChevronRight
-                            size={16}
-                            color={C.sidebarText}
-                          />
-                        )}
-                      </button>
-
-                      {riskOpen && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            marginLeft: 28,
-                            marginTop: 4,
-                            gap: 2,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActive(
-                                "risiko-form-0"
-                              );
-                              navigate(
-                                "/risiko/konteks"
-                              );
-                            }}
-                            style={subMenuStyle(
-                              active ===
-                                "risiko-form-0"
-                            )}
-                          >
-                            Form 0.0 Penetapan Konteks
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActive(
-                                "risiko-form-1"
-                              );
-                              navigate("/risiko");
-                            }}
-                            style={subMenuStyle(
-                              active ===
-                                "risiko-form-1"
-                            )}
-                          >
-                            Form 1.0 Profil & Penilaian
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActive(
-                                "risiko-form-2"
-                              );
-                              navigate(
-                                "/risiko/layanan-prioritas"
-                              );
-                            }}
-                            style={subMenuStyle(
-                              active ===
-                                "risiko-form-2"
-                            )}
-                          >
-                            Form 2.0 Layanan Prioritas
-                          </button>
-
-                          <div>
-                          <button
-                            type="button"
-                            onClick={() => setRiskForm3Open(!riskForm3Open)}
-                            style={{
-                              ...subMenuStyle(
-                                active.startsWith("risiko-form-3")
-                              ),
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              width: "100%",
-                            }}
-                          >
-                            <span>
-                              Form 3.0 Peta Risiko dan Monitoring
-                            </span>
-
-                            {riskForm3Open ? (
-                              <ChevronDown size={14} />
-                            ) : (
-                              <ChevronRight size={14} />
-                            )}
-                          </button>
-
-                          {riskForm3Open && (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                marginLeft: 18,
-                                marginTop: 2,
-                                gap: 2,
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActive("risiko-form-3-peta");
-                                  navigate("/risiko/peta-risiko");
-                                }}
-                                style={subMenuStyle(
-                                  active === "risiko-form-3-peta"
-                                )}
-                              >
-                                Peta Risiko
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActive("risiko-form-3-semester-1");
-                                  navigate("/risiko/monitoring/semester-1");
-                                }}
-                                style={subMenuStyle(
-                                  active === "risiko-form-3-semester-1"
-                                )}
-                              >
-                                Monitoring Semester I
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActive("risiko-form-3-semester-2");
-                                  navigate("/risiko/monitoring/semester-2");
-                                }}
-                                style={subMenuStyle(
-                                  active === "risiko-form-3-semester-2"
-                                )}
-                              >
-                                Monitoring Semester II
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActive("risiko-form-3-tahunan");
-                                  navigate("/risiko/monitoring/tahunan");
-                                }}
-                                style={subMenuStyle(
-                                  active === "risiko-form-3-tahunan"
-                                )}
-                              >
-                                Monitoring Tahunan
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                if (m.id === "perubahan") {
-                  return (
-                    <div key={m.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActive("perubahan");
-                          setChangeOpen(true);
-                          navigate("/perubahan/perencanaan");
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: "12px 16px",
-                          width: "100%",
-                          border: "none",
-                          borderRadius: 6,
-                          background: active.startsWith("perubahan")
-                            ? C.sidebarActive
-                            : "transparent",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <RotateCw
-                          size={18}
-                          color={C.sidebarText}
-                          strokeWidth={2}
-                        />
-
-                        <span
-                          style={{
-                            flex: 1,
-                            textAlign: "left",
-                            fontWeight: 500,
-                            fontSize: 13,
-                            color: C.sidebarText,
-                          }}
-                        >
-                          Manajemen Perubahan
-                        </span>
-
-                        {changeOpen ? (
-                          <ChevronDown size={16} color={C.sidebarText} />
-                        ) : (
-                          <ChevronRight size={16} color={C.sidebarText} />
-                        )}
-                      </button>
-
-                      {changeOpen && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            marginLeft: 28,
-                            marginTop: 4,
-                            gap: 2,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActive("perubahan-mpr01");
-                              navigate("/perubahan/perencanaan");
-                            }}
-                            style={subMenuStyle(
-                              active === "perubahan-mpr01"
-                            )}
-                          >
-                            MPR01 Perencanaan Perubahan
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
-                return (
-                  <SidebarItem
-                    key={m.id}
-                    Icon={m.Icon}
-                    label={m.label}
-                    active={active === m.id}
-                    onClick={() =>
-                      handleMenuClick(m.id)
-                    }
-                  />
-                );
-              })}
-          </nav>
-
-        {/* collapse toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
+        <h1
           style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: 12, border: "none", borderRadius: 6,
-            background: C.sidebarActive, cursor: "pointer",
-            justifyContent: collapsed ? "center" : "flex-start",
+            margin: 0,
+            fontWeight: 700,
+            fontSize: 22,
+            lineHeight: "27px",
+            color: C.title,
           }}
         >
-          <ArrowLeft
-            size={16}
-            color={C.sidebarText}
-            strokeWidth={2}
-            style={{ transform: collapsed ? "rotate(180deg)" : "none", transition: "transform .25s" }}
-          />
-          {!collapsed && (
-            <span style={{ fontWeight: 400, fontSize: 12, color: C.sidebarText }}>Kecilkan Menu</span>
-          )}
-        </button>
-      </aside>
+          Dashboard Overview
+        </h1>
 
-      {/* ─── WORKSPACE ─── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        {/* header bar */}
-        <header
+        <p
           style={{
+            margin: 0,
+            fontWeight: 400,
+            fontSize: 13,
+            color: C.body,
+          }}
+        >
+          Ringkasan manajemen layanan digital pemerintah secara terpadu
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+        }}
+      >
+        {kpis.map((kpi, i) => (
+          <KpiCard
+            key={i}
+            kpi={kpi}
+          />
+        ))}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 20,
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
             boxSizing: "border-box",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "0 24px",
-            height: 72,
+            flexDirection: "column",
+            gap: 20,
+            padding: 20,
             background: C.white,
-            borderBottom: `1px solid ${C.border}`,
-            flexShrink: 0,
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
           }}
         >
-          {/* header left */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: C.muted }}>Beranda</span>
-              <span style={{ fontSize: 12, color: C.muted }}>&gt;</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: C.title }}>Dashboard</span>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 15,
+                  color: C.title,
+                }}
+              >
+                Tingkat Kematangan Layanan
+              </span>
+
+              <span
+                style={{
+                  fontWeight: 400,
+                  fontSize: 12,
+                  color: C.muted,
+                }}
+              >
+                Periode: Januari – Juni 2024
+              </span>
             </div>
-            <span style={{ fontWeight: 700, fontSize: 13, color: C.subtitle }}>
-              Kementerian Komunikasi dan Informatika
+
+            <span
+              style={{
+                padding: "4px 10px",
+                background: C.greenLight,
+                borderRadius: 12,
+                fontWeight: 600,
+                fontSize: 12,
+                color: C.green,
+              }}
+            >
+              Baik
             </span>
           </div>
 
-          {/* header right */}
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {/* search */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+            }}
+          >
             <div
               style={{
-                boxSizing: "border-box",
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 12px",
-                width: 220, height: 32,
-                background: C.bg,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
+                width: 100,
+                height: 100,
+                borderRadius: 50,
+                border: `4px solid ${C.title}`,
+                background: "#F4F8FF",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
               }}
             >
-              <Search size={16} color={C.muted} strokeWidth={2} />
-              <span style={{ fontSize: 13, color: C.muted }}>Cari layanan...</span>
-            </div>
-
-            {/* notification */}
-            <div
-              style={{
-                position: "relative",
-                width: 36, height: 36,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: C.bg, borderRadius: 8, cursor: "pointer",
-              }}
-            >
-              <Bell size={18} color={C.title} strokeWidth={2} />
-              <div
+              <span
                 style={{
-                  position: "absolute", top: 6, right: 6,
-                  width: 8, height: 8,
-                  background: C.red, borderRadius: 4,
-                }}
-              />
-            </div>
-
-            {/* profile */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  width: 36, height: 36, borderRadius: 18,
-                  background: `linear-gradient(135deg, ${C.blueLight}, #C7D2FE)`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, fontSize: 14, color: C.title,
+                  fontWeight: 700,
+                  fontSize: 24,
+                  color: C.title,
                 }}
               >
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontWeight: 600, fontSize: 13, color: C.title }}>Dr. Andi Wijaya, M.Si</span>
-                <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>Administrator</span>
-              </div>
+                3.8
+              </span>
+
+              <span
+                style={{
+                  fontWeight: 400,
+                  fontSize: 11,
+                  color: C.subtitle,
+                }}
+              >
+                dari 5.0
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                flex: 1,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontWeight: 400,
+                  fontSize: 13,
+                  lineHeight: "16px",
+                  color: C.body,
+                }}
+              >
+                Indeks Kematangan Layanan Digital Pemerintah berada pada kategori{" "}
+                <strong>BAIK</strong>. Seluruh parameter dipantau berkala.
+              </p>
+
               <button
-                onClick={onLogout}
-                className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700"
+                type="button"
+                style={{
+                  boxSizing: "border-box",
+                  padding: "8px 16px",
+                  border: `1.5px solid ${C.title}`,
+                  borderRadius: 6,
+                  background: "transparent",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontWeight: 600,
+                  fontSize: 12,
+                  color: C.title,
+                  cursor: "pointer",
+                  alignSelf: "flex-start",
+                }}
               >
-                Logout
+                Lihat Detail Nilai
               </button>
             </div>
           </div>
-        </header>
 
-        {/* ─── BODY CONTENT ─── */}
-        <main style={{ flex: 1, padding: 24, display: "flex", flexDirection: "column", gap: 24, overflowY: "auto" }}>
-          {/* title block */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <h1 style={{ margin: 0, fontWeight: 700, fontSize: 22, lineHeight: "27px", color: C.title }}>
-              Dashboard Overview
-            </h1>
-            <p style={{ margin: 0, fontWeight: 400, fontSize: 13, color: C.body }}>
-              Ringkasan manajemen layanan digital pemerintah secara terpadu
-            </p>
+          <div
+            style={{
+              width: "100%",
+              height: 1,
+              background: C.border,
+            }}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
+          >
+            {domains.map((domain, i) => (
+              <ProgressRow
+                key={i}
+                label={domain.label}
+                score={domain.score}
+                max={domain.max}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            padding: 20,
+            background: C.white,
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: 15,
+                color: C.title,
+              }}
+            >
+              Risiko Terbaru
+            </span>
+
+            <span
+              style={{
+                padding: "4px 8px",
+                background: C.redLight,
+                borderRadius: 12,
+                fontWeight: 600,
+                fontSize: 11,
+                color: C.red,
+              }}
+            >
+              Butuh Tindakan
+            </span>
           </div>
 
-          {/* KPI row */}
-          <div style={{ display: "flex", gap: 16 }}>
-            {kpis.map((kpi, i) => (
-              <KpiCard key={i} kpi={kpi} />
+          <div
+            style={{
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              overflow: "hidden",
+              flex: 1,
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "80px 1fr 1fr 80px 80px",
+                padding: "10px 16px",
+                background: C.bg,
+                borderBottom: `1px solid ${C.border}`,
+              }}
+            >
+              {[
+                "ID Risiko",
+                "Layanan",
+                "Deskripsi Risiko",
+                "Tingkat",
+                "Status",
+              ].map((heading) => (
+                <span
+                  key={heading}
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: C.subtitle,
+                  }}
+                >
+                  {heading}
+                </span>
+              ))}
+            </div>
+
+            {risks.map((risk, i) => (
+              <div
+                key={risk.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "80px 1fr 1fr 80px 80px",
+                  padding: "12px 16px",
+                  alignItems: "center",
+                  borderBottom:
+                    i < risks.length - 1
+                      ? `1px solid ${C.border}`
+                      : "none",
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: C.title,
+                  }}
+                >
+                  {risk.id}
+                </span>
+
+                <span
+                  style={{
+                    fontWeight: 500,
+                    fontSize: 13,
+                    color: C.title,
+                  }}
+                >
+                  {risk.service}
+                </span>
+
+                <span
+                  style={{
+                    fontWeight: 400,
+                    fontSize: 13,
+                    color: C.body,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {risk.desc}
+                </span>
+
+                <RiskBadge
+                  level={risk.level}
+                  color={risk.levelColor}
+                  bg={risk.levelBg}
+                />
+
+                <span
+                  style={{
+                    fontWeight: 500,
+                    fontSize: 13,
+                    color: C.title,
+                  }}
+                >
+                  {risk.status}
+                </span>
+              </div>
             ))}
           </div>
 
-          {/* two‑column layout */}
-          <div style={{ display: "flex", gap: 20, flex: 1, minHeight: 0 }}>
-            {/* ── maturity panel ── */}
-            <div
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              paddingTop: 8,
+            }}
+          >
+            <a
+              href="#"
+              onClick={(e) => e.preventDefault()}
               style={{
-                flex: 1,
-                boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
-                gap: 20,
-                padding: 20,
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderRadius: 10,
+                fontWeight: 600,
+                fontSize: 13,
+                color: C.title,
+                textDecoration: "underline",
+                cursor: "pointer",
               }}
             >
-              {/* panel header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 15, color: C.title }}>Tingkat Kematangan Layanan</span>
-                  <span style={{ fontWeight: 400, fontSize: 12, color: C.muted }}>Periode: Januari – Juni 2024</span>
-                </div>
-                <span
-                  style={{
-                    padding: "4px 10px",
-                    background: C.greenLight,
-                    borderRadius: 12,
-                    fontWeight: 600, fontSize: 12, color: C.green,
-                  }}
-                >
-                  Baik
-                </span>
-              </div>
-
-              {/* chart summary row */}
-              <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-                {/* circular score */}
-                <div
-                  style={{
-                    width: 100, height: 100, borderRadius: 50,
-                    border: `4px solid ${C.title}`,
-                    background: "#F4F8FF",
-                    display: "flex", flexDirection: "column",
-                    alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span style={{ fontWeight: 700, fontSize: 24, color: C.title }}>3.8</span>
-                  <span style={{ fontWeight: 400, fontSize: 11, color: C.subtitle }}>dari 5.0</span>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                  <p style={{ margin: 0, fontWeight: 400, fontSize: 13, lineHeight: "16px", color: C.body }}>
-                    Indeks Kematangan Layanan Digital Pemerintah berada pada kategori <strong>BAIK</strong>.
-                    Seluruh parameter dipantau berkala.
-                  </p>
-                  <button
-                    style={{
-                      boxSizing: "border-box",
-                      padding: "8px 16px",
-                      border: `1.5px solid ${C.title}`,
-                      borderRadius: 6,
-                      background: "transparent",
-                      fontFamily: "Inter, system-ui, sans-serif",
-                      fontWeight: 600, fontSize: 12, color: C.title,
-                      cursor: "pointer",
-                      alignSelf: "flex-start",
-                    }}
-                  >
-                    Lihat Detail Nilai
-                  </button>
-                </div>
-              </div>
-
-              {/* divider */}
-              <div style={{ width: "100%", height: 1, background: C.border }} />
-
-              {/* domain scores */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {domains.map((d, i) => (
-                  <ProgressRow key={i} label={d.label} score={d.score} max={d.max} />
-                ))}
-              </div>
-            </div>
-
-            {/* ── risks panel ── */}
-            <div
-              style={{
-                flex: 1,
-                boxSizing: "border-box",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-                padding: 20,
-                background: C.white,
-                border: `1px solid ${C.border}`,
-                borderRadius: 10,
-              }}
-            >
-              {/* panel header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: 15, color: C.title }}>Risiko Terbaru</span>
-                <span
-                  style={{
-                    padding: "4px 8px",
-                    background: C.redLight,
-                    borderRadius: 12,
-                    fontWeight: 600, fontSize: 11, color: C.red,
-                  }}
-                >
-                  Butuh Tindakan
-                </span>
-              </div>
-
-              {/* table */}
-              <div
-                style={{
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  flex: 1,
-                }}
-              >
-                {/* thead */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "80px 1fr 1fr 80px 80px",
-                    padding: "10px 16px",
-                    background: C.bg,
-                    borderBottom: `1px solid ${C.border}`,
-                  }}
-                >
-                  {["ID Risiko", "Layanan", "Deskripsi Risiko", "Tingkat", "Status"].map((h) => (
-                    <span key={h} style={{ fontWeight: 600, fontSize: 12, color: C.subtitle }}>{h}</span>
-                  ))}
-                </div>
-
-                {/* rows */}
-                {risks.map((r, i) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "80px 1fr 1fr 80px 80px",
-                      padding: "12px 16px",
-                      alignItems: "center",
-                      borderBottom: i < risks.length - 1 ? `1px solid ${C.border}` : "none",
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, fontSize: 13, color: C.title }}>{r.id}</span>
-                    <span style={{ fontWeight: 500, fontSize: 13, color: C.title }}>{r.service}</span>
-                    <span style={{ fontWeight: 400, fontSize: 13, color: C.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.desc}</span>
-                    <RiskBadge level={r.level} color={r.levelColor} bg={r.levelBg} />
-                    <span style={{ fontWeight: 500, fontSize: 13, color: C.title }}>{r.status}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* table action */}
-              <div style={{ display: "flex", justifyContent: "center", paddingTop: 8 }}>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  style={{
-                    fontWeight: 600, fontSize: 13,
-                    color: C.title,
-                    textDecoration: "underline",
-                    cursor: "pointer",
-                  }}
-                >
-                  Lihat Semua Risiko Layanan →
-                </a>
-              </div>
-            </div>
+              Lihat Semua Risiko Layanan →
+            </a>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

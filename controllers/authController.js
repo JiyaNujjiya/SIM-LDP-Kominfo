@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // 1. Registrasi User Baru
 exports.register = async (req, res) => {
@@ -111,6 +112,136 @@ exports.login = async (req, res) => {
 
         res.status(500).json({
             error: error.message
+        });
+    }
+};
+
+exports.forgotPassword = async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({
+            message: 'Email wajib diisi.'
+        });
+    }
+
+    try {
+        const [users] = await db.query(
+            'SELECT id, nama, email FROM users WHERE email = ? LIMIT 1',
+            [email]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                message: 'Email tidak terdaftar.'
+            });
+        }
+
+        const user = users[0];
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+        await db.query(
+            `UPDATE users
+             SET reset_password_token = ?,
+                 reset_password_expires = ?
+             WHERE id = ?`,
+            [hashedToken, expiresAt, user.id]
+        );
+
+        const resetUrl =
+            `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+
+        return res.json({
+            message: 'Email berhasil diverifikasi.',
+            resetUrl
+        });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+
+        return res.status(500).json({
+            message: 'Terjadi kesalahan saat memproses reset password.'
+        });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    const { token, password, confirmPassword } = req.body;
+
+    if (!token) {
+        return res.status(400).json({
+            message: 'Token reset password tidak ditemukan.'
+        });
+    }
+
+    if (!password || !confirmPassword) {
+        return res.status(400).json({
+            message: 'Password baru dan konfirmasi password wajib diisi.'
+        });
+    }
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({
+            message: 'Konfirmasi password tidak sesuai.'
+        });
+    }
+
+    if (password.length < 8) {
+        return res.status(400).json({
+            message: 'Password minimal 8 karakter.'
+        });
+    }
+
+    try {
+        const hashedToken = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        const [users] = await db.query(
+            `SELECT id
+             FROM users
+             WHERE reset_password_token = ?
+             AND reset_password_expires > NOW()
+             LIMIT 1`,
+            [hashedToken]
+        );
+
+        if (users.length === 0) {
+            return res.status(400).json({
+                message: 'Link reset password tidak valid atau sudah kedaluwarsa.'
+            });
+        }
+
+        const user = users[0];
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        await db.query(
+            `UPDATE users
+             SET password = ?,
+                 reset_password_token = NULL,
+                 reset_password_expires = NULL
+             WHERE id = ?`,
+            [hashedPassword, user.id]
+        );
+
+        return res.json({
+            message: 'Password berhasil diperbarui. Silakan login menggunakan password baru.'
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
+
+        return res.status(500).json({
+            message: 'Terjadi kesalahan saat mengubah password.'
         });
     }
 };

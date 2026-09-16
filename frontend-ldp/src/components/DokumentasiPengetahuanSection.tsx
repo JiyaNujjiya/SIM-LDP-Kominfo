@@ -66,7 +66,7 @@ export default function DokumentasiPengetahuanSection({
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const getToken = () => localStorage.getItem("token");
+  const getToken = () => sessionStorage.getItem("token");
 
   const clearNotification = () => {
     setMessage("");

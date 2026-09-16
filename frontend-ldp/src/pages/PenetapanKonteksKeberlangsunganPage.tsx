@@ -747,7 +747,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 			setLoading(true);
 			setError('');
 
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/ruang-lingkup',
@@ -786,7 +786,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 	const fetchLayananOptions = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/risiko/layanan-prioritas-options',
@@ -834,7 +834,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 			setLoadingLayananDetail(true);
 			setError('');
 
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/layanan-prioritas/${layananPrioritasId}/detail`,
@@ -871,7 +871,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 	const fetchTimManajemen = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/tim-manajemen',
@@ -908,7 +908,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 	const fetchPegawaiOptions = async () => {
 			try {
-				const token = localStorage.getItem('token');
+				const token = sessionStorage.getItem('token');
 
 				const response = await fetch(
 					'http://localhost:5000/api/bcp/pegawai-options',
@@ -945,7 +945,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 		const fetchTimTanggapInsiden = async () => {
 			try {
-				const token = localStorage.getItem('token');
+				const token = sessionStorage.getItem('token');
 
 				const response = await fetch(
 					'http://localhost:5000/api/bcp/tanggap-insiden',
@@ -982,7 +982,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 		const fetchTimPemulihanLayanan = async () => {
 			try {
-				const token = localStorage.getItem('token');
+				const token = sessionStorage.getItem('token');
 
 				const response = await fetch(
 					'http://localhost:5000/api/bcp/pemulihan-layanan',
@@ -1019,7 +1019,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 		const fetchTimOperasional = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/operasional',
@@ -1056,7 +1056,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 	const fetchRencanaKomunikasi = async () => {
 			try {
-				const token = localStorage.getItem('token');
+				const token = sessionStorage.getItem('token');
 
 				const response = await fetch(
 					'http://localhost:5000/api/bcp/rencana-komunikasi',
@@ -1093,7 +1093,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 		const fetchDaftarKontak = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/daftar-kontak',
@@ -1130,7 +1130,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 	const fetchSumberDayaManusia = async () => {
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(
       'http://localhost:5000/api/bcp/sumber-daya-manusia',
@@ -1167,7 +1167,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
 const fetchFasilitasOperasional = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/fasilitas-operasional',
@@ -1204,7 +1204,7 @@ const fetchFasilitasOperasional = async () => {
 
 	const fetchSumberDayaTik = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/sumber-daya-tik',
@@ -1241,7 +1241,7 @@ const fetchFasilitasOperasional = async () => {
 
 	const fetchAksesSistemTik = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/akses-sistem-tik',
@@ -1278,7 +1278,7 @@ const fetchFasilitasOperasional = async () => {
 
 	const fetchSumberDayaEksternalTik = async () => {
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				'http://localhost:5000/api/bcp/sumber-daya-eksternal-tik',
@@ -1462,7 +1462,7 @@ const fetchFasilitasOperasional = async () => {
 			setError('');
 
 			const token =
-				localStorage.getItem('token');
+				sessionStorage.getItem('token');
 
 			const payload: Record<
 				string,
@@ -1570,7 +1570,7 @@ const fetchFasilitasOperasional = async () => {
 			setError('');
 
 			const token =
-				localStorage.getItem('token');
+				sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/ruang-lingkup/${item.id}`,
@@ -1684,7 +1684,7 @@ const fetchFasilitasOperasional = async () => {
 			setError('');
 
 			const token =
-				localStorage.getItem('token');
+				sessionStorage.getItem('token');
 
 			const payload: Record<
 				string,
@@ -1769,7 +1769,7 @@ const fetchFasilitasOperasional = async () => {
 			setError('');
 
 			const token =
-				localStorage.getItem('token');
+				sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/tim-manajemen/${item.id}`,
@@ -1885,7 +1885,7 @@ const fetchFasilitasOperasional = async () => {
 			setError('');
 
 			const token =
-				localStorage.getItem('token');
+				sessionStorage.getItem('token');
 
 			const payload: Record<
 				string,
@@ -1972,7 +1972,7 @@ const fetchFasilitasOperasional = async () => {
 			setError('');
 
 			const token =
-				localStorage.getItem('token');
+				sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/tanggap-insiden/${item.id}`,
@@ -2079,7 +2079,7 @@ const handleSubmitPemulihanLayanan = async (
 		setMessage('');
 		setError('');
 
-		const token = localStorage.getItem('token');
+		const token = sessionStorage.getItem('token');
 
 		const payload: Record<
 			string,
@@ -2163,7 +2163,7 @@ const handleDeletePemulihanLayanan = async (
 			setMessage('');
 			setError('');
 
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/pemulihan-layanan/${item.id}`,
@@ -2265,7 +2265,7 @@ const handleSubmitOperasional = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -2347,7 +2347,7 @@ const handleDeleteOperasional = async (
 			setMessage('');
 			setError('');
 
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/operasional/${item.id}`,
@@ -2442,7 +2442,7 @@ const handleSubmitKomunikasi = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -2528,7 +2528,7 @@ const handleDeleteKomunikasi = async (
 		if (!confirmed) return;
 
 		try {
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/rencana-komunikasi/${item.id}`,
@@ -2624,7 +2624,7 @@ const handleSubmitKontak = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -2705,7 +2705,7 @@ const handleDeleteKontak = async (
 			setMessage('');
 			setError('');
 
-			const token = localStorage.getItem('token');
+			const token = sessionStorage.getItem('token');
 
 			const response = await fetch(
 				`http://localhost:5000/api/bcp/daftar-kontak/${item.id}`,
@@ -2806,7 +2806,7 @@ const handleSubmitSdm = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -2890,7 +2890,7 @@ const handleDeleteSdm = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(
       `http://localhost:5000/api/bcp/sumber-daya-manusia/${item.id}`,
@@ -2994,7 +2994,7 @@ const handleSubmitFasilitas = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -3079,7 +3079,7 @@ const handleDeleteFasilitas = async (
   }
 
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(
       `http://localhost:5000/api/bcp/fasilitas-operasional/${item.id}`,
@@ -3185,7 +3185,7 @@ const handleSubmitTik = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -3268,7 +3268,7 @@ const handleDeleteTik = async (
   }
 
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(
       `http://localhost:5000/api/bcp/sumber-daya-tik/${item.id}`,
@@ -3373,7 +3373,7 @@ const handleSubmitAkses = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -3457,7 +3457,7 @@ const handleDeleteAkses = async (
   }
 
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(
       `http://localhost:5000/api/bcp/akses-sistem-tik/${item.id}`,
@@ -3567,7 +3567,7 @@ const handleSubmitEksternalTik = async (
     setMessage('');
     setError('');
 
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const payload: Record<
       string,
@@ -3655,7 +3655,7 @@ const handleDeleteEksternalTik = async (
   }
 
   try {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
 
     const response = await fetch(
       `http://localhost:5000/api/bcp/sumber-daya-eksternal-tik/${item.id}`,

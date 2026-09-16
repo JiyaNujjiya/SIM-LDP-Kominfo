@@ -178,7 +178,7 @@ export default function PerencanaanPengetahuanPage() {
     pemilik_unit_kerja_id: '',
   });
 
-  const getToken = () => localStorage.getItem('token');
+  const getToken = () => sessionStorage.getItem('token');
 
   const request = async (
     url: string,

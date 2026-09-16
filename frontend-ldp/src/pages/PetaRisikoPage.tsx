@@ -79,7 +79,7 @@ const PetaRisikoPage: React.FC = () => {
   React.useEffect(() => {
     const fetchPetaRisiko = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
 
         const response = await fetch(
           'http://localhost:5000/api/risiko/peta-risiko',

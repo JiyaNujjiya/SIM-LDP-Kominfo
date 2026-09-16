@@ -197,7 +197,7 @@ export default function AnalisisPerubahanPage() {
 
   const [catatanKeputusan, setCatatanKeputusan] = useState('');
 
-  const getToken = () => localStorage.getItem('token');
+  const getToken = () => sessionStorage.getItem('token');
 
   const request = async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {

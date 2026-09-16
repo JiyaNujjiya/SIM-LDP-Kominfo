@@ -84,7 +84,7 @@ export default function PengumpulanPengolahanPengetahuanPage() {
     pengetahuan_hasil_id: "",
   });
 
-  const getToken = () => localStorage.getItem("token");
+  const getToken = () => sessionStorage.getItem("token");
 
   const request = async (
     url: string,

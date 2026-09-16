@@ -41,7 +41,7 @@ const LayananPrioritasRisikoPage: React.FC = () => {
 
   const fetchForm2 = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         'http://localhost:5000/api/risiko/form2',
@@ -70,7 +70,7 @@ const LayananPrioritasRisikoPage: React.FC = () => {
     if (!editingItem) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/form2/${editingItem.risiko_id}`,
@@ -150,7 +150,7 @@ const LayananPrioritasRisikoPage: React.FC = () => {
 
   const fetchPicOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         'http://localhost:5000/api/risiko/penanggung-jawab-options',

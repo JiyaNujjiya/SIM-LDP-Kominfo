@@ -49,7 +49,7 @@ function KonteksRisikoPage() {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const isEdit = editId !== null;
 
@@ -181,7 +181,7 @@ function KonteksRisikoPage() {
 
   const fetchKonteks = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         'http://localhost:5000/api/risiko/konteks',
@@ -208,7 +208,7 @@ function KonteksRisikoPage() {
 
   const fetchDetailKonteks = async (id: number) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/konteks/${id}`,
@@ -287,7 +287,7 @@ function KonteksRisikoPage() {
     if (!konfirmasi) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const response = await fetch(
         `http://localhost:5000/api/risiko/konteks/${id}`,

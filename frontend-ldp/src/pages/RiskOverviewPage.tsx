@@ -30,7 +30,7 @@ function RiskOverviewPage() {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       const [risikoResponse, monitoringResponse] = await Promise.all([
         fetch('http://localhost:5000/api/risiko', {

@@ -1,18 +1,34 @@
+import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
-type Props = {
+interface RequirePermissionProps {
   permission: string;
-  children: React.ReactNode;
-};
+  children: ReactNode;
+}
 
 export default function RequirePermission({
   permission,
   children,
-}: Props) {
-  const savedUser = localStorage.getItem("user");
-  const user = savedUser ? JSON.parse(savedUser) : null;
+}: RequirePermissionProps) {
+  const savedUser = sessionStorage.getItem("user");
 
-  const permissions: string[] = user?.permissions || [];
+  if (!savedUser) {
+    return <Navigate to="/" replace />;
+  }
+
+  let user: any;
+
+  try {
+    user = JSON.parse(savedUser);
+  } catch {
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+
+    return <Navigate to="/" replace />;
+  }
+
+  const permissions: string[] =
+    user?.permissions || [];
 
   if (!permissions.includes(permission)) {
     return <Navigate to="/dashboard" replace />;
