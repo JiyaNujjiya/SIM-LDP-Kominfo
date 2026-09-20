@@ -11,8 +11,36 @@ interface RisikoPetaItem {
   status_risiko: string | null;
 }
 
+const processSteps = [
+  {
+    number: 1,
+    label: 'Penetapan Konteks',
+    route: '/risiko/konteks',
+  },
+  {
+    number: 2,
+    label: 'Profil & Penilaian Risiko',
+    route: '/risiko',
+  },
+  {
+    number: 3,
+    label: 'Layanan Digital Prioritas',
+    route: '/risiko/layanan-prioritas',
+  },
+  {
+    number: 4,
+    label: 'Peta Risiko',
+    route: '/risiko/peta-risiko',
+  },
+  {
+    number: 5,
+    label: 'Pemantauan & Pelaporan',
+    route: '/risiko/monitoring/semester-1',
+  },
+];
+
 const PetaRisikoPage: React.FC = () => {
-  const navigate =useNavigate();
+  const navigate = useNavigate();
   const [risikoData, setRisikoData] = React.useState<RisikoPetaItem[]>([]);
 
   const kemungkinan = [
@@ -108,113 +136,86 @@ const PetaRisikoPage: React.FC = () => {
   const totalRisiko = risikoData.length;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">
-          Peta Risiko
-        </h2>
+        <h1 className="text-2xl font-bold text-slate-800">
+          Manajemen Risiko
+        </h1>
 
         <p className="mt-1 text-sm text-slate-500">
-          Matriks analisis risiko berdasarkan tingkat kemungkinan dan
-          dampak/konsekuensi.
+          Proses 4 - Peta Risiko
         </p>
       </div>
 
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center">
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko/konteks')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              1
-            </button>
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start">
+          {processSteps.map((step, index) => {
+            const active = step.number === 4;
 
-            <button
-              type="button"
-              onClick={() => navigate('/risiko/konteks')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Penetapan Konteks
-            </button>
-          </div>
+            return (
+              <div
+                key={step.number}
+                className="flex flex-1 items-start"
+              >
+                <button
+                  type="button"
+                  onClick={() => navigate(step.route)}
+                  className="flex min-w-[110px] flex-col items-center text-center"
+                >
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
+                      active
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-300 bg-white text-slate-500'
+                    }`}
+                  >
+                    {step.number}
+                  </div>
 
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              2
-            </button>
+                  <span
+                    className={`mt-2 max-w-[150px] text-xs leading-4 ${
+                      active
+                        ? 'font-semibold text-slate-800'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Profil & Penilaian Risiko
-            </button>
-          </div>
+                {index < processSteps.length - 1 && (
+                  <div className="mx-3 mt-[18px] h-px flex-1 bg-slate-200" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              3
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Layanan Digital Prioritas
-            </button>
-          </div>
-
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1B2A4A] text-xs font-semibold text-white">
-              4
-            </div>
-
-            <span className="text-xs font-semibold text-slate-900">
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">
               Peta Risiko
-            </span>
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Matriks analisis risiko berdasarkan tingkat kemungkinan dan dampak/konsekuensi.
+            </p>
           </div>
 
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500">
-              5
-            </div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Total Risiko
+            </p>
 
-            <span className="text-xs text-slate-500">
-              Pemantauan dan Pelaporan
-            </span>
+            <p className="mt-1 text-xl font-bold text-slate-800">
+              {totalRisiko}
+            </p>
           </div>
         </div>
-      </div>
 
-      <div className="mb-6">
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Total Risiko
-          </p>
-
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {totalRisiko}
-          </p>
-        </div>
-      </div>
-
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="overflow-x-auto">
         <table className="w-full min-w-[1050px] border-collapse text-sm">
           <thead>
             <tr>
@@ -321,31 +322,10 @@ const PetaRisikoPage: React.FC = () => {
         </table>
       </div>
 
-      {/* KETERANGAN */}
-      <div className="mt-4 text-xs text-slate-500">
-        Posisi setiap risiko ditentukan berdasarkan kombinasi tingkat kemungkinan
-        dan nilai dampak.
-      </div>
-
-      <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
-        <button
-          type="button"
-          onClick={() => navigate('/risiko/layanan-prioritas')}
-          className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Kembali ke Layanan Digital Prioritas
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/risiko/monitoring/semester-1')}
-          className="rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
-        >
-          Lanjut ke Monitoring Semester I
-          <span className="ml-2" aria-hidden="true">
-            →
-          </span>
-        </button>
+        <div className="border-t border-slate-200 p-5 text-xs text-slate-500">
+          Posisi setiap risiko ditentukan berdasarkan kombinasi tingkat kemungkinan
+          dan nilai dampak.
+        </div>
       </div>
     </div>
   );

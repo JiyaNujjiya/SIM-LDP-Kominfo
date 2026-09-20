@@ -1,8 +1,110 @@
 const db = require('../config/db');
 
+const {
+    notifyPimpinanChangeSubmitted,
+    resolveChangeApprovalNotifications,
+    notifyChangeDecision
+} = require('../services/notificationService');
+
 const isPositiveInteger = (value) => {
     const number = Number(value);
     return Number.isInteger(number) && number > 0;
+};
+
+const sendChangeApprovalNotification = async (perubahanId, actorId) => {
+    const [rows] = await db.query(
+        `
+        SELECT
+            id,
+            kode_perubahan,
+            created_by,
+            lingkup
+        FROM mpr_perubahan
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [Number(perubahanId)]
+    );
+
+    if (rows.length === 0) return;
+
+    const perubahan = rows[0];
+
+    const butuhTeknis =
+        perubahan.lingkup === 'Teknis' ||
+        perubahan.lingkup === 'Teknis & Organisasi';
+
+    const butuhOrganisasi =
+        perubahan.lingkup === 'Organisasi' ||
+        perubahan.lingkup === 'Teknis & Organisasi';
+
+    let teknisSiap = true;
+    let organisasiSiap = true;
+
+    if (butuhTeknis) {
+        const [teknisRows] = await db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM mpr_dampak_teknis
+            WHERE perubahan_id = ?
+            `,
+            [Number(perubahanId)]
+        );
+
+        teknisSiap = Number(teknisRows[0].total) > 0;
+    }
+
+    if (butuhOrganisasi) {
+        const [organisasiRows] = await db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM mpr_analisis_organisasi
+            WHERE perubahan_id = ?
+            `,
+            [Number(perubahanId)]
+        );
+
+        organisasiSiap = Number(organisasiRows[0].total) > 0;
+    }
+
+    if (!teknisSiap || !organisasiSiap) return;
+
+    await notifyPimpinanChangeSubmitted(
+        perubahan,
+        actorId
+    );
+};
+
+const sendChangeDecisionNotification = async ({
+    perubahan,
+    tahap,
+    keputusan,
+    statusPerubahan,
+    actorId
+}) => {
+    try {
+        await notifyChangeDecision({
+            userId: perubahan.created_by,
+            perubahan,
+            tahap,
+            decision: keputusan,
+            actorId
+        });
+
+        if (
+            keputusan === 'Tidak Disetujui' ||
+            statusPerubahan === 'Implementasi'
+        ) {
+            await resolveChangeApprovalNotifications(
+                perubahan.id
+            );
+        }
+    } catch (notificationError) {
+        console.error(
+            'Gagal memproses notifikasi keputusan perubahan:',
+            notificationError
+        );
+    }
 };
 
 exports.getUnitOptions = async (req, res) => {
@@ -1753,14 +1855,19 @@ exports.getDampakTeknisByPerubahan = async (req, res) => {
             data: rows
         });
     } catch (error) {
-        console.error('getDampakTeknisByPerubahan error:', error);
+        console.error(
+            'getDampakTeknisByPerubahan error:',
+            error
+        );
 
         return res.status(500).json({
-            message: 'Terjadi kesalahan saat mengambil analisis dampak teknis.'
+            message:
+                'Terjadi kesalahan saat mengambil analisis dampak teknis.'
         });
     }
 };
 
+// GET /api/perubahan/dampak-teknis/:id
 // GET /api/perubahan/dampak-teknis/:id
 exports.getDampakTeknisById = async (req, res) => {
     const { id } = req.params;
@@ -1791,171 +1898,187 @@ exports.getDampakTeknisById = async (req, res) => {
             data: rows[0]
         });
     } catch (error) {
-        console.error('getDampakTeknisById error:', error);
+        console.error(
+            'getDampakTeknisById error:',
+            error
+        );
 
         return res.status(500).json({
-            message: 'Terjadi kesalahan saat mengambil detail dampak teknis.'
+            message:
+                'Terjadi kesalahan saat mengambil detail dampak teknis.'
         });
     }
 };
 
 // POST /api/perubahan/:id/dampak-teknis
-exports.createDampakTeknis = async (req, res) => {
-    const { id } = req.params;
+  exports.createDampakTeknis = async (req, res) => {
+      const { id } = req.params;
 
-    const {
-        risiko_id,
-        mkb_insiden_id
-    } = req.body;
+      const {
+          risiko_id,
+          mkb_insiden_id
+      } = req.body;
 
-    if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message: 'ID perubahan tidak valid.'
-        });
-    }
+      if (!isPositiveInteger(id)) {
+          return res.status(400).json({
+              message: 'ID perubahan tidak valid.'
+          });
+      }
 
-    const validationError = validateDampakTeknisInput({
-        risiko_id,
-        mkb_insiden_id
-    });
+      const validationError = validateDampakTeknisInput({
+          risiko_id,
+          mkb_insiden_id
+      });
 
-    if (validationError) {
-        return res.status(400).json({
-            message: validationError
-        });
-    }
+      if (validationError) {
+          return res.status(400).json({
+              message: validationError
+          });
+      }
 
-    const normalizedMkbInsidenId =
-        normalizeMkbInsidenId(mkb_insiden_id);
+      const normalizedMkbInsidenId =
+          normalizeMkbInsidenId(mkb_insiden_id);
 
-    try {
-        const [perubahanRows] = await db.query(
-            `
-            SELECT id
-            FROM mpr_perubahan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [Number(id)]
-        );
+      try {
+          const [perubahanRows] = await db.query(
+              `
+              SELECT id
+              FROM mpr_perubahan
+              WHERE id = ?
+              LIMIT 1
+              `,
+              [Number(id)]
+          );
 
-        if (perubahanRows.length === 0) {
-            return res.status(404).json({
-                message: 'Data perubahan tidak ditemukan.'
-            });
-        }
+          if (perubahanRows.length === 0) {
+              return res.status(404).json({
+                  message: 'Data perubahan tidak ditemukan.'
+              });
+          }
 
-        const [risikoRows] = await db.query(
-            `
-            SELECT id
-            FROM mr_risiko
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [Number(risiko_id)]
-        );
+          const [risikoRows] = await db.query(
+              `
+              SELECT id
+              FROM mr_risiko
+              WHERE id = ?
+              LIMIT 1
+              `,
+              [Number(risiko_id)]
+          );
 
-        if (risikoRows.length === 0) {
-            return res.status(400).json({
-                message: 'Data risiko tidak ditemukan.'
-            });
-        }
+          if (risikoRows.length === 0) {
+              return res.status(400).json({
+                  message: 'Data risiko tidak ditemukan.'
+              });
+          }
 
-        if (normalizedMkbInsidenId !== null) {
-            const [insidenRows] = await db.query(
-                `
-                SELECT id
-                FROM mkb_insiden
-                WHERE id = ?
-                LIMIT 1
-                `,
-                [normalizedMkbInsidenId]
-            );
+          if (normalizedMkbInsidenId !== null) {
+              const [insidenRows] = await db.query(
+                  `
+                  SELECT id
+                  FROM mkb_insiden
+                  WHERE id = ?
+                  LIMIT 1
+                  `,
+                  [normalizedMkbInsidenId]
+              );
 
-            if (insidenRows.length === 0) {
-                return res.status(400).json({
-                    message: 'Data insiden MKB tidak ditemukan.'
-                });
-            }
-        }
+              if (insidenRows.length === 0) {
+                  return res.status(400).json({
+                      message: 'Data insiden MKB tidak ditemukan.'
+                  });
+              }
+          }
 
-        const [duplicateRows] = await db.query(
-            `
-            SELECT id
-            FROM mpr_dampak_teknis
-            WHERE perubahan_id = ?
-              AND risiko_id = ?
-            LIMIT 1
-            `,
-            [
-                Number(id),
-                Number(risiko_id)
-            ]
-        );
+          const [duplicateRows] = await db.query(
+              `
+              SELECT id
+              FROM mpr_dampak_teknis
+              WHERE perubahan_id = ?
+                AND risiko_id = ?
+              LIMIT 1
+              `,
+              [
+                  Number(id),
+                  Number(risiko_id)
+              ]
+          );
 
-        if (duplicateRows.length > 0) {
-            return res.status(409).json({
-                message: 'Risiko tersebut sudah tercatat pada perubahan ini.'
-            });
-        }
+          if (duplicateRows.length > 0) {
+              return res.status(409).json({
+                  message: 'Risiko tersebut sudah tercatat pada perubahan ini.'
+              });
+          }
 
-        const [result] = await db.query(
-            `
-            INSERT INTO mpr_dampak_teknis (
-                perubahan_id,
-                risiko_id,
-                mkb_insiden_id,
-                created_by
-            )
-            VALUES (?, ?, ?, ?)
-            `,
-            [
-                Number(id),
-                Number(risiko_id),
-                normalizedMkbInsidenId,
-                req.user.id
-            ]
-        );
+          const [result] = await db.query(
+              `
+              INSERT INTO mpr_dampak_teknis (
+                  perubahan_id,
+                  risiko_id,
+                  mkb_insiden_id,
+                  created_by
+              )
+              VALUES (?, ?, ?, ?)
+              `,
+              [
+                  Number(id),
+                  Number(risiko_id),
+                  normalizedMkbInsidenId,
+                  req.user.id
+              ]
+          );
 
-        // Saat analisis dampak mulai dicatat,
-// workflow berpindah dari Perencanaan ke Analisis.
-await db.query(
-    `
-    UPDATE mpr_perubahan
-    SET status = 'Analisis'
-    WHERE id = ?
-      AND status = 'Perencanaan'
-    `,
-    [Number(id)]
-);
+          // Saat analisis dampak mulai dicatat,
+  // workflow berpindah dari Perencanaan ke Analisis.
+  await db.query(
+      `
+      UPDATE mpr_perubahan
+      SET status = 'Analisis'
+      WHERE id = ?
+        AND status = 'Perencanaan'
+      `,
+      [Number(id)]
+  );
 
-        const [rows] = await db.query(
-            `
-            ${dampakTeknisSelectQuery}
-            WHERE dt.id = ?
-            LIMIT 1
-            `,
-            [result.insertId]
-        );
+          const [rows] = await db.query(
+              `
+              ${dampakTeknisSelectQuery}
+              WHERE dt.id = ?
+              LIMIT 1
+              `,
+              [result.insertId]
+          );
 
-        return res.status(201).json({
-            message: 'Analisis dampak teknis berhasil disimpan.',
-            data: rows[0]
-        });
-    } catch (error) {
-        console.error('createDampakTeknis error:', error);
+          try {
+              await sendChangeApprovalNotification(
+                  Number(id),
+                  req.user.id
+              );
+          } catch (notificationError) {
+              console.error(
+                  'Gagal mengirim notifikasi persetujuan perubahan:',
+                  notificationError
+              );
+          }
 
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({
-                message: 'Risiko tersebut sudah tercatat pada perubahan ini.'
-            });
-        }
+          return res.status(201).json({
+              message: 'Analisis dampak teknis berhasil disimpan.',
+              data: rows[0]
+          });
+      } catch (error) {
+          console.error('createDampakTeknis error:', error);
 
-        return res.status(500).json({
-            message: 'Terjadi kesalahan saat menyimpan analisis dampak teknis.'
-        });
-    }
-};
+          if (error.code === 'ER_DUP_ENTRY') {
+              return res.status(409).json({
+                  message: 'Risiko tersebut sudah tercatat pada perubahan ini.'
+              });
+          }
+
+          return res.status(500).json({
+              message: 'Terjadi kesalahan saat menyimpan analisis dampak teknis.'
+          });
+      }
+  };
 
 // PUT /api/perubahan/dampak-teknis/:id
 exports.updateDampakTeknis = async (req, res) => {
@@ -1999,11 +2122,13 @@ exports.updateDampakTeknis = async (req, res) => {
 
         if (existingRows.length === 0) {
             return res.status(404).json({
-                message: 'Data dampak teknis tidak ditemukan.'
+                message:
+                    'Data dampak teknis tidak ditemukan.'
             });
         }
 
-        const perubahanId = existingRows[0].perubahan_id;
+        const perubahanId =
+            existingRows[0].perubahan_id;
 
         const [risikoRows] = await db.query(
             `
@@ -2034,7 +2159,8 @@ exports.updateDampakTeknis = async (req, res) => {
 
             if (insidenRows.length === 0) {
                 return res.status(400).json({
-                    message: 'Data insiden MKB tidak ditemukan.'
+                    message:
+                        'Data insiden MKB tidak ditemukan.'
                 });
             }
         }
@@ -2057,7 +2183,8 @@ exports.updateDampakTeknis = async (req, res) => {
 
         if (duplicateRows.length > 0) {
             return res.status(409).json({
-                message: 'Risiko tersebut sudah tercatat pada perubahan ini.'
+                message:
+                    'Risiko tersebut sudah tercatat pada perubahan ini.'
             });
         }
 
@@ -2085,21 +2212,39 @@ exports.updateDampakTeknis = async (req, res) => {
             [Number(id)]
         );
 
+        try {
+            await sendChangeApprovalNotification(
+                perubahanId,
+                req.user.id
+            );
+        } catch (notificationError) {
+            console.error(
+                'Gagal mengirim ulang notifikasi persetujuan perubahan:',
+                notificationError
+            );
+        }
+
         return res.status(200).json({
-            message: 'Analisis dampak teknis berhasil diperbarui.',
+            message:
+                'Analisis dampak teknis berhasil diperbarui.',
             data: rows[0]
         });
     } catch (error) {
-        console.error('updateDampakTeknis error:', error);
+        console.error(
+            'updateDampakTeknis error:',
+            error
+        );
 
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({
-                message: 'Risiko tersebut sudah tercatat pada perubahan ini.'
+                message:
+                    'Risiko tersebut sudah tercatat pada perubahan ini.'
             });
         }
 
         return res.status(500).json({
-            message: 'Terjadi kesalahan saat memperbarui analisis dampak teknis.'
+            message:
+                'Terjadi kesalahan saat memperbarui analisis dampak teknis.'
         });
     }
 };
@@ -2232,18 +2377,19 @@ const createKeputusanAnalisisTeknis = async (
         typeof catatan_keputusan !== 'string'
     ) {
         return res.status(400).json({
-            message: 'catatan_keputusan harus berupa teks.'
+            message:
+                'catatan_keputusan harus berupa teks.'
         });
     }
 
     try {
-        // Pastikan data perubahan ada
         const [perubahanRows] = await db.query(
             `
             SELECT
                 id,
                 kode_perubahan,
-                status
+                status,
+                created_by
             FROM mpr_perubahan
             WHERE id = ?
             LIMIT 1
@@ -2253,13 +2399,11 @@ const createKeputusanAnalisisTeknis = async (
 
         if (perubahanRows.length === 0) {
             return res.status(404).json({
-                message: 'Data perubahan tidak ditemukan.'
+                message:
+                    'Data perubahan tidak ditemukan.'
             });
         }
 
-        // Keputusan analisis hanya boleh dilakukan
-        // selama workflow masih berada pada tahap
-        // Perencanaan atau Analisis.
         if (
             !['Perencanaan', 'Analisis'].includes(
                 perubahanRows[0].status
@@ -2271,7 +2415,6 @@ const createKeputusanAnalisisTeknis = async (
             });
         }
 
-        // Analisis teknis harus sudah memiliki minimal satu risiko
         const [dampakTeknisRows] = await db.query(
             `
             SELECT COUNT(*) AS total
@@ -2281,7 +2424,11 @@ const createKeputusanAnalisisTeknis = async (
             [Number(id)]
         );
 
-        if (Number(dampakTeknisRows[0].total) === 0) {
+        if (
+            Number(
+                dampakTeknisRows[0].total
+            ) === 0
+        ) {
             return res.status(409).json({
                 message:
                     'Analisis dampak teknis belum tersedia.'
@@ -2297,7 +2444,13 @@ const createKeputusanAnalisisTeknis = async (
                 pic_id,
                 catatan_keputusan
             )
-            VALUES (?, 'Analisis Teknis', ?, ?, ?)
+            VALUES (
+                ?,
+                'Analisis Teknis',
+                ?,
+                ?,
+                ?
+            )
             `,
             [
                 Number(id),
@@ -2309,9 +2462,21 @@ const createKeputusanAnalisisTeknis = async (
             ]
         );
 
-        await syncStatusSetelahAnalisis(
-            Number(id)
-        );
+        const statusPerubahan =
+            await syncStatusSetelahAnalisis(
+                Number(id)
+            );
+
+        await sendChangeDecisionNotification({
+            perubahan:
+                perubahanRows[0],
+            tahap:
+                'Analisis Teknis',
+            keputusan,
+            statusPerubahan,
+            actorId:
+                req.user.id
+        });
 
         const [rows] = await db.query(
             `
@@ -2341,7 +2506,6 @@ const createKeputusanAnalisisTeknis = async (
         });
     }
 };
-
 
 // POST /api/perubahan/:id/persetujuan/analisis-teknis/setujui
 exports.approveAnalisisTeknis = async (
@@ -2786,11 +2950,12 @@ exports.createAnalisisOrganisasi = async (req, res) => {
         });
     }
 
-    const validationError = validateAnalisisOrganisasiInput({
-        kesimpulan,
-        rekomendasi,
-        dampak_organisasi
-    });
+    const validationError =
+        validateAnalisisOrganisasiInput({
+            kesimpulan,
+            rekomendasi,
+            dampak_organisasi
+        });
 
     if (validationError) {
         return res.status(400).json({
@@ -2798,100 +2963,121 @@ exports.createAnalisisOrganisasi = async (req, res) => {
         });
     }
 
-    const connection = await db.getConnection();
+    const connection =
+        await db.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        const [perubahanRows] = await connection.query(
-            `
-            SELECT id, lingkup
-            FROM mpr_perubahan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [Number(id)]
-        );
+        const [perubahanRows] =
+            await connection.query(
+                `
+                SELECT id, lingkup
+                FROM mpr_perubahan
+                WHERE id = ?
+                LIMIT 1
+                `,
+                [Number(id)]
+            );
 
         if (perubahanRows.length === 0) {
             await connection.rollback();
 
             return res.status(404).json({
-                message: 'Data perubahan tidak ditemukan.'
+                message:
+                    'Data perubahan tidak ditemukan.'
             });
         }
 
-        const [existingRows] = await connection.query(
-            `
-            SELECT id
-            FROM mpr_analisis_organisasi
-            WHERE perubahan_id = ?
-            LIMIT 1
-            `,
-            [Number(id)]
-        );
+        const [existingRows] =
+            await connection.query(
+                `
+                SELECT id
+                FROM mpr_analisis_organisasi
+                WHERE perubahan_id = ?
+                LIMIT 1
+                `,
+                [Number(id)]
+            );
 
         if (existingRows.length > 0) {
             await connection.rollback();
 
             return res.status(409).json({
-                message: 'Analisis dampak organisasi untuk perubahan ini sudah tersedia.'
+                message:
+                    'Analisis dampak organisasi untuk perubahan ini sudah tersedia.'
             });
         }
 
-        const [result] = await connection.query(
-            `
-            INSERT INTO mpr_analisis_organisasi (
-                perubahan_id,
-                kesimpulan,
-                rekomendasi,
-                created_by
-            )
-            VALUES (?, ?, ?, ?)
-            `,
-            [
-                Number(id),
-                kesimpulan,
-                typeof rekomendasi === 'string'
-                    ? rekomendasi.trim() || null
-                    : null,
-                req.user.id
-            ]
-        );
+        const [result] =
+            await connection.query(
+                `
+                INSERT INTO mpr_analisis_organisasi (
+                    perubahan_id,
+                    kesimpulan,
+                    rekomendasi,
+                    created_by
+                )
+                VALUES (?, ?, ?, ?)
+                `,
+                [
+                    Number(id),
+                    kesimpulan,
+                    typeof rekomendasi === 'string'
+                        ? rekomendasi.trim() || null
+                        : null,
+                    req.user.id
+                ]
+            );
 
         await saveDampakOrganisasi(
-    connection,
-    result.insertId,
-    dampak_organisasi
-);
+            connection,
+            result.insertId,
+            dampak_organisasi
+        );
 
-// Saat analisis dampak mulai dicatat,
-// workflow berpindah dari Perencanaan ke Analisis.
         await connection.query(
             `
             UPDATE mpr_perubahan
             SET status = 'Analisis'
             WHERE id = ?
-            AND status = 'Perencanaan'
+              AND status = 'Perencanaan'
             `,
             [Number(id)]
         );
 
-        const data = await buildAnalisisOrganisasiResponse(
-            connection,
-            result.insertId
-        );
+        const data =
+            await buildAnalisisOrganisasiResponse(
+                connection,
+                result.insertId
+            );
 
         await connection.commit();
 
+        try {
+            await sendChangeApprovalNotification(
+                Number(id),
+                req.user.id
+            );
+        } catch (notificationError) {
+            console.error(
+                'Gagal mengirim notifikasi persetujuan perubahan:',
+                notificationError
+            );
+        }
+
         return res.status(201).json({
-            message: 'Analisis dampak organisasi berhasil disimpan.',
+            message:
+                'Analisis dampak organisasi berhasil disimpan.',
             data
         });
     } catch (error) {
         await connection.rollback();
 
-        console.error('createAnalisisOrganisasi error:', error);
+        console.error(
+            'createAnalisisOrganisasi error:',
+            error
+        );
 
         if (error.statusCode === 400) {
             return res.status(400).json({
@@ -2901,12 +3087,14 @@ exports.createAnalisisOrganisasi = async (req, res) => {
 
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({
-                message: 'Analisis atau area dampak organisasi sudah tersedia.'
+                message:
+                    'Analisis atau area dampak organisasi sudah tersedia.'
             });
         }
 
         return res.status(500).json({
-            message: 'Terjadi kesalahan saat menyimpan analisis dampak organisasi.'
+            message:
+                'Terjadi kesalahan saat menyimpan analisis dampak organisasi.'
         });
     } finally {
         connection.release();
@@ -2925,15 +3113,17 @@ exports.updateAnalisisOrganisasi = async (req, res) => {
 
     if (!isPositiveInteger(id)) {
         return res.status(400).json({
-            message: 'ID analisis organisasi tidak valid.'
+            message:
+                'ID analisis organisasi tidak valid.'
         });
     }
 
-    const validationError = validateAnalisisOrganisasiInput({
-        kesimpulan,
-        rekomendasi,
-        dampak_organisasi
-    });
+    const validationError =
+        validateAnalisisOrganisasiInput({
+            kesimpulan,
+            rekomendasi,
+            dampak_organisasi
+        });
 
     if (validationError) {
         return res.status(400).json({
@@ -2941,26 +3131,31 @@ exports.updateAnalisisOrganisasi = async (req, res) => {
         });
     }
 
-    const connection = await db.getConnection();
+    const connection =
+        await db.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        const [existingRows] = await connection.query(
-            `
-            SELECT id
-            FROM mpr_analisis_organisasi
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [Number(id)]
-        );
+        const [existingRows] =
+            await connection.query(
+                `
+                SELECT
+                    id,
+                    perubahan_id
+                FROM mpr_analisis_organisasi
+                WHERE id = ?
+                LIMIT 1
+                `,
+                [Number(id)]
+            );
 
         if (existingRows.length === 0) {
             await connection.rollback();
 
             return res.status(404).json({
-                message: 'Analisis dampak organisasi tidak ditemukan.'
+                message:
+                    'Analisis dampak organisasi tidak ditemukan.'
             });
         }
 
@@ -2981,11 +3176,6 @@ exports.updateAnalisisOrganisasi = async (req, res) => {
             ]
         );
 
-        /*
-         * Child dihapus lalu dibuat ulang supaya payload PUT
-         * merepresentasikan kondisi lengkap terbaru.
-         * FK junction -> dampak_organisasi memakai ON DELETE CASCADE.
-         */
         await connection.query(
             `
             DELETE FROM mpr_dampak_organisasi
@@ -3000,36 +3190,56 @@ exports.updateAnalisisOrganisasi = async (req, res) => {
             dampak_organisasi
         );
 
-        const data = await buildAnalisisOrganisasiResponse(
-            connection,
-            Number(id)
-        );
+        const data =
+            await buildAnalisisOrganisasiResponse(
+                connection,
+                Number(id)
+            );
 
         await connection.commit();
 
+        try {
+            await sendChangeApprovalNotification(
+                existingRows[0].perubahan_id,
+                req.user.id
+            );
+        } catch (notificationError) {
+            console.error(
+                'Gagal mengirim ulang notifikasi persetujuan perubahan:',
+                notificationError
+            );
+        }
+
         return res.status(200).json({
-            message: 'Analisis dampak organisasi berhasil diperbarui.',
+            message:
+                'Analisis dampak organisasi berhasil diperbarui.',
             data
         });
     } catch (error) {
         await connection.rollback();
 
-        console.error('updateAnalisisOrganisasi error:', error);
+        console.error(
+            'updateAnalisisOrganisasi error:',
+            error
+        );
 
         if (error.statusCode === 400) {
             return res.status(400).json({
-                message: error.message
+                message:
+                    error.message
             });
         }
 
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({
-                message: 'Terdapat data dampak organisasi yang duplikat.'
+                message:
+                    'Terdapat data dampak organisasi yang duplikat.'
             });
         }
 
         return res.status(500).json({
-            message: 'Terjadi kesalahan saat memperbarui analisis dampak organisasi.'
+            message:
+                'Terjadi kesalahan saat memperbarui analisis dampak organisasi.'
         });
     } finally {
         connection.release();
@@ -3149,18 +3359,19 @@ const createKeputusanAnalisisOrganisasi = async (
         typeof catatan_keputusan !== 'string'
     ) {
         return res.status(400).json({
-            message: 'catatan_keputusan harus berupa teks.'
+            message:
+                'catatan_keputusan harus berupa teks.'
         });
     }
 
     try {
-        // Pastikan perubahan ada
         const [perubahanRows] = await db.query(
             `
             SELECT
                 id,
                 kode_perubahan,
-                status
+                status,
+                created_by
             FROM mpr_perubahan
             WHERE id = ?
             LIMIT 1
@@ -3170,13 +3381,11 @@ const createKeputusanAnalisisOrganisasi = async (
 
         if (perubahanRows.length === 0) {
             return res.status(404).json({
-                message: 'Data perubahan tidak ditemukan.'
+                message:
+                    'Data perubahan tidak ditemukan.'
             });
         }
 
-        // Keputusan analisis hanya boleh dilakukan
-        // selama workflow masih berada pada tahap
-        // Perencanaan atau Analisis.
         if (
             !['Perencanaan', 'Analisis'].includes(
                 perubahanRows[0].status
@@ -3188,7 +3397,6 @@ const createKeputusanAnalisisOrganisasi = async (
             });
         }
 
-        // Analisis organisasi wajib tersedia sebelum keputusan
         const [analisisRows] = await db.query(
             `
             SELECT id
@@ -3215,7 +3423,13 @@ const createKeputusanAnalisisOrganisasi = async (
                 pic_id,
                 catatan_keputusan
             )
-            VALUES (?, 'Analisis Organisasi', ?, ?, ?)
+            VALUES (
+                ?,
+                'Analisis Organisasi',
+                ?,
+                ?,
+                ?
+            )
             `,
             [
                 Number(id),
@@ -3227,9 +3441,21 @@ const createKeputusanAnalisisOrganisasi = async (
             ]
         );
 
-        await syncStatusSetelahAnalisis(
-            Number(id)
-        );
+        const statusPerubahan =
+            await syncStatusSetelahAnalisis(
+                Number(id)
+            );
+
+        await sendChangeDecisionNotification({
+            perubahan:
+                perubahanRows[0],
+            tahap:
+                'Analisis Organisasi',
+            keputusan,
+            statusPerubahan,
+            actorId:
+                req.user.id
+        });
 
         const [rows] = await db.query(
             `

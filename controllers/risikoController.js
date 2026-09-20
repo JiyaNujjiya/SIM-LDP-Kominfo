@@ -3,6 +3,8 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 
+const {notifyPimpinanRiskSubmitted, resolveRiskApprovalNotifications, notifyRiskDecision} = require('../services/notificationService');
+
 // 1. Tambah Data Risiko (Form 1.0)
 exports.createRisiko = async (req, res) => {
     const {
@@ -622,159 +624,280 @@ exports.deleteRisiko = async (req, res) => {
   }
 };
 
-exports.submitRisiko = async (req, res) => {
-  const { id } = req.params;
+exports.submitRisiko =
+  async (req, res) => {
+    const { id } = req.params;
 
-  try {
-    const [rows] = await db.query(
-      `
-      SELECT id, status_risiko
-      FROM mr_risiko
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
+    try {
+      const [rows] =
+        await db.query(
+          `
+            SELECT
+              id,
+              kode_risiko,
+              peristiwa_risiko,
+              besaran_risiko,
+              status_risiko,
+              created_by
 
-    if (rows.length === 0) {
-      return res.status(404).json({
-        message: 'Data risiko tidak ditemukan.',
+            FROM mr_risiko
+
+            WHERE id = ?
+
+            LIMIT 1
+          `,
+          [id]
+        );
+
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({
+            message:
+              'Data risiko tidak ditemukan.',
+          });
+      }
+
+      const risiko = rows[0];
+
+      if (
+        risiko.status_risiko !==
+        'Draft'
+      ) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Hanya risiko berstatus Draft yang dapat diajukan.',
+          });
+      }
+
+      await db.query(
+        `
+          UPDATE mr_risiko
+
+          SET
+            status_risiko = 'Diajukan'
+
+          WHERE id = ?
+        `,
+        [id]
+      );
+
+      await notifyPimpinanRiskSubmitted(
+        risiko,
+        req.user.id
+      );
+
+      return res.json({
+        message:
+          'Risiko berhasil diajukan.',
+        status_risiko:
+          'Diajukan',
       });
+    } catch (error) {
+      console.error(
+        'ERROR SUBMIT RISIKO:',
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error: error.message,
+        });
     }
+  };
 
-    const risiko = rows[0];
+exports.approveRisiko =
+  async (req, res) => {
+    const { id } = req.params;
 
-    if (risiko.status_risiko !== 'Draft') {
-      return res.status(400).json({
-        message: 'Hanya risiko berstatus Draft yang dapat diajukan.',
+    try {
+      const [rows] =
+        await db.query(
+          `
+            SELECT
+              id,
+              kode_risiko,
+              peristiwa_risiko,
+              status_risiko,
+              created_by
+
+            FROM mr_risiko
+
+            WHERE id = ?
+
+            LIMIT 1
+          `,
+          [id]
+        );
+
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({
+            message:
+              'Data risiko tidak ditemukan.',
+          });
+      }
+
+      const risiko = rows[0];
+
+      if (
+        risiko.status_risiko !==
+        'Diajukan'
+      ) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Hanya risiko berstatus Diajukan yang dapat disetujui.',
+          });
+      }
+
+      await db.query(
+        `
+          UPDATE mr_risiko
+
+          SET
+            status_risiko =
+              'Disetujui'
+
+          WHERE id = ?
+        `,
+        [id]
+      );
+
+      await resolveRiskApprovalNotifications(
+        id
+      );
+
+      await notifyRiskDecision({
+        userId:
+          risiko.created_by,
+        risiko,
+        decision:
+          'Disetujui',
+        actorId:
+          req.user.id,
       });
-    }
 
-    await db.query(
-      `
-      UPDATE mr_risiko
-      SET status_risiko = 'Diajukan'
-      WHERE id = ?
-      `,
-      [id]
-    );
-
-    res.json({
-      message: 'Risiko berhasil diajukan.',
-      status_risiko: 'Diajukan',
-    });
-
-  } catch (error) {
-    console.error('ERROR SUBMIT RISIKO:', error);
-
-    res.status(500).json({
-      error: error.message,
-    });
-  }
-};
-
-exports.approveRisiko = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const [rows] = await db.query(
-      `
-      SELECT id, status_risiko
-      FROM mr_risiko
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        message: 'Data risiko tidak ditemukan.',
+      return res.json({
+        message:
+          'Risiko berhasil disetujui.',
+        status_risiko:
+          'Disetujui',
       });
+    } catch (error) {
+      console.error(
+        'ERROR APPROVE RISIKO:',
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error: error.message,
+        });
     }
+  };
 
-    const risiko = rows[0];
+exports.rejectRisiko =
+  async (req, res) => {
+    const { id } = req.params;
 
-    if (risiko.status_risiko !== 'Diajukan') {
-      return res.status(400).json({
-        message: 'Hanya risiko berstatus Diajukan yang dapat disetujui.',
+    try {
+      const [rows] =
+        await db.query(
+          `
+            SELECT
+              id,
+              kode_risiko,
+              peristiwa_risiko,
+              status_risiko,
+              created_by
+
+            FROM mr_risiko
+
+            WHERE id = ?
+
+            LIMIT 1
+          `,
+          [id]
+        );
+
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({
+            message:
+              'Data risiko tidak ditemukan.',
+          });
+      }
+
+      const risiko = rows[0];
+
+      if (
+        risiko.status_risiko !==
+        'Diajukan'
+      ) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Hanya risiko berstatus Diajukan yang dapat ditolak.',
+          });
+      }
+
+      await db.query(
+        `
+          UPDATE mr_risiko
+
+          SET
+            status_risiko =
+              'Ditolak'
+
+          WHERE id = ?
+        `,
+        [id]
+      );
+
+      await resolveRiskApprovalNotifications(
+        id
+      );
+
+      await notifyRiskDecision({
+        userId:
+          risiko.created_by,
+        risiko,
+        decision:
+          'Ditolak',
+        actorId:
+          req.user.id,
       });
-    }
 
-    await db.query(
-      `
-      UPDATE mr_risiko
-      SET status_risiko = 'Disetujui'
-      WHERE id = ?
-      `,
-      [id]
-    );
-
-    res.json({
-      message: 'Risiko berhasil disetujui.',
-      status_risiko: 'Disetujui',
-    });
-
-  } catch (error) {
-    console.error('ERROR APPROVE RISIKO:', error);
-
-    res.status(500).json({
-      error: error.message,
-    });
-  }
-};
-
-exports.rejectRisiko = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const [rows] = await db.query(
-      `
-      SELECT id, status_risiko
-      FROM mr_risiko
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({
-        message: 'Data risiko tidak ditemukan.',
+      return res.json({
+        message:
+          'Risiko berhasil ditolak.',
+        status_risiko:
+          'Ditolak',
       });
+    } catch (error) {
+      console.error(
+        'ERROR REJECT RISIKO:',
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          error: error.message,
+        });
     }
+  };
 
-    const risiko = rows[0];
-
-    if (risiko.status_risiko !== 'Diajukan') {
-      return res.status(400).json({
-        message: 'Hanya risiko berstatus Diajukan yang dapat ditolak.',
-      });
-    }
-
-    await db.query(
-      `
-      UPDATE mr_risiko
-      SET status_risiko = 'Ditolak'
-      WHERE id = ?
-      `,
-      [id]
-    );
-
-    res.json({
-      message: 'Risiko berhasil ditolak.',
-      status_risiko: 'Ditolak',
-    });
-
-  } catch (error) {
-    console.error('ERROR REJECT RISIKO:', error);
-
-    res.status(500).json({
-      error: error.message,
-    });
-  }
-};
-
+  
 // Form 2.0 - Daftar Layanan Digital Prioritas
 exports.getForm2Risiko = async (req, res) => {
     try {

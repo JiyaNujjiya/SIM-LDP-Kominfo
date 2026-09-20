@@ -122,7 +122,7 @@ type ApprovalItem = {
 const getToken = () => sessionStorage.getItem("token") || "";
 
 const getUser = () => {
-  const raw = localStorage.getItem("user");
+  const raw = sessionStorage.getItem("user");
 
   if (!raw) {
     return null;

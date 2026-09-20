@@ -95,7 +95,7 @@ const API = 'http://localhost:5000/api';
 export default function PerencanaanPerubahanPage() {
   const navigate = useNavigate();
 
-  const savedUser = localStorage.getItem('user');
+  const savedUser = sessionStorage.getItem('user');
   const user = savedUser ? JSON.parse(savedUser) : null;
   const permissions: string[] = user?.permissions || [];
 

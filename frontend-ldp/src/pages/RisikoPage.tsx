@@ -1,4 +1,4 @@
-import React, { use, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface RisikoItem {
@@ -55,9 +55,37 @@ interface RisikoItem {
 }[];
 }
 
+const processSteps = [
+  {
+    number: 1,
+    label: 'Penetapan Konteks',
+    route: '/risiko/konteks',
+  },
+  {
+    number: 2,
+    label: 'Profil & Penilaian Risiko',
+    route: '/risiko',
+  },
+  {
+    number: 3,
+    label: 'Layanan Digital Prioritas',
+    route: '/risiko/layanan-prioritas',
+  },
+  {
+    number: 4,
+    label: 'Peta Risiko',
+    route: '/risiko/peta-risiko',
+  },
+  {
+    number: 5,
+    label: 'Pemantauan & Pelaporan',
+    route: '/risiko/monitoring/semester-1',
+  },
+];
 
 export default function RisikoPage() {
   const navigate = useNavigate();
+  const [openActionId, setOpenActionId] = useState<number | null>(null);
   const [dataRisiko, setDataRisiko] = useState<RisikoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -96,15 +124,12 @@ export default function RisikoPage() {
     membutuhkan_perubahan: false,
   });
 
-  const savedUser = localStorage.getItem('user');
+  const savedUser = sessionStorage.getItem('user');
   const user = savedUser ? JSON.parse(savedUser) : null;
 
   // permission user
   const permissions: string[] = user?.permissions || [];
   const canCreate = permissions.includes('risk.create');
-  const canSubmit = permissions.includes('risk.submit');
-  const canApprove = permissions.includes('risk.approve');
-  const canReject = permissions.includes('risk.reject');
   const canUpdate = permissions.includes('risk.update');
   const canDelete = permissions.includes('risk.delete');
 
@@ -469,60 +494,6 @@ export default function RisikoPage() {
     }
   };
 
-  const handleSubmitRisiko = async (id: number) => {
-    const token = sessionStorage.getItem('token');
-
-    const confirmSubmit = window.confirm(
-      'Yakin ingin mengajukan risiko ini? Setelah diajukan, risiko akan menunggu persetujuan.'
-    );
-
-    if (!confirmSubmit) return;
-
-    try {
-      setMessage('');
-
-      const response = await fetch(
-        `http://localhost:5000/api/risiko/${id}/submit`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-            result.error ||
-            'Gagal mengajukan risiko'
-        );
-      }
-
-      setMessage('Risiko berhasil diajukan.');
-
-      setDataRisiko((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status_risiko: 'Diajukan',
-              }
-            : item
-        )
-      );
-
-    } catch (err) {
-      const error = err as Error;
-
-      console.error('Error submit risiko:', error);
-      setMessage(error.message);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -669,114 +640,6 @@ export default function RisikoPage() {
 
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleApproveRisiko = async (id: number) => {
-    const token = sessionStorage.getItem('token');
-
-    const confirmApprove = window.confirm(
-      'Yakin ingin menyetujui risiko ini?'
-    );
-
-    if (!confirmApprove) return;
-
-    try {
-      setMessage('');
-
-      const response = await fetch(
-        `http://localhost:5000/api/risiko/${id}/approve`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-            result.error ||
-            'Gagal menyetujui risiko'
-        );
-      }
-
-      setMessage('Risiko berhasil disetujui.');
-
-      setDataRisiko((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status_risiko: 'Disetujui',
-              }
-            : item
-        )
-      );
-
-    } catch (err) {
-      const error = err as Error;
-
-      console.error('Error approve risiko:', error);
-      setMessage(error.message);
-    }
-  };
-
-  const handleRejectRisiko = async (id: number) => {
-    const token = sessionStorage.getItem('token');
-
-    const confirmReject = window.confirm(
-      'Yakin ingin menolak risiko ini?'
-    );
-
-    if (!confirmReject) return;
-
-    try {
-      setMessage('');
-
-      const response = await fetch(
-        `http://localhost:5000/api/risiko/${id}/reject`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-            result.error ||
-            'Gagal menolak risiko'
-        );
-      }
-
-      setMessage('Risiko berhasil ditolak.');
-
-      setDataRisiko((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                status_risiko: 'Ditolak',
-              }
-            : item
-        )
-      );
-
-    } catch (err) {
-      const error = err as Error;
-
-      console.error('Error reject risiko:', error);
-      setMessage(error.message);
     }
   };
 
@@ -936,8 +799,6 @@ export default function RisikoPage() {
     }
   };
 
-  const [openActionId, setOpenActionId] = useState<number | null>(null);
-
   const getNextKodeRisiko = () => {
   const numbers = dataRisiko
     .map((item) => {
@@ -963,108 +824,59 @@ export default function RisikoPage() {
 return (
   <div className="p-6">
     <div className="mb-6">
-      <h1 className="text-2xl font-bold text-slate-900">
-        Profil dan Penilaian Risiko
+      <h1 className="text-2xl font-bold text-slate-800">
+        Manajemen Risiko
       </h1>
 
       <p className="mt-1 text-sm text-slate-500">
-        Identifikasi, analisis, evaluasi, dan perlakuan risiko layanan digital pemerintah.
+        Proses 2 - Profil dan Penilaian Risiko
       </p>
     </div>
 
-    <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-4">
-      <div className="flex items-center">
-        <div className="flex min-w-fit items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/konteks')}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-          >
-            1
-          </button>
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start">
+          {processSteps.map((step, index) => {
+            const active = step.number === 2;
 
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/konteks')}
-            className="text-xs text-slate-500 hover:text-slate-800"
-          >
-            Penetapan Konteks
-          </button>
-        </div>
+            return (
+              <div
+                key={step.number}
+                className="flex flex-1 items-start"
+              >
+                <button
+                  type="button"
+                  onClick={() => navigate(step.route)}
+                  className="flex min-w-[110px] flex-col items-center text-center"
+                >
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
+                      active
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-300 bg-white text-slate-500'
+                    }`}
+                  >
+                    {step.number}
+                  </div>
 
-        <div className="mx-4 h-px flex-1 bg-slate-300" />
+                  <span
+                    className={`mt-2 max-w-[150px] text-xs leading-4 ${
+                      active
+                        ? 'font-semibold text-slate-800'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </button>
 
-        <div className="flex min-w-fit items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1B2A4A] text-xs font-semibold text-white">
-            2
-          </div>
-
-          <span className="text-xs font-semibold text-slate-900">
-            Profil & Penilaian Risiko
-          </span>
-        </div>
-
-        <div className="mx-4 h-px flex-1 bg-slate-300" />
-
-        <div className="flex min-w-fit items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/layanan-prioritas')}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-          >
-            3
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/layanan-prioritas')}
-            className="text-xs text-slate-500 hover:text-slate-800"
-          >
-            Layanan Digital Prioritas
-          </button>
-        </div>
-
-        <div className="mx-4 h-px flex-1 bg-slate-300" />
-
-        <div className="flex min-w-fit items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/peta-risiko')}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-          >
-            4
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/peta-risiko')}
-            className="text-xs text-slate-500 hover:text-slate-800"
-          >
-            Peta Risiko
-          </button>
-        </div>
-
-        <div className="mx-4 h-px flex-1 bg-slate-300" />
-
-        <div className="flex min-w-fit items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/monitoring/semester-1')}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-          >
-            5
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/monitoring/semester-1')}
-            className="text-xs text-slate-500 hover:text-slate-800"
-          >
-            Pemantauan & Pelaporan
-          </button>
+                {index < processSteps.length - 1 && (
+                  <div className="mx-3 mt-[18px] h-px flex-1 bg-slate-200" />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
-    </div>
 
     {message && (
       <div className="mb-4 text-sm text-gray-700">
@@ -1073,11 +885,11 @@ return (
     )}
 
     {showForm && (
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
-        <div className="mb-6">
-          <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-xl">
+          <div className="flex items-center justify-between px-6 py-4">
             <div>
-              <h3 className="text-xl font-bold text-slate-900">
+              <h3 className="text-lg font-semibold text-slate-800">
                 {editingId ? 'Edit Risiko' : 'Tambah Risiko'}
               </h3>
 
@@ -1093,35 +905,37 @@ return (
                 setEditingId(null);
                 setCurrentStep(1);
               }}
-              className="text-sm font-semibold text-slate-500 hover:text-slate-800"
+              className="text-xl text-slate-400 hover:text-slate-600"
             >
-              Batal
+              ×
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
-            {[
-              { step: 1, label: 'Identifikasi Risiko' },
-              { step: 2, label: 'Analisis dan Evaluasi' },
-              { step: 3, label: 'Perlakuan Risiko' },
-              { step: 4, label: 'Risiko Residual' },
-              { step: 5, label: 'Kolom Tambahan' },
-            ].map((item) => (
-              <button
-                key={item.step}
-                type="button"
-                onClick={() => setCurrentStep(item.step)}
-                className={`min-h-[52px] rounded-lg border px-3 py-2 text-sm font-semibold ${
-                  currentStep === item.step
-                    ? 'border-[#1B2A4A] bg-[#1B2A4A] text-white'
-                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {item.step}. {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+          <div className="p-6">
+            <div className="mb-6">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+                {[
+                  { step: 1, label: 'Identifikasi Risiko' },
+                  { step: 2, label: 'Analisis dan Evaluasi' },
+                  { step: 3, label: 'Perlakuan Risiko' },
+                  { step: 4, label: 'Risiko Residual' },
+                  { step: 5, label: 'Kolom Tambahan' },
+                ].map((item) => (
+                  <button
+                    key={item.step}
+                    type="button"
+                    onClick={() => setCurrentStep(item.step)}
+                    className={`min-h-[52px] rounded-lg border px-3 py-2 text-sm font-semibold ${
+                      currentStep === item.step
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {item.step}. {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
         <form onSubmit={handleSubmit}>
           {currentStep === 1 && (
@@ -1146,7 +960,7 @@ return (
                           konteks_id: e.target.value,
                         }))
                       }
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                       required
                     >
                       <option value="">
@@ -1178,7 +992,7 @@ return (
                         })
                       }
                       rows={2}
-                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                       placeholder="Masukkan sasaran pembangunan nasional"
                     />
                   </div>
@@ -1197,7 +1011,7 @@ return (
                         })
                       }
                       rows={2}
-                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                       placeholder="Masukkan sasaran UPR"
                     />
                   </div>
@@ -1216,7 +1030,7 @@ return (
                         })
                       }
                       rows={2}
-                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                       placeholder="Masukkan indikator kinerja"
                     />
                   </div>
@@ -1257,7 +1071,7 @@ return (
                         })
                       }
                       rows={2}
-                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                      className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                       placeholder="Masukkan peristiwa risiko"
                     />
                   </div>
@@ -1282,7 +1096,7 @@ return (
                       kategori_risiko: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   placeholder="Masukkan kategori risiko"
                 />
               </div>
@@ -1301,7 +1115,7 @@ return (
                       area_dampak: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   placeholder="Masukkan area dampak"
                 />
               </div>
@@ -1320,7 +1134,7 @@ return (
                     })
                   }
                   rows={3}
-                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   placeholder="Masukkan penyebab"
                 />
               </div>
@@ -1339,7 +1153,7 @@ return (
                     })
                   }
                   rows={3}
-                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   placeholder="Masukkan dampak"
                 />
               </div>
@@ -1357,7 +1171,7 @@ return (
                       kemungkinan: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -1380,7 +1194,7 @@ return (
                       nilai_dampak: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -1420,7 +1234,7 @@ return (
                       prioritas_risiko: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   placeholder="Masukkan prioritas risiko"
                 />
               </div>
@@ -1442,7 +1256,7 @@ return (
                       keputusan_perlakuan: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="Mengurangi Risiko">
                     Mengurangi Risiko
@@ -1472,7 +1286,7 @@ return (
                       deskripsi_detail_perlakuan: e.target.value,
                     })
                   }
-                  className="min-h-[96px] w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                  className="min-h-[96px] w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   placeholder="Jelaskan rencana perlakuan risiko"
                 />
               </div>
@@ -1491,7 +1305,7 @@ return (
                       waktu_rencana_perlakuan: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 />
               </div>
 
@@ -1508,7 +1322,7 @@ return (
                       penanggung_jawab_id: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="">
                     Pilih Penanggung Jawab
@@ -1540,7 +1354,7 @@ return (
                       level_kemungkinan_residual: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -1563,7 +1377,7 @@ return (
                       level_dampak_residual: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -1606,7 +1420,7 @@ return (
                       layanan_id: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="">
                     Pilih layanan pendukung
@@ -1633,7 +1447,7 @@ return (
                       layanan_prioritas_id: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="">
                     Pilih layanan prioritas
@@ -1660,7 +1474,7 @@ return (
                       pemilik_layanan: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="">
                     Pilih pemilik layanan
@@ -1690,7 +1504,7 @@ return (
                       strategis_operasional: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-blue-500"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="">
                     Pilih tipe risiko
@@ -1799,7 +1613,7 @@ return (
                 onClick={() =>
                   setCurrentStep((prev) => Math.min(prev + 1, 5))
                 }
-                className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
+                className="rounded-md bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700"
               >
                 Selanjutnya
               </button>
@@ -1808,38 +1622,42 @@ return (
                 key="submit-button"
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f] disabled:opacity-50"
+                className="rounded-md bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
               >
                 {saving ? 'Menyimpan...' : 'Simpan Risiko'}
               </button>
             )}
           </div>
         </form>
+          </div>
+        </div>
       </div>
     )}
 
     {selectedRisiko && (
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Detail Risiko
-            </h3>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-xl">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Detail Risiko
+              </h3>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {selectedRisiko.kode_risiko || '-'}
-            </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {selectedRisiko.kode_risiko || '-'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedRisiko(null)}
+              className="text-xl text-slate-400 hover:text-slate-600"
+            >
+              ×
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSelectedRisiko(null)}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Tutup
-          </button>
-        </div>
-
+          <div className="p-6">
         <div className="space-y-8">
           <section className="border-t border-slate-200 pt-5">
             <h4 className="mb-4 text-sm font-bold text-slate-900">
@@ -2161,12 +1979,13 @@ return (
             </div>
           </section>
         </div>
+          </div>
+        </div>
       </div>
     )}
 
-    {!showForm && !selectedRisiko && (
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-base font-semibold text-slate-900">
               Daftar Profil dan Penilaian Risiko
@@ -2216,16 +2035,16 @@ return (
                 setSelectedIppdIds([]);
                 setShowForm(true);
               }}
-              className="shrink-0 rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#24385f]"
+              className="shrink-0 rounded-md bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
             >
               Tambah Data
             </button>
           )}
         </div>
 
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
               Kategori Risiko
             </label>
 
@@ -2234,7 +2053,7 @@ return (
               onChange={(e) =>
                 setKategoriFilter(e.target.value)
               }
-              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
             >
               <option value="Semua">
                 Semua Kategori
@@ -2252,7 +2071,7 @@ return (
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
               Status Risiko
             </label>
 
@@ -2261,7 +2080,7 @@ return (
               onChange={(e) =>
                 setStatusFilter(e.target.value)
               }
-              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
             >
               <option value="Semua">
                 Semua Status
@@ -2282,7 +2101,7 @@ return (
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
               Pencarian
             </label>
 
@@ -2293,7 +2112,7 @@ return (
                 setSearch(e.target.value)
               }
               placeholder="Cari kode, risiko, atau kategori..."
-              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500"
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
             />
           </div>
         </div>
@@ -2303,39 +2122,39 @@ return (
             Memuat data risiko...
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1150px] border-collapse text-left">
-              <thead>
-                <tr className="bg-slate-50 text-sm font-semibold text-slate-700">
-                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1450px] border-collapse text-left">
+              <thead className="bg-slate-50">
+                <tr className="border-b border-slate-200">
+                  <th className="px-4 py-3 text-center">
                     No
                   </th>
 
-                  <th className="w-[120px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[120px] px-4 py-3 text-center">
                     Kode Risiko
                   </th>
 
-                  <th className="w-[300px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[300px] px-4 py-3 text-center">
                     Peristiwa Risiko
                   </th>
 
-                  <th className="w-[150px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[150px] px-4 py-3 text-center">
                     Kategori Risiko
                   </th>
 
-                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center">
                     Besaran Risiko
                   </th>
 
-                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center">
                     Prioritas
                   </th>
 
-                  <th className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center">
                     Status Risiko
                   </th>
 
-                  <th className="border-b border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[150px] px-4 py-3 text-center">
                     Aksi
                   </th>
                 </tr>
@@ -2348,27 +2167,27 @@ return (
                       key={item.id}
                       className="hover:bg-slate-50"
                     >
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         {index + 1}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 font-semibold text-slate-900">
+                      <td className="px-4 py-3 font-semibold text-slate-900">
                         {item.kode_risiko || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.peristiwa_risiko || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.kategori_risiko || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">
+                      <td className="px-4 py-3 text-center font-semibold text-slate-900">
                         {item.besaran_risiko ?? '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         {item.prioritas_risiko ? (
                           <span
                             className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getPrioritasClass(
@@ -2384,7 +2203,7 @@ return (
                         )}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         <span
                           className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getStatusClass(
                             item.status_risiko || 'Draft'
@@ -2394,13 +2213,13 @@ return (
                         </span>
                       </td>
 
-                      <td className="border-b border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
                             onClick={() => handleDetail(item.id)}
                             disabled={loadingDetail}
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
                           >
                             Detail
                           </button>
@@ -2410,87 +2229,46 @@ return (
                               type="button"
                               onClick={() =>
                                 setOpenActionId((prev) =>
-                                  prev === item.id
-                                    ? null
-                                    : item.id
+                                  prev === item.id ? null : item.id
                                 )
                               }
-                              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                             >
-                              ⋮
+                              Lainnya
+                              <span className="text-[10px] text-slate-500">▼</span>
                             </button>
 
                             {openActionId === item.id && (
-                              <div className="absolute right-0 z-20 mt-2 w-36 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                                {canUpdate &&
-                                  item.status_risiko === 'Draft' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenActionId(null);
-                                        handleEdit(item.id);
-                                      }}
-                                      className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                                    >
-                                      Edit
-                                    </button>
-                                  )}
+                              <div className="absolute right-0 z-30 mt-2 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                                {canUpdate && item.status_risiko === "Draft" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionId(null);
+                                      handleEdit(item.id);
+                                    }}
+                                    className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
 
-                                {canDelete &&
-                                  item.status_risiko === 'Draft' && (
+                                {canDelete && item.status_risiko === "Draft" && (
+                                  <>
+                                    <div className="my-1 border-t border-slate-100" />
+
                                     <button
                                       type="button"
                                       onClick={() => {
                                         setOpenActionId(null);
                                         handleDelete(item.id);
                                       }}
-                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
                                     >
                                       Hapus
                                     </button>
-                                  )}
-
-                                {canSubmit &&
-                                  item.status_risiko === 'Draft' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenActionId(null);
-                                        handleSubmitRisiko(item.id);
-                                      }}
-                                      className="block w-full px-4 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
-                                    >
-                                      Submit
-                                    </button>
-                                  )}
-
-                                {canApprove &&
-                                  item.status_risiko === 'Diajukan' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenActionId(null);
-                                        handleApproveRisiko(item.id);
-                                      }}
-                                      className="block w-full px-4 py-2 text-left text-sm text-emerald-700 hover:bg-emerald-50"
-                                    >
-                                      Approve
-                                    </button>
-                                  )}
-
-                                {canReject &&
-                                  item.status_risiko === 'Diajukan' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenActionId(null);
-                                        handleRejectRisiko(item.id);
-                                      }}
-                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                                    >
-                                      Reject
-                                    </button>
-                                  )}
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2512,29 +2290,7 @@ return (
             </table>
           </div>
         )}
-
-        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/konteks')}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Kembali ke Penetapan Konteks
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/risiko/layanan-prioritas')}
-            className="rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
-          >
-            Lanjut ke Layanan Digital Prioritas
-            <span className="ml-2" aria-hidden="true">
-              →
-            </span>
-          </button>
-        </div>
       </div>
-    )}
   </div>
 );
 

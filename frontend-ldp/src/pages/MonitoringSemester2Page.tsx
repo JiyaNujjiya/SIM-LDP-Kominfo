@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 interface MonitoringDokumen {
   id: number;
@@ -36,6 +36,14 @@ interface PicOption {
   id: number;
   nama: string;
 }
+
+const processSteps = [
+  { number: 1, label: 'Penetapan Konteks', route: '/risiko/konteks' },
+  { number: 2, label: 'Profil & Penilaian Risiko', route: '/risiko' },
+  { number: 3, label: 'Layanan Digital Prioritas', route: '/risiko/layanan-prioritas' },
+  { number: 4, label: 'Peta Risiko', route: '/risiko/peta-risiko' },
+  { number: 5, label: 'Pemantauan & Pelaporan', route: '/risiko/monitoring/semester-1' },
+];
 
 const MonitoringSemester2Page: React.FC = () => {
   const [data, setData] = React.useState<MonitoringSemester2Item[]>([]);
@@ -412,105 +420,59 @@ const MonitoringSemester2Page: React.FC = () => {
     );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">
-          Monitoring Risiko Semester II
-        </h2>
+        <h1 className="text-2xl font-bold text-slate-800">
+          Manajemen Risiko
+        </h1>
 
         <p className="mt-1 text-sm text-slate-500">
-          Pemantauan pelaksanaan penanganan risiko pada Semester II tahun{' '}
-          {tahunSekarang}.
+          Proses 5 - Pemantauan & Pelaporan - Semester II
         </p>
       </div>
 
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center">
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko/konteks')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              1
-            </button>
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-start">
+          {processSteps.map((step, index) => {
+            const active = step.number === 5;
 
-            <button
-              type="button"
-              onClick={() => navigate('/risiko/konteks')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Penetapan Konteks
-            </button>
-          </div>
+            return (
+              <div
+                key={step.number}
+                className="flex flex-1 items-start"
+              >
+                <button
+                  type="button"
+                  onClick={() => navigate(step.route)}
+                  className="flex min-w-[110px] flex-col items-center text-center"
+                >
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
+                      active
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-300 bg-white text-slate-500'
+                    }`}
+                  >
+                    {step.number}
+                  </div>
 
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              2
-            </button>
+                  <span
+                    className={`mt-2 max-w-[150px] text-xs leading-4 ${
+                      active
+                        ? 'font-semibold text-slate-800'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Profil & Penilaian Risiko
-            </button>
-          </div>
-
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              3
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Layanan Digital Prioritas
-            </button>
-          </div>
-
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-xs text-slate-500 hover:border-slate-400"
-            >
-              4
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/risiko')}
-              className="text-xs text-slate-500 hover:text-slate-800"
-            >
-              Peta Risiko
-            </button>
-          </div>
-
-          <div className="mx-4 h-px flex-1 bg-slate-300" />
-          <div className="flex min-w-fit items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1B2A4A] text-xs font-semibold text-white">
-              5
-            </div>
-
-            <span className="text-xs text-slate-500">
-              Pemantauan dan Pelaporan
-            </span>
-          </div>
+                {index < processSteps.length - 1 && (
+                  <div className="mx-3 mt-[18px] h-px flex-1 bg-slate-200" />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -520,11 +482,20 @@ const MonitoringSemester2Page: React.FC = () => {
         </div>
       )}
 
-      {!editingItem && (
-        <>
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="p-5">
+          <h2 className="text-lg font-semibold text-slate-800">
+            Monitoring Risiko Semester II
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Pemantauan dan pelaporan risiko pada periode berjalan.
+          </p>
+        </div>
+
+        <div className="p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
+              <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
                 Status Monitoring
               </label>
 
@@ -533,7 +504,7 @@ const MonitoringSemester2Page: React.FC = () => {
                 onChange={(e) =>
                   setStatusFilter(e.target.value)
                 }
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
               >
                 <option value="Semua">
                   Semua Status
@@ -550,7 +521,7 @@ const MonitoringSemester2Page: React.FC = () => {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
+              <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
                 Pencarian
               </label>
 
@@ -561,60 +532,62 @@ const MonitoringSemester2Page: React.FC = () => {
                   setSearch(e.target.value)
                 }
                 placeholder="Cari kode risiko, peristiwa risiko, atau PIC..."
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-500"
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
               />
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
+        </div>
+
+        <div className="overflow-x-auto">
             <table className="w-full min-w-[1650px] border-collapse text-left">
-              <thead>
-                <tr className="bg-slate-50 text-sm font-semibold text-slate-700">
-                  <th className="w-[120px] border-b border-r border-slate-200 px-4 py-3 text-center">
+              <thead className="bg-slate-50">
+                <tr className="border-b border-slate-200">
+                  <th className="w-[120px] px-4 py-3 text-center">
                     Kode Risiko
                   </th>
 
-                  <th className="w-[280px] border-b border-r border-slate-200 px-4 py-3">
+                  <th className="w-[280px] px-4 py-3">
                     Peristiwa Risiko
                   </th>
 
-                  <th className="w-[150px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[150px] px-4 py-3 text-center">
                     Risiko Saat Ini
                   </th>
 
-                  <th className="w-[140px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[140px] px-4 py-3 text-center">
                     Proyeksi Risiko
                   </th>
 
-                  <th className="w-[220px] border-b border-r border-slate-200 px-4 py-3">
+                  <th className="w-[220px] px-4 py-3">
                     Perlakuan Risiko
                   </th>
 
-                  <th className="w-[260px] border-b border-r border-slate-200 px-4 py-3">
+                  <th className="w-[260px] px-4 py-3">
                     Rencana Penanganan
                   </th>
 
-                  <th className="w-[180px] border-b border-r border-slate-200 px-4 py-3">
+                  <th className="w-[180px] px-4 py-3">
                     Penanggung Jawab
                   </th>
 
-                  <th className="w-[150px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[150px] px-4 py-3 text-center">
                     Waktu Pelaksanaan
                   </th>
 
-                  <th className="w-[240px] border-b border-r border-slate-200 px-4 py-3">
+                  <th className="w-[240px] px-4 py-3">
                     Hasil Pelaksanaan
                   </th>
 
-                  <th className="w-[220px] border-b border-r border-slate-200 px-4 py-3">
+                  <th className="w-[220px] px-4 py-3">
                     Data Dukung
                   </th>
 
-                  <th className="w-[140px] border-b border-r border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[140px] px-4 py-3 text-center">
                     Status
                   </th>
 
-                  <th className="w-[120px] border-b border-slate-200 px-4 py-3 text-center">
+                  <th className="w-[120px] px-4 py-3 text-center">
                     Aksi
                   </th>
                 </tr>
@@ -645,37 +618,37 @@ const MonitoringSemester2Page: React.FC = () => {
                       key={item.risiko_id}
                       className="hover:bg-slate-50"
                     >
-                      <td className="whitespace-nowrap border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">
+                      <td className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-900">
                         {item.kode_risiko}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.peristiwa_risiko || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center font-semibold text-slate-900">
+                      <td className="px-4 py-3 text-center font-semibold text-slate-900">
                         {item.risiko_saat_ini ??
                           item.besaran_risiko ??
                           '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         {item.proyeksi_risiko ?? '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.perlakuan_risiko || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.rencana_penanganan || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.nama_penanggung_jawab || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         {item.waktu_pelaksanaan
                           ? new Date(
                               item.waktu_pelaksanaan
@@ -683,11 +656,11 @@ const MonitoringSemester2Page: React.FC = () => {
                           : '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.hasil_pelaksanaan || '-'}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3">
+                      <td className="px-4 py-3">
                         {item.dokumen &&
                         item.dokumen.length > 0 ? (
                           <div className="space-y-1">
@@ -717,7 +690,7 @@ const MonitoringSemester2Page: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="border-b border-r border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         {item.monitoring_id ? (
                           <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
                             Sudah Dimonitor
@@ -729,7 +702,7 @@ const MonitoringSemester2Page: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="border-b border-slate-200 px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center">
                         <button
                           type="button"
                           onClick={() =>
@@ -748,40 +721,40 @@ const MonitoringSemester2Page: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </>
-      )}
+      </div>
 
       {editingItem && (
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">
-                {editingItem.monitoring_id
-                  ? 'Edit Monitoring Semester II'
-                  : 'Lengkapi Monitoring Semester II'}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">
+                  {editingItem.monitoring_id
+                    ? 'Edit Monitoring Semester II'
+                    : 'Lengkapi Monitoring Semester II'}
+                </h3>
 
-              <p className="mt-1 text-sm text-slate-500">
-                {editingItem.kode_risiko}
-                {' - '}
-                {editingItem.peristiwa_risiko}
-              </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {editingItem.kode_risiko}
+                  {' - '}
+                  {editingItem.peristiwa_risiko}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={saving}
+                className="text-xl text-slate-400 hover:text-slate-600 disabled:opacity-50"
+              >
+                ×
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={saving}
-              className="text-sm font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-50"
+            <form
+              onSubmit={handleSave}
+              className="p-6"
             >
-              Tutup
-            </button>
-          </div>
-
-          <form
-            onSubmit={handleSave}
-            className="p-6"
-          >
             <section>
               <div className="mb-4">
                 <h4 className="text-sm font-bold text-slate-900">
@@ -813,7 +786,7 @@ const MonitoringSemester2Page: React.FC = () => {
                           e.target.value,
                       })
                     }
-                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   />
                 </div>
 
@@ -836,7 +809,7 @@ const MonitoringSemester2Page: React.FC = () => {
                           e.target.value,
                       })
                     }
-                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   />
                 </div>
               </div>
@@ -868,7 +841,7 @@ const MonitoringSemester2Page: React.FC = () => {
                       })
                     }
                     placeholder="Masukkan perlakuan risiko"
-                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   />
                 </div>
 
@@ -890,7 +863,7 @@ const MonitoringSemester2Page: React.FC = () => {
                       })
                     }
                     placeholder="Masukkan rencana penanganan"
-                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   />
                 </div>
 
@@ -910,7 +883,7 @@ const MonitoringSemester2Page: React.FC = () => {
                           e.target.value,
                       })
                     }
-                    className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
+                    className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   >
                     <option value="">
                       Pilih Penanggung Jawab
@@ -944,7 +917,7 @@ const MonitoringSemester2Page: React.FC = () => {
                           e.target.value,
                       })
                     }
-                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-blue-500"
+                    className="h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   />
                 </div>
               </div>
@@ -976,7 +949,7 @@ const MonitoringSemester2Page: React.FC = () => {
                       })
                     }
                     placeholder="Masukkan hasil pelaksanaan"
-                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
                   />
                 </div>
 
@@ -1024,37 +997,17 @@ const MonitoringSemester2Page: React.FC = () => {
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-[#1B2A4A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f] disabled:opacity-50"
+                className="rounded-md bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
               >
                 {saving
                   ? 'Menyimpan...'
                   : 'Simpan Monitoring'}
               </button>
             </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
-
-      <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
-        <button
-          type="button"
-          onClick={() => navigate('/risiko/peta-risiko')}
-          className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Kembali ke Monitoring Semester I
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/risiko/monitoring/semester-2')}
-          className="rounded-lg bg-[#1B2A4A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#24375f]"
-        >
-          Lanjut ke Monitoring Tahunan
-          <span className="ml-2" aria-hidden="true">
-            →
-          </span>
-        </button>
-      </div>
     </div>
   );
 };

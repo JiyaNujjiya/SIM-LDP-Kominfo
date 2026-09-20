@@ -43,6 +43,8 @@ import PermintaanRelasiPenggunaPage from "./pages/PermintaanRelasiPenggunaPage";
 import PenangananRelasiPenggunaPage from "./pages/PenangananRelasiPenggunaPage";
 import EvaluasiRelasiPenggunaPage from "./pages/EvaluasiRelasiPenggunaPage";
 
+import KelolaAkunPage from "./pages/KelolaAkunPage";
+
 export default function App() {
   const [user, setUser] = useState<any>(null);
 
@@ -108,6 +110,20 @@ export default function App() {
             <Route
               path="/dashboard"
               element={<Dashboard />}
+            />
+
+            <Route
+              path="/admin/accounts"
+              element={
+                Number(user?.role_id) === 1 ? (
+                  <KelolaAkunPage />
+                ) : (
+                  <Navigate
+                    to="/dashboard"
+                    replace
+                  />
+                )
+              }
             />
 
             {/* ================= RISIKO ================= */}

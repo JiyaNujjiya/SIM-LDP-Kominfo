@@ -71,7 +71,7 @@ const metodeOptions: MetodeAlih["metode"][] = [
 ];
 
 export default function PemanfaatanAlihPengetahuanPage() {
-  const savedUser = localStorage.getItem("user");
+  const savedUser = sessionStorage.getItem("user");
   const user = savedUser ? JSON.parse(savedUser) : null;
   const permissions: string[] = user?.permissions || [];
 
