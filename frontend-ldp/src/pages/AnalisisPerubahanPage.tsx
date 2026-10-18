@@ -15,19 +15,6 @@ type PerubahanItem = {
   periode_perencanaan?: string;
 };
 
-type RisikoItem = {
-  id: number;
-  kode_risiko: string;
-  peristiwa_risiko: string;
-  penyebab?: string | null;
-  dampak?: string | null;
-  kemungkinan?: number | null;
-  nilai_dampak?: number | null;
-  besaran_risiko?: number | null;
-  keputusan_perlakuan?: string | null;
-  prioritas_risiko?: string | null;
-};
-
 type DampakTeknisItem = {
   id: number;
   perubahan_id: number;
@@ -35,16 +22,9 @@ type DampakTeknisItem = {
   perubahan_layanan_id: number;
   kode_layanan?: string;
   nama_layanan?: string;
-  risiko_id: number;
-  kode_risiko: string;
-  peristiwa_risiko: string;
-  penyebab?: string | null;
-  dampak?: string | null;
-  kemungkinan?: number | null;
-  nilai_dampak?: number | null;
-  besaran_risiko?: number | null;
-  keputusan_perlakuan?: string | null;
-  prioritas_risiko?: string | null;
+  aspek_teknis: string;
+  uraian_dampak: string;
+  tindakan_penanganan?: string | null;
   mkb_insiden_id?: number | null;
   nama_insiden?: string | null;
   jenis_kejadian?: string | null;
@@ -144,7 +124,6 @@ export default function AnalisisPerubahanPage() {
   const [selectedPerubahan, setSelectedPerubahan] =
     useState<PerubahanItem | null>(null);
 
-  const [risikoOptions, setRisikoOptions] = useState<RisikoItem[]>([]);
   const [dampakTeknis, setDampakTeknis] = useState<DampakTeknisItem[]>([]);
   const [analisisOrganisasi, setAnalisisOrganisasi] =
     useState<AnalisisOrganisasi | null>(null);
@@ -176,7 +155,9 @@ export default function AnalisisPerubahanPage() {
     useState<DampakTeknisItem | null>(null);
 
   const [teknisForm, setTeknisForm] = useState({
-    risiko_id: '',
+    aspek_teknis: '',
+    uraian_dampak: '',
+    tindakan_penanganan: '',
   });
 
   const [showOrganisasiForm, setShowOrganisasiForm] = useState(false);
@@ -257,21 +238,6 @@ export default function AnalisisPerubahanPage() {
     }
   };
 
-  const fetchRisikoOptions = async () => {
-    try {
-      const result = await request(`${API}/risiko`);
-
-      const data = Array.isArray(result)
-        ? result
-        : Array.isArray(result.data)
-        ? result.data
-        : [];
-
-      setRisikoOptions(data);
-    } catch {
-      setRisikoOptions([]);
-    }
-  };
 
   const fetchIndikatorOrganisasi = async () => {
     try {
@@ -394,7 +360,6 @@ export default function AnalisisPerubahanPage() {
 
   useEffect(() => {
     fetchPerubahan();
-    fetchRisikoOptions();
     fetchIndikatorOrganisasi();
   }, []);
 
@@ -420,7 +385,9 @@ export default function AnalisisPerubahanPage() {
     clearNotification();
     setEditingTeknis(null);
     setTeknisForm({
-      risiko_id: '',
+      aspek_teknis: '',
+      uraian_dampak: '',
+      tindakan_penanganan: '',
     });
     setShowTeknisForm(true);
   };
@@ -429,7 +396,9 @@ export default function AnalisisPerubahanPage() {
     clearNotification();
     setEditingTeknis(item);
     setTeknisForm({
-      risiko_id: String(item.risiko_id),
+      aspek_teknis: item.aspek_teknis || '',
+      uraian_dampak: item.uraian_dampak || '',
+      tindakan_penanganan: item.tindakan_penanganan || '',
     });
     setShowTeknisForm(true);
   };
@@ -437,8 +406,13 @@ export default function AnalisisPerubahanPage() {
   const handleSaveTeknis = async () => {
     if (!selectedPerubahan) return;
 
-    if (!teknisForm.risiko_id) {
-      setError('Risiko wajib dipilih.');
+    if (!teknisForm.aspek_teknis.trim()) {
+      setError('Aspek teknis wajib diisi.');
+      return;
+    }
+
+    if (!teknisForm.uraian_dampak.trim()) {
+      setError('Uraian dampak wajib diisi.');
       return;
     }
 
@@ -447,7 +421,10 @@ export default function AnalisisPerubahanPage() {
       setSaving(true);
 
       const payload = {
-        risiko_id: Number(teknisForm.risiko_id),
+        aspek_teknis: teknisForm.aspek_teknis.trim(),
+        uraian_dampak: teknisForm.uraian_dampak.trim(),
+        tindakan_penanganan:
+          teknisForm.tindakan_penanganan.trim() || null,
         mkb_insiden_id: null,
       };
 
@@ -468,7 +445,9 @@ export default function AnalisisPerubahanPage() {
       setShowTeknisForm(false);
       setEditingTeknis(null);
       setTeknisForm({
-        risiko_id: '',
+        aspek_teknis: '',
+        uraian_dampak: '',
+        tindakan_penanganan: '',
       });
 
       await fetchDampakTeknis(selectedPerubahan.id);
@@ -488,7 +467,7 @@ export default function AnalisisPerubahanPage() {
     if (!selectedPerubahan) return;
 
     const confirmed = window.confirm(
-      `Hapus risiko "${item.kode_risiko}" dari analisis teknis?`
+      `Hapus dampak teknis "${item.aspek_teknis}"?`
     );
 
     if (!confirmed) return;
@@ -931,36 +910,38 @@ export default function AnalisisPerubahanPage() {
               className="mb-5 w-full max-w-lg rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
             />
 
-            <div>
+            <div className="overflow-x-auto">
               <table className="w-full table-fixed border-collapse text-left text-sm">
                 <thead>
-                  <th className="w-[16%] px-3 py-3">
-                    ID Perubahan
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                    <th className="w-[14%] px-3 py-3 font-semibold">
+                      ID Perubahan
                     </th>
 
-                    <th className="w-[20%] px-3 py-3">
-                    Layanan Digital
+                    <th className="w-[17%] px-3 py-3 font-semibold">
+                      Layanan Digital
                     </th>
 
-                    <th className="w-[29%] px-3 py-3">
-                    Detail Perubahan
+                    <th className="w-[24%] px-3 py-3 font-semibold">
+                      Detail Perubahan
                     </th>
 
-                    <th className="w-[10%] px-3 py-3">
-                    Klasifikasi
+                    <th className="w-[10%] px-3 py-3 font-semibold">
+                      Klasifikasi
                     </th>
 
-                    <th className="w-[9%] px-3 py-3">
-                    Lingkup
+                    <th className="w-[10%] px-3 py-3 font-semibold">
+                      Lingkup
                     </th>
 
-                    <th className="w-[9%] px-3 py-3 text-center">
-                    Status
+                    <th className="w-[12%] px-3 py-3 text-center font-semibold">
+                      Status
                     </th>
 
-                    <th className="w-[7%] px-3 py-3 text-center">
-                    Aksi
-                  </th>
+                    <th className="w-[13%] px-3 py-3 text-center font-semibold">
+                      Aksi
+                    </th>
+                  </tr>
                 </thead>
 
                 <tbody>
@@ -989,12 +970,12 @@ export default function AnalisisPerubahanPage() {
                         className="border-b border-slate-100 align-top hover:bg-slate-50"
                       >
                         <td className="px-3 py-3 align-top font-semibold text-slate-800">
-                          <span className="break-words text-xs">
+                          <span className="break-normal">
                             {item.kode_perubahan}
                           </span>
                         </td>
 
-                        <td className="break-words px-4 py-3">
+                        <td className="whitespace-normal break-words px-3 py-3">
                           <div className="font-medium text-slate-800">
                             {item.nama_layanan || '-'}
                           </div>
@@ -1006,24 +987,24 @@ export default function AnalisisPerubahanPage() {
                           )}
                         </td>
 
-                        <td className="break-words px-4 py-3">
+                        <td className="whitespace-normal break-words px-3 py-3">
                           {item.detail_perubahan}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="whitespace-normal break-words px-3 py-3">
                           {item.klasifikasi}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="whitespace-normal break-words px-3 py-3">
                           {item.lingkup}
                         </td>
 
                         <td className="px-3 py-3 align-top text-center">
                           <span
-                            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold ${getStatusClass(
-                            item.status
+                            className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(
+                              item.status
                             )}`}
-                           >
+                          >
                             {item.status}
                           </span>
                         </td>
@@ -1032,7 +1013,7 @@ export default function AnalisisPerubahanPage() {
                           <button
                             type="button"
                             onClick={() => openDetail(item)}
-                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                            className="w-[72px] rounded-md border border-slate-300 px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                           >
                             Analisis
                           </button>
@@ -1187,8 +1168,7 @@ export default function AnalisisPerubahanPage() {
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      Identifikasi risiko yang berkaitan
-                      dengan perubahan.
+                      Identifikasi dampak teknis yang timbul dari perubahan.
                     </p>
                   </div>
 
@@ -1198,7 +1178,7 @@ export default function AnalisisPerubahanPage() {
                       onClick={handleTambahTeknis}
                       className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
                     >
-                      Tambah Risiko
+                      Tambah Dampak Teknis
                     </button>
                   )}
                 </div>
@@ -1208,31 +1188,19 @@ export default function AnalisisPerubahanPage() {
                     <table className="w-full table-fixed border-collapse text-left text-sm">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
-                          <th className="w-[12%] px-3 py-3">
-                            Kode Risiko
+                          <th className="w-[25%] px-3 py-3">
+                            Aspek Teknis
                           </th>
 
-                          <th className="w-[24%] px-3 py-3">
-                            Peristiwa Risiko
+                          <th className="w-[35%] px-3 py-3">
+                            Uraian Dampak
                           </th>
 
-                          <th className="w-[18%] px-3 py-3">
-                            Penyebab
+                          <th className="w-[25%] px-3 py-3">
+                            Tindakan Penanganan
                           </th>
 
-                          <th className="w-[18%] px-3 py-3">
-                            Dampak
-                          </th>
-
-                          <th className="w-[9%] px-3 py-3">
-                            Kemungkinan
-                          </th>
-
-                          <th className="w-[9%] px-3 py-3">
-                            Nilai Dampak
-                          </th>
-
-                          <th className="w-[10%] px-3 py-3 text-center">
+                          <th className="w-[15%] px-3 py-3 text-center">
                             Aksi
                           </th>
                         </tr>
@@ -1242,7 +1210,7 @@ export default function AnalisisPerubahanPage() {
                         {dampakTeknis.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={7}
+                              colSpan={4}
                               className="py-8 text-center text-slate-400"
                             >
                               Belum ada analisis dampak teknis.
@@ -1255,27 +1223,15 @@ export default function AnalisisPerubahanPage() {
                               className="border-b border-slate-100 align-top"
                             >
                               <td className="break-words px-3 py-3 font-semibold text-slate-800">
-                                {item.kode_risiko}
+                                {item.aspek_teknis}
                               </td>
 
                               <td className="break-words px-3 py-3">
-                                {item.peristiwa_risiko}
+                                {item.uraian_dampak}
                               </td>
 
                               <td className="break-words px-3 py-3">
-                                {item.penyebab || '-'}
-                              </td>
-
-                              <td className="break-words px-3 py-3">
-                                {item.dampak || '-'}
-                              </td>
-
-                              <td className="px-3 py-3">
-                                {item.kemungkinan ?? '-'}
-                              </td>
-
-                              <td className="px-3 py-3">
-                                {item.nilai_dampak ?? '-'}
+                                {item.tindakan_penanganan || '-'}
                               </td>
 
                               <td className="px-3 py-3">
@@ -1284,9 +1240,7 @@ export default function AnalisisPerubahanPage() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        handleEditTeknis(
-                                          item
-                                        )
+                                        handleEditTeknis(item)
                                       }
                                       className="w-[70px] rounded-md border border-blue-200 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                                     >
@@ -1298,9 +1252,7 @@ export default function AnalisisPerubahanPage() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        handleDeleteTeknis(
-                                          item
-                                        )
+                                        handleDeleteTeknis(item)
                                       }
                                       className="w-[70px] rounded-md border border-red-200 px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                                     >
@@ -1385,7 +1337,7 @@ export default function AnalisisPerubahanPage() {
               </div>
             ) : null}
 
-                        {activeTab === 'organisasi' &&
+            {activeTab === 'organisasi' &&
             usesOrganisasi(selectedPerubahan) ? (
               <div>
                 <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
@@ -1602,43 +1554,72 @@ export default function AnalisisPerubahanPage() {
               </h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                Pilih risiko yang berkaitan dengan perubahan.
+                Isi dampak teknis yang berkaitan dengan perubahan.
               </p>
             </div>
 
-            <div className="p-5">
-              <label className="mb-1 block text-sm font-semibold text-slate-700">
-                Risiko
-              </label>
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Aspek Teknis
+                  <span className="text-red-500"> *</span>
+                </label>
 
-              <select
-                value={teknisForm.risiko_id}
-                onChange={(e) =>
-                  setTeknisForm({
-                    risiko_id: e.target.value,
-                  })
-                }
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-              >
-                <option value="">
-                  Pilih risiko
-                </option>
+                <input
+                  type="text"
+                  required
+                  maxLength={200}
+                  value={teknisForm.aspek_teknis}
+                  onChange={(e) =>
+                    setTeknisForm((prev) => ({
+                      ...prev,
+                      aspek_teknis: e.target.value,
+                    }))
+                  }
+                  placeholder="Contoh: Infrastruktur server"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                />
+              </div>
 
-                {risikoOptions.map((item) => (
-                  <option
-                    key={item.id}
-                    value={item.id}
-                  >
-                    {item.kode_risiko} - {item.peristiwa_risiko}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Uraian Dampak
+                  <span className="text-red-500"> *</span>
+                </label>
 
-              {risikoOptions.length === 0 && (
-                <p className="mt-2 text-xs text-amber-600">
-                  Belum ada data risiko yang dapat dipilih.
-                </p>
-              )}
+                <textarea
+                  required
+                  rows={4}
+                  value={teknisForm.uraian_dampak}
+                  onChange={(e) =>
+                    setTeknisForm((prev) => ({
+                      ...prev,
+                      uraian_dampak: e.target.value,
+                    }))
+                  }
+                  placeholder="Jelaskan dampak teknis yang mungkin terjadi."
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Tindakan Penanganan
+                </label>
+
+                <textarea
+                  rows={4}
+                  value={teknisForm.tindakan_penanganan}
+                  onChange={(e) =>
+                    setTeknisForm((prev) => ({
+                      ...prev,
+                      tindakan_penanganan: e.target.value,
+                    }))
+                  }
+                  placeholder="Tuliskan rencana penanganan atau mitigasi dampak."
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
@@ -1648,7 +1629,9 @@ export default function AnalisisPerubahanPage() {
                   setShowTeknisForm(false);
                   setEditingTeknis(null);
                   setTeknisForm({
-                    risiko_id: '',
+                    aspek_teknis: '',
+                    uraian_dampak: '',
+                    tindakan_penanganan: '',
                   });
                 }}
                 disabled={saving}
@@ -1670,7 +1653,7 @@ export default function AnalisisPerubahanPage() {
         </div>
       )}
 
-     {showOrganisasiForm && (
+      {showOrganisasiForm && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
             <div className="flex min-h-full justify-center p-4">
             <div className="my-6 w-full max-w-4xl self-start rounded-lg bg-white shadow-xl">

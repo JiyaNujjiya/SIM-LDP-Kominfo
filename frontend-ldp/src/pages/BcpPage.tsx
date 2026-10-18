@@ -32,7 +32,7 @@ export default function BcpPage() {
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 uppercase">
+          <h2 className="text-2xl font-bold text-gray-800">
             Rencana Keberlangsungan Pelayanan (BCP)
           </h2>
           <p className="text-sm text-gray-500">
@@ -41,7 +41,7 @@ export default function BcpPage() {
         </div>
         <div className="text-right">
           <span className="text-sm text-gray-600 block font-medium">Operator LDP</span>
-          <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
+          <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full">
             Operator
           </span>
         </div>

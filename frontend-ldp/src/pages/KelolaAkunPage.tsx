@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   KeyRound,
   Pencil,
@@ -7,6 +8,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+
 import API from "../api";
 
 type Account = {
@@ -16,6 +18,9 @@ type Account = {
   role: string;
   role_id: number;
   nama_role: string;
+  nama_instansi: string | null;
+  nama_unit: string | null;
+  jabatan: string | null;
   upr_instansi: string | null;
   created_at: string;
 };
@@ -31,7 +36,9 @@ type AccountForm = {
   email: string;
   password: string;
   role_id: string;
-  upr_instansi: string;
+  nama_instansi: string;
+  nama_unit: string;
+  jabatan: string;
 };
 
 const emptyForm: AccountForm = {
@@ -39,29 +46,77 @@ const emptyForm: AccountForm = {
   email: "",
   password: "",
   role_id: "",
-  upr_instansi: "",
+  nama_instansi: "",
+  nama_unit: "",
+  jabatan: "",
 };
 
 export default function KelolaAkunPage() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Account | null>(null);
-  const [resetAccount, setResetAccount] = useState<Account | null>(null);
-  const [form, setForm] = useState<AccountForm>(emptyForm);
-  const [resetPassword, setResetPassword] = useState("");
-  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [accounts, setAccounts] =
+    useState<Account[]>([]);
+
+  const [roles, setRoles] =
+    useState<Role[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [success, setSuccess] =
+    useState("");
+
+  const [modalOpen, setModalOpen] =
+    useState(false);
+
+  const [
+    resetModalOpen,
+    setResetModalOpen,
+  ] = useState(false);
+
+  const [editing, setEditing] =
+    useState<Account | null>(null);
+
+  const [
+    resetAccount,
+    setResetAccount,
+  ] = useState<Account | null>(null);
+
+  const [form, setForm] =
+    useState<AccountForm>(emptyForm);
+
+  const [
+    resetPassword,
+    setResetPassword,
+  ] = useState("");
+
+  const [
+    resetConfirmPassword,
+    setResetConfirmPassword,
+  ] = useState("");
 
   const inputClass =
     "mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500 focus:ring-1 focus:ring-slate-500";
 
   const labelClass =
     "text-sm font-medium text-slate-700";
+
+  const selectedRole =
+    roles.find(
+      (role) =>
+        String(role.id) ===
+        form.role_id
+    );
+
+  const isAdminRole =
+    selectedRole?.nama_role
+      ?.trim()
+      .toLowerCase() ===
+    "admin";
 
   const loadData = async () => {
     try {
@@ -113,17 +168,34 @@ export default function KelolaAkunPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (account: Account) => {
+  const openEdit = (
+    account: Account
+  ) => {
     setEditing(account);
 
     setForm({
-      nama: account.nama,
-      email: account.email,
-      password: "",
+      nama:
+        account.nama,
+
+      email:
+        account.email,
+
+      password:
+        "",
+
       role_id:
         String(account.role_id),
-      upr_instansi:
-        account.upr_instansi || "",
+
+      nama_instansi:
+        account.nama_instansi ||
+        account.upr_instansi ||
+        "",
+
+      nama_unit:
+        account.nama_unit || "",
+
+      jabatan:
+        account.jabatan || "",
     });
 
     setError("");
@@ -145,13 +217,62 @@ export default function KelolaAkunPage() {
     setError("");
     setSuccess("");
 
+    if (!form.nama.trim()) {
+      setError(
+        "Nama wajib diisi."
+      );
+      return;
+    }
+
+    if (!form.email.trim()) {
+      setError(
+        "Email wajib diisi."
+      );
+      return;
+    }
+
+    if (!form.role_id) {
+      setError(
+        "Role wajib dipilih."
+      );
+      return;
+    }
+
+    if (!isAdminRole) {
+      if (
+        !form.nama_instansi.trim()
+      ) {
+        setError(
+          "Instansi wajib diisi."
+        );
+        return;
+      }
+
+      if (
+        !form.nama_unit.trim()
+      ) {
+        setError(
+          "Unit / Bidang wajib diisi."
+        );
+        return;
+      }
+
+      if (
+        !form.jabatan.trim()
+      ) {
+        setError(
+          "Jabatan wajib diisi."
+        );
+        return;
+      }
+    }
+
     if (
-      !form.nama.trim() ||
-      !form.email.trim() ||
-      !form.role_id
+      !editing &&
+      !form.password
     ) {
       setError(
-        "Nama, email, dan role wajib diisi."
+        "Password wajib diisi."
       );
       return;
     }
@@ -169,19 +290,36 @@ export default function KelolaAkunPage() {
     try {
       setSaving(true);
 
+      const payload = {
+        nama:
+          form.nama.trim(),
+
+        email:
+          form.email.trim(),
+
+        role_id:
+          Number(form.role_id),
+
+        nama_instansi:
+          isAdminRole
+            ? null
+            : form.nama_instansi.trim(),
+
+        nama_unit:
+          isAdminRole
+            ? null
+            : form.nama_unit.trim(),
+
+        jabatan:
+          isAdminRole
+            ? null
+            : form.jabatan.trim(),
+      };
+
       if (editing) {
         await API.put(
           `/accounts/${editing.id}`,
-          {
-            nama:
-              form.nama.trim(),
-            email:
-              form.email.trim(),
-            role_id:
-              Number(form.role_id),
-            upr_instansi:
-              form.upr_instansi.trim(),
-          }
+          payload
         );
 
         setSuccess(
@@ -191,16 +329,9 @@ export default function KelolaAkunPage() {
         await API.post(
           "/accounts",
           {
-            nama:
-              form.nama.trim(),
-            email:
-              form.email.trim(),
+            ...payload,
             password:
               form.password,
-            role_id:
-              Number(form.role_id),
-            upr_instansi:
-              form.upr_instansi.trim(),
           }
         );
 
@@ -251,6 +382,22 @@ export default function KelolaAkunPage() {
     setError("");
     setSuccess("");
 
+    if (!resetPassword) {
+      setError(
+        "Password baru wajib diisi."
+      );
+      return;
+    }
+
+    if (
+      !resetConfirmPassword
+    ) {
+      setError(
+        "Konfirmasi password wajib diisi."
+      );
+      return;
+    }
+
     if (
       resetPassword.length < 8
     ) {
@@ -278,6 +425,7 @@ export default function KelolaAkunPage() {
         {
           password:
             resetPassword,
+
           confirmPassword:
             resetConfirmPassword,
         }
@@ -389,30 +537,38 @@ export default function KelolaAkunPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full">
+          <table className="w-full min-w-[1200px]">
             <thead className="bg-slate-50">
               <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">
                   Nama
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 text-xs font-semibold text-slate-600">
                   Email
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">
                   Role
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  UPR / Instansi
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">
+                  Instansi
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">
+                  Unit / Bidang
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold text-slate-600">
+                  Jabatan
+                </th>
+
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">
                   Dibuat
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">
                   Aksi
                 </th>
               </tr>
@@ -422,7 +578,7 @@ export default function KelolaAkunPage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="px-4 py-10 text-center text-sm text-slate-500"
                   >
                     Memuat akun...
@@ -432,7 +588,7 @@ export default function KelolaAkunPage() {
                 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="px-4 py-10 text-center text-sm text-slate-500"
                   >
                     Belum ada akun.
@@ -467,7 +623,18 @@ export default function KelolaAkunPage() {
                       </td>
 
                       <td className="px-4 py-3 text-sm text-slate-600">
-                        {account.upr_instansi ||
+                        {account.nama_instansi ||
+                          account.upr_instansi ||
+                          "-"}
+                      </td>
+
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        {account.nama_unit ||
+                          "-"}
+                      </td>
+
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        {account.jabatan ||
                           "-"}
                       </td>
 
@@ -535,7 +702,9 @@ export default function KelolaAkunPage() {
 
               <button
                 type="button"
-                onClick={closeModal}
+                onClick={
+                  closeModal
+                }
                 className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
               >
                 <X size={18} />
@@ -551,7 +720,10 @@ export default function KelolaAkunPage() {
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
                   <label className={labelClass}>
-                    Nama
+                    Nama{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -566,6 +738,7 @@ export default function KelolaAkunPage() {
                           e.target.value,
                       })
                     }
+                    required
                     className={
                       inputClass
                     }
@@ -574,7 +747,10 @@ export default function KelolaAkunPage() {
 
                 <div>
                   <label className={labelClass}>
-                    Email
+                    Email{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -589,6 +765,7 @@ export default function KelolaAkunPage() {
                           e.target.value,
                       })
                     }
+                    required
                     className={
                       inputClass
                     }
@@ -598,7 +775,10 @@ export default function KelolaAkunPage() {
                 {!editing && (
                   <div>
                     <label className={labelClass}>
-                      Password
+                      Password{" "}
+                      <span className="text-red-500">
+                        *
+                      </span>
                     </label>
 
                     <input
@@ -613,6 +793,8 @@ export default function KelolaAkunPage() {
                             e.target.value,
                         })
                       }
+                      minLength={8}
+                      required
                       className={
                         inputClass
                       }
@@ -626,20 +808,58 @@ export default function KelolaAkunPage() {
 
                 <div>
                   <label className={labelClass}>
-                    Role
+                    Role{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <select
                     value={
                       form.role_id
                     }
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const value =
+                        e.target.value;
+
+                      const selected =
+                        roles.find(
+                          (role) =>
+                            String(
+                              role.id
+                            ) ===
+                            value
+                        );
+
+                      const adminSelected =
+                        selected?.nama_role
+                          ?.trim()
+                          .toLowerCase() ===
+                        "admin";
+
                       setForm({
                         ...form,
+
                         role_id:
-                          e.target.value,
-                      })
-                    }
+                          value,
+
+                        nama_instansi:
+                          adminSelected
+                            ? ""
+                            : form.nama_instansi,
+
+                        nama_unit:
+                          adminSelected
+                            ? ""
+                            : form.nama_unit,
+
+                        jabatan:
+                          adminSelected
+                            ? ""
+                            : form.jabatan,
+                      });
+                    }}
+                    required
                     className={
                       inputClass
                     }
@@ -667,29 +887,93 @@ export default function KelolaAkunPage() {
                   </select>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className={labelClass}>
-                    UPR / Instansi
-                  </label>
+                {!isAdminRole && (
+                  <>
+                    <div>
+                      <label className={labelClass}>
+                        Instansi{" "}
+                        <span className="text-red-500">
+                          *
+                        </span>
+                      </label>
 
-                  <input
-                    type="text"
-                    value={
-                      form.upr_instansi
-                    }
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        upr_instansi:
-                          e.target.value,
-                      })
-                    }
-                    placeholder="Contoh: Dinas Komunikasi dan Informatika"
-                    className={
-                      inputClass
-                    }
-                  />
-                </div>
+                      <input
+                        type="text"
+                        value={
+                          form.nama_instansi
+                        }
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            nama_instansi:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: Dinas Komunikasi dan Informatika"
+                        required
+                        className={
+                          inputClass
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>
+                        Unit / Bidang{" "}
+                        <span className="text-red-500">
+                          *
+                        </span>
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          form.nama_unit
+                        }
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            nama_unit:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: Bidang Aplikasi dan Informatika"
+                        required
+                        className={
+                          inputClass
+                        }
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className={labelClass}>
+                        Jabatan{" "}
+                        <span className="text-red-500">
+                          *
+                        </span>
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          form.jabatan
+                        }
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            jabatan:
+                              e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: Kepala Bidang Aplikasi dan Informatika"
+                        required
+                        className={
+                          inputClass
+                        }
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-5">
@@ -705,7 +989,9 @@ export default function KelolaAkunPage() {
 
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={
+                    saving
+                  }
                   className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
                 >
                   {saving
@@ -754,7 +1040,10 @@ export default function KelolaAkunPage() {
               >
                 <div>
                   <label className={labelClass}>
-                    Password Baru
+                    Password Baru{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -767,6 +1056,8 @@ export default function KelolaAkunPage() {
                         e.target.value
                       )
                     }
+                    minLength={8}
+                    required
                     className={
                       inputClass
                     }
@@ -775,7 +1066,10 @@ export default function KelolaAkunPage() {
 
                 <div className="mt-4">
                   <label className={labelClass}>
-                    Konfirmasi Password
+                    Konfirmasi Password{" "}
+                    <span className="text-red-500">
+                      *
+                    </span>
                   </label>
 
                   <input
@@ -788,6 +1082,8 @@ export default function KelolaAkunPage() {
                         e.target.value
                       )
                     }
+                    minLength={8}
+                    required
                     className={
                       inputClass
                     }

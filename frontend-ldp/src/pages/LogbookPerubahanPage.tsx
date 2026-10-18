@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 type PerubahanItem = {
@@ -126,6 +126,7 @@ export default function LogbookPerubahanPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
 
   const [showLogbookForm, setShowLogbookForm] =
     useState(false);
@@ -363,6 +364,7 @@ export default function LogbookPerubahanPage() {
   const openTambahLogbook = () => {
     clearNotification();
     resetLogbookForm();
+    setModalError("");
     setShowLogbookForm(true);
   };
 
@@ -371,6 +373,7 @@ export default function LogbookPerubahanPage() {
   ) => {
     clearNotification();
 
+    setModalError("");
     setEditingLogbook(item);
 
     setLogbookForm({
@@ -393,21 +396,21 @@ export default function LogbookPerubahanPage() {
     }
 
     if (!logbookForm.tanggal_pelaksanaan) {
-      setError(
+      setModalError(
         "Tanggal pelaksanaan wajib diisi."
       );
       return;
     }
 
     if (!logbookForm.catatan.trim()) {
-      setError("Catatan wajib diisi.");
+      setModalError("Catatan wajib diisi.");
       return;
     }
 
     if (
       !logbookForm.status_perubahan.trim()
     ) {
-      setError(
+      setModalError(
         "Status perubahan wajib diisi."
       );
       return;
@@ -417,7 +420,7 @@ export default function LogbookPerubahanPage() {
       logbookForm.status_perubahan.trim()
         .length > 50
     ) {
-      setError(
+      setModalError(
         "Status perubahan maksimal 50 karakter."
       );
       return;
@@ -425,6 +428,7 @@ export default function LogbookPerubahanPage() {
 
     try {
       clearNotification();
+      setModalError("");
       setSaving(true);
 
       const payload = {
@@ -472,7 +476,7 @@ export default function LogbookPerubahanPage() {
         );
       }
     } catch (err) {
-      setError(
+      setModalError(
         err instanceof Error
           ? err.message
           : "Gagal menyimpan logbook perubahan."
@@ -537,6 +541,7 @@ export default function LogbookPerubahanPage() {
   ) => {
     clearNotification();
     setEditingBukti(null);
+    setModalError("");
     setSelectedLogbookForBukti(item);
     setBuktiForm(initialBuktiForm);
     setShowBuktiForm(true);
@@ -552,6 +557,7 @@ export default function LogbookPerubahanPage() {
       logbookItem
     );
 
+    setModalError("");
     setEditingBukti(bukti);
 
     setBuktiForm({
@@ -574,14 +580,14 @@ export default function LogbookPerubahanPage() {
     }
 
     if (!buktiForm.nama_bukti.trim()) {
-      setError(
+      setModalError(
         "Nama bukti wajib diisi."
       );
       return;
     }
 
     if (!buktiForm.lokasi_bukti.trim()) {
-      setError(
+      setModalError(
         "Lokasi bukti wajib diisi."
       );
       return;
@@ -589,6 +595,7 @@ export default function LogbookPerubahanPage() {
 
     try {
       clearNotification();
+      setModalError("");
       setSaving(true);
 
       const payload = {
@@ -627,7 +634,7 @@ export default function LogbookPerubahanPage() {
 
       await fetchBukti(logbookId);
     } catch (err) {
-      setError(
+      setModalError(
         err instanceof Error
           ? err.message
           : "Gagal menyimpan bukti pelaksanaan."
@@ -808,7 +815,7 @@ export default function LogbookPerubahanPage() {
         </div>
       )}
 
-      {error && (
+      {error && !showLogbookForm && !showBuktiForm && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
@@ -816,111 +823,69 @@ export default function LogbookPerubahanPage() {
 
       {!selectedPerubahan ? (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800">
-                Daftar Perubahan
-              </h2>
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-lg font-semibold text-slate-900">Daftar Perubahan</h2>
+            <p className="mt-1 text-sm text-slate-500">Pilih perubahan yang akan dicatat ke dalam logbook.</p>
+          </div>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Pilih perubahan yang akan dicatat ke dalam logbook.
-              </p>
-            </div>
-
+          <div className="p-5">
             <input
               type="text"
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Cari perubahan..."
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:w-72"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari ID perubahan, layanan, detail, lingkup, klasifikasi, atau status..."
+              className="mb-5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:max-w-md"
             />
-          </div>
 
-          {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              Memuat data perubahan...
-            </div>
-          ) : filteredPerubahan.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              Tidak ada perubahan yang dapat dicatat.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
-                    <th className="w-[18%] px-4 py-3 font-semibold">
-                      ID Perubahan
-                    </th>
-                    <th className="w-[20%] px-4 py-3 font-semibold">
-                      Layanan
-                    </th>
-                    <th className="w-[30%] px-4 py-3 font-semibold">
-                      Detail Perubahan
-                    </th>
-                    <th className="w-[12%] px-4 py-3 font-semibold">
-                      Klasifikasi
-                    </th>
-                    <th className="w-[10%] px-4 py-3 font-semibold">
-                      Status
-                    </th>
-                    <th className="w-[10%] px-4 py-3 text-center font-semibold">
-                      Aksi
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-200">
-                  {filteredPerubahan.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="align-top hover:bg-slate-50"
-                    >
-                      <td className="break-words px-4 py-4 font-medium text-slate-800">
-                        {item.kode_perubahan}
-                      </td>
-
-                      <td className="break-words px-4 py-4 text-slate-600">
-                        {item.nama_layanan || "-"}
-                      </td>
-
-                      <td className="break-words px-4 py-4 text-slate-600">
-                        {item.detail_perubahan}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {item.klasifikasi}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
-                            item.status
-                          )}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openDetail(item)
-                          }
-                          className="rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
-                        >
-                          Buka
-                        </button>
-                      </td>
+            {loading ? (
+              <div className="py-8 text-center text-sm text-slate-500">Memuat data perubahan...</div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full min-w-[900px] table-fixed text-sm">
+                  <thead className="bg-slate-50 text-left font-semibold text-slate-700">
+                    <tr>
+                      <th className="w-[13%] px-4 py-3 font-semibold">ID Perubahan</th>
+                      <th className="w-[19%] px-4 py-3 font-semibold">Layanan Digital</th>
+                      <th className="w-[27%] px-4 py-3 font-semibold">Detail Perubahan</th>
+                      <th className="w-[11%] px-4 py-3 font-semibold">Klasifikasi</th>
+                      <th className="w-[10%] px-4 py-3 font-semibold">Lingkup</th>
+                      <th className="w-[10%] px-4 py-3 text-center font-semibold">Status</th>
+                      <th className="w-[10%] px-4 py-3 text-center font-semibold">Aksi</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {filteredPerubahan.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Tidak ada perubahan yang dapat dicatat.</td></tr>
+                    ) : (
+                      filteredPerubahan.map((item) => (
+                        <tr key={item.id} className="align-top hover:bg-slate-50">
+                          <td className="break-words px-4 py-4 font-semibold text-slate-800">{item.kode_perubahan}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.nama_layanan || "-"}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.detail_perubahan}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.klasifikasi}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.lingkup || "-"}</td>
+                          <td className="px-4 py-4 text-center">
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(item.status)}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => openDetail(item)}
+                              className="whitespace-nowrap rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Logbook
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div>
@@ -1118,219 +1083,90 @@ export default function LogbookPerubahanPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-200">
-                    {logbook.map((item, index) => {
-                      const bukti =
-                        buktiMap[item.id] || [];
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="p-5"
-                        >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Pencatatan {index + 1}
-                              </p>
-
-                              <h4 className="mt-1 text-base font-semibold text-slate-800">
-                                {formatDate(
-                                  item.tanggal_pelaksanaan
-                                )}
-                              </h4>
-
-                              {item.dibuat_oleh && (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Dicatat oleh{" "}
-                                  {item.dibuat_oleh}
-                                </p>
-                              )}
-                            </div>
-
-                            {(canUpdate ||
-                              canDelete) && (
-                              <div className="flex gap-2">
-                                {canUpdate && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      openEditLogbook(
-                                        item
-                                      )
-                                    }
-                                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                  >
-                                    Edit
-                                  </button>
-                                )}
-
-                                {canDelete && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteLogbook(
-                                        item
-                                      )
-                                    }
-                                    className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                                  >
-                                    Hapus
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="mt-5 grid gap-5 lg:grid-cols-3">
-                            <div className="lg:col-span-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Catatan
-                              </p>
-
-                              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                                {item.catatan}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Status Perubahan
-                              </p>
-
-                              <p className="mt-2 text-sm font-semibold text-slate-800">
-                                {item.status_perubahan}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-6 border-t border-slate-200 pt-5">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <h5 className="text-sm font-semibold text-slate-800">
-                                  Bukti Pelaksanaan
-                                </h5>
-
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Foto, video, atau dokumen pendukung perubahan.
-                                </p>
-                              </div>
-
-                              {canCreate && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openTambahBukti(item)
-                                  }
-                                  className="w-fit rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                >
-                                  Tambah Bukti
-                                </button>
-                              )}
-                            </div>
-
-                            {bukti.length === 0 ? (
-                              <p className="mt-4 text-sm text-slate-500">
-                                Belum ada bukti pelaksanaan.
-                              </p>
-                            ) : (
-                              <div className="mt-4 overflow-x-auto rounded-md border border-slate-200">
-                                <table className="w-full table-fixed text-sm">
-                                  <thead className="bg-slate-50 text-left text-slate-600">
-                                    <tr>
-                                      <th className="w-[14%] px-3 py-3 font-semibold">
-                                        Jenis
-                                      </th>
-                                      <th className="w-[24%] px-3 py-3 font-semibold">
-                                        Nama Bukti
-                                      </th>
-                                      <th className="w-[28%] px-3 py-3 font-semibold">
-                                        Lokasi Bukti
-                                      </th>
-                                      <th className="w-[22%] px-3 py-3 font-semibold">
-                                        Keterangan
-                                      </th>
-                                      <th className="w-[12%] px-3 py-3 text-center font-semibold">
-                                        Aksi
-                                      </th>
-                                    </tr>
-                                  </thead>
-
-                                  <tbody className="divide-y divide-slate-200">
-                                    {bukti.map(
-                                      (buktiItem) => (
-                                        <tr
-                                          key={
-                                            buktiItem.id
-                                          }
-                                          className="align-top"
-                                        >
-                                          <td className="px-3 py-3 text-slate-600">
-                                            {
-                                              buktiItem.jenis_bukti
-                                            }
-                                          </td>
-
-                                          <td className="break-words px-3 py-3 text-slate-700">
-                                            {
-                                              buktiItem.nama_bukti
-                                            }
-                                          </td>
-
-                                          <td className="break-words px-3 py-3 text-slate-600">
-                                            {
-                                              buktiItem.lokasi_bukti
-                                            }
-                                          </td>
-
-                                          <td className="break-words px-3 py-3 text-slate-600">
-                                            {buktiItem.keterangan ||
-                                              "-"}
-                                          </td>
-
-                                          <td className="px-3 py-3">
-                                            <div className="flex justify-center gap-2">
-                                              {canUpdate && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    openEditBukti(
-                                                      item,
-                                                      buktiItem
-                                                    )
-                                                  }
-                                                  className="text-xs font-semibold text-slate-700 hover:text-slate-900"
-                                                >
-                                                  Edit
-                                                </button>
-                                              )}
-
-                                              {canDelete && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    handleDeleteBukti(
-                                                      buktiItem
-                                                    )
-                                                  }
-                                                  className="text-xs font-semibold text-red-600 hover:text-red-700"
-                                                >
-                                                  Hapus
-                                                </button>
-                                              )}
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      )
+                  <div className="overflow-x-auto p-5">
+                    <table className="w-full min-w-[900px] table-fixed text-sm">
+                      <thead className="bg-slate-50 text-left text-slate-700">
+                        <tr>
+                          <th className="w-[15%] px-4 py-3 font-semibold">Tanggal</th>
+                          <th className="w-[35%] px-4 py-3 font-semibold">Catatan</th>
+                          <th className="w-[17%] px-4 py-3 font-semibold">Status Perubahan</th>
+                          <th className="w-[13%] px-4 py-3 font-semibold">Pencatat</th>
+                          <th className="w-[20%] px-4 py-3 text-center font-semibold">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {logbook.map((item) => {
+                          const bukti = buktiMap[item.id] || [];
+                          return (
+                            <Fragment key={item.id}>
+                              <tr className="align-top hover:bg-slate-50">
+                                <td className="break-words px-4 py-4 text-slate-700">{formatDate(item.tanggal_pelaksanaan)}</td>
+                                <td className="whitespace-pre-wrap break-words px-4 py-4 text-slate-700">{item.catatan}</td>
+                                <td className="break-words px-4 py-4 text-slate-700">{item.status_perubahan}</td>
+                                <td className="break-words px-4 py-4 text-slate-600">{item.dibuat_oleh || "-"}</td>
+                                <td className="px-4 py-4">
+                                  <div className="flex flex-wrap justify-center gap-2">
+                                    {canUpdate && (
+                                      <button type="button" onClick={() => openEditLogbook(item)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
                                     )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                                    {canDelete && (
+                                      <button type="button" onClick={() => handleDeleteLogbook(item)} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">Hapus</button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              <tr className="bg-slate-50/40">
+                                <td colSpan={5} className="px-4 py-4">
+                                  <div className="mb-3 flex items-center justify-between gap-3">
+                                    <span className="font-semibold text-slate-800">Bukti Pelaksanaan</span>
+                                    {canCreate && (
+                                      <button type="button" onClick={() => openTambahBukti(item)} className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-white">Tambah Bukti</button>
+                                    )}
+                                  </div>
+                                  {bukti.length === 0 ? (
+                                    <p className="text-sm text-slate-500">Belum ada bukti pelaksanaan.</p>
+                                  ) : (
+                                    <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+                                      <table className="w-full min-w-[700px] table-fixed text-sm">
+                                        <thead className="bg-slate-50 text-left text-slate-700">
+                                          <tr>
+                                            <th className="w-[14%] px-3 py-3 font-semibold">Jenis</th>
+                                            <th className="w-[24%] px-3 py-3 font-semibold">Nama Bukti</th>
+                                            <th className="w-[28%] px-3 py-3 font-semibold">Lokasi Bukti</th>
+                                            <th className="w-[22%] px-3 py-3 font-semibold">Keterangan</th>
+                                            <th className="w-[12%] px-3 py-3 text-center font-semibold">Aksi</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200">
+                                          {bukti.map((buktiItem) => (
+                                            <tr key={buktiItem.id} className="align-top">
+                                              <td className="break-words px-3 py-3 text-slate-700">{buktiItem.jenis_bukti}</td>
+                                              <td className="break-words px-3 py-3 text-slate-700">{buktiItem.nama_bukti}</td>
+                                              <td className="break-words px-3 py-3 text-slate-700">{buktiItem.lokasi_bukti}</td>
+                                              <td className="break-words px-3 py-3 text-slate-700">{buktiItem.keterangan || "-"}</td>
+                                              <td className="px-3 py-3">
+                                                <div className="flex flex-wrap justify-center gap-2">
+                                                  {canUpdate && (
+                                                    <button type="button" onClick={() => openEditBukti(item, buktiItem)} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">Edit</button>
+                                                  )}
+                                                  {canDelete && (
+                                                    <button type="button" onClick={() => handleDeleteBukti(buktiItem)} className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600">Hapus</button>
+                                                  )}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -1351,9 +1187,14 @@ export default function LogbookPerubahanPage() {
             </div>
 
             <div className="space-y-5 p-6">
+              {modalError && (
+                <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {modalError}
+                </div>
+              )}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Tanggal Pelaksanaan
+                  Tanggal Pelaksanaan <span className="text-red-600">*</span>
                 </label>
 
                 <input
@@ -1374,7 +1215,7 @@ export default function LogbookPerubahanPage() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Catatan
+                  Catatan <span className="text-red-600">*</span>
                 </label>
 
                 <textarea
@@ -1393,7 +1234,7 @@ export default function LogbookPerubahanPage() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Status Perubahan
+                  Status Perubahan <span className="text-red-600">*</span>
                 </label>
 
                 <input
@@ -1421,6 +1262,7 @@ export default function LogbookPerubahanPage() {
                 disabled={saving}
                 onClick={() => {
                   setShowLogbookForm(false);
+                  setModalError("");
                   resetLogbookForm();
                 }}
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -1455,9 +1297,14 @@ export default function LogbookPerubahanPage() {
             </div>
 
             <div className="space-y-5 p-6">
+              {modalError && (
+                <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {modalError}
+                </div>
+              )}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Jenis Bukti
+                  Jenis Bukti <span className="text-red-600">*</span>
                 </label>
 
                 <select
@@ -1488,7 +1335,7 @@ export default function LogbookPerubahanPage() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Nama Bukti
+                  Nama Bukti <span className="text-red-600">*</span>
                 </label>
 
                 <input
@@ -1507,7 +1354,7 @@ export default function LogbookPerubahanPage() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Lokasi Bukti
+                  Lokasi Bukti <span className="text-red-600">*</span>
                 </label>
 
                 <input
@@ -1551,6 +1398,7 @@ export default function LogbookPerubahanPage() {
                 disabled={saving}
                 onClick={() => {
                   setShowBuktiForm(false);
+                  setModalError("");
                   resetBuktiForm();
                 }}
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"

@@ -14,6 +14,7 @@ const relasiPenggunaRoutes = require('./routes/relasiPenggunaRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const accountRoutes = require('./routes/accountRoutes');
+const laporanEksporRoutes = require('./routes/laporanEksporRoutes');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/tiketing', tiketingRoutes);
 app.use('/api/relasi-pengguna', relasiPenggunaRoutes);
 app.use('/api/pengetahuan', pengetahuanRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/laporan-ekspor', laporanEksporRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/accounts', accountRoutes);
 

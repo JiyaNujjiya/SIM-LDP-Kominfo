@@ -79,6 +79,7 @@ export default function EvaluasiPengetahuanPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [evaluasiFormError, setEvaluasiFormError] = useState("");
   const [search, setSearch] = useState("");
 
   const [showForm, setShowForm] = useState(false);
@@ -298,12 +299,14 @@ export default function EvaluasiPengetahuanPage() {
 
   const handleTambah = () => {
     clearNotification();
+    setEvaluasiFormError("");
     resetForm();
     setShowForm(true);
   };
 
   const handleEdit = (item: EvaluasiItem) => {
     clearNotification();
+    setEvaluasiFormError("");
 
     setEditingItem(item);
 
@@ -349,109 +352,92 @@ export default function EvaluasiPengetahuanPage() {
       : null;
 
   const handleSave = async () => {
-    try {
-      clearNotification();
+  try {
+    clearNotification();
+    setEvaluasiFormError("");
 
-      if (!form.indikator_perencanaan_id) {
-        setError(
-          "Indikator perencanaan wajib dipilih."
-        );
-        return;
-      }
-
-      if (!form.tanggal_evaluasi) {
-        setError(
-          "Tanggal evaluasi wajib diisi."
-        );
-        return;
-      }
-
-      if (form.nilai_realisasi === "") {
-        setError(
-          "Nilai realisasi wajib diisi."
-        );
-        return;
-      }
-
-      const realisasi = Number(
-        form.nilai_realisasi
-      );
-
-      if (
-        !Number.isFinite(realisasi) ||
-        realisasi < 0 ||
-        realisasi > 100
-      ) {
-        setError(
-          "Nilai realisasi harus berada antara 0 sampai 100."
-        );
-        return;
-      }
-
-      if (!form.pelaksana_terkait.trim()) {
-        setError(
-          "Pelaksana terkait wajib diisi."
-        );
-        return;
-      }
-
-      if (
-        form.pelaksana_terkait.trim()
-          .length > 255
-      ) {
-        setError(
-          "Pelaksana terkait maksimal 255 karakter."
-        );
-        return;
-      }
-
-      setSaving(true);
-
-      const payload = {
-        indikator_perencanaan_id: Number(
-          form.indikator_perencanaan_id
-        ),
-        tanggal_evaluasi:
-          form.tanggal_evaluasi,
-        nilai_realisasi: realisasi,
-        analisis:
-          form.analisis.trim() || null,
-        tindak_lanjut:
-          form.tindak_lanjut.trim() || null,
-        pelaksana_terkait:
-          form.pelaksana_terkait.trim(),
-      };
-
-      const url = editingItem
-        ? `${API}/pengetahuan/evaluasi/${editingItem.id}`
-        : `${API}/pengetahuan/evaluasi`;
-
-      const result = await request(url, {
-        method: editingItem
-          ? "PUT"
-          : "POST",
-        body: JSON.stringify(payload),
-      });
-
-      setMessage(
-        result?.message ||
-          "Data evaluasi berhasil disimpan."
-      );
-
-      setShowForm(false);
-      resetForm();
-
-      await fetchEvaluasi();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Gagal menyimpan data evaluasi."
-      );
-    } finally {
-      setSaving(false);
+    if (!form.indikator_perencanaan_id) {
+      setEvaluasiFormError("Indikator Manajemen Pengetahuan wajib dipilih.");
+      return;
     }
-  };
+
+    if (!form.tanggal_evaluasi) {
+      setEvaluasiFormError("Tanggal Evaluasi wajib diisi.");
+      return;
+    }
+
+    if (form.nilai_realisasi.trim() === "") {
+      setEvaluasiFormError("Realisasi wajib diisi.");
+      return;
+    }
+
+    const realisasi = Number(form.nilai_realisasi);
+
+    if (
+      !Number.isFinite(realisasi) ||
+      realisasi < 0 ||
+      realisasi > 100
+    ) {
+      setEvaluasiFormError("Realisasi harus berada antara 0 sampai 100.");
+      return;
+    }
+
+    if (!form.analisis.trim()) {
+      setEvaluasiFormError("Analisis wajib diisi.");
+      return;
+    }
+
+    if (!form.tindak_lanjut.trim()) {
+      setEvaluasiFormError("Tindak Lanjut wajib diisi.");
+      return;
+    }
+
+    if (!form.pelaksana_terkait.trim()) {
+      setEvaluasiFormError("Pelaksana Terkait wajib diisi.");
+      return;
+    }
+
+    if (form.pelaksana_terkait.trim().length > 255) {
+      setEvaluasiFormError("Pelaksana Terkait maksimal 255 karakter.");
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      indikator_perencanaan_id: Number(form.indikator_perencanaan_id),
+      tanggal_evaluasi: form.tanggal_evaluasi,
+      nilai_realisasi: realisasi,
+      analisis: form.analisis.trim(),
+      tindak_lanjut: form.tindak_lanjut.trim(),
+      pelaksana_terkait: form.pelaksana_terkait.trim(),
+    };
+
+    const url = editingItem
+      ? `${API}/pengetahuan/evaluasi/${editingItem.id}`
+      : `${API}/pengetahuan/evaluasi`;
+
+    const result = await request(url, {
+      method: editingItem ? "PUT" : "POST",
+      body: JSON.stringify(payload),
+    });
+
+    setMessage(result?.message || "Data evaluasi berhasil disimpan.");
+    setShowForm(false);
+    resetForm();
+    setEvaluasiFormError("");
+
+    await fetchEvaluasi();
+  } catch (err) {
+    setEvaluasiFormError(
+      err instanceof Error
+        ? err.message
+        : "Gagal menyimpan data evaluasi."
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleDelete = async (
     item: EvaluasiItem
@@ -833,6 +819,12 @@ export default function EvaluasiPengetahuanPage() {
                   ? "Edit Evaluasi"
                   : "Tambah Evaluasi"}
               </h3>
+
+              {evaluasiFormError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {evaluasiFormError}
+                </div>
+              )}
             </div>
 
             <div className="grid gap-5 p-5 md:grid-cols-2">

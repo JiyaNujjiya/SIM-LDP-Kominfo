@@ -1,506 +1,386 @@
 const db = require('../config/db');
 
+
+const getDashboardScope = async (req) => {
+    const userId = Number(req.user?.id);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+        const error = new Error('Pengguna belum terautentikasi.');
+        error.status = 401;
+        throw error;
+    }
+
+    const [rows] = await db.query(
+        `
+        SELECT
+            id,
+            role_id,
+            role,
+            instansi_id
+        FROM users
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [userId]
+    );
+
+    if (!rows.length) {
+        const error = new Error('Akun pengguna tidak ditemukan.');
+        error.status = 401;
+        throw error;
+    }
+
+    const user = rows[0];
+
+    const isAdmin =
+        Number(user.role_id) === 1 ||
+        String(user.role || '').toLowerCase() === 'admin';
+
+    const instansiId = Number(user.instansi_id);
+
+    if (!isAdmin && (!Number.isInteger(instansiId) || instansiId <= 0)) {
+        const error = new Error('Akun belum memiliki instansi.');
+        error.status = 403;
+        throw error;
+    }
+
+    return {
+        userId,
+        isAdmin,
+        instansiId: isAdmin ? null : instansiId
+    };
+};
+
+
+const getScopedDashboardStats = async (scope) => {
+    const global = scope.isAdmin ? 1 : 0;
+    const instansiId = scope.instansiId;
+
+    const [
+        risikoResult,
+        risikoTerbaruResult,
+        perubahanResult,
+        pengetahuanResult,
+        bcpResult,
+        ujiResult,
+        permintaanResult,
+        kueriResult,
+        insidenResult,
+        masalahResult
+    ] = await Promise.all([
+        db.query(
+            `
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(
+                    CASE
+                        WHEN CAST(COALESCE(r.besaran_risiko, 0) AS UNSIGNED) >= 17
+                          OR LOWER(COALESCE(r.besaran_risiko, '')) IN
+                             ('tinggi', 'sangat tinggi', 'ekstrem')
+                        THEN 1 ELSE 0
+                    END
+                ), 0) AS tinggi,
+                COALESCE(SUM(r.status_risiko = 'Draft'), 0) AS draft,
+                COALESCE(SUM(r.status_risiko = 'Ditolak'), 0) AS perlu_perbaikan,
+                COALESCE(SUM(r.status_risiko = 'Diajukan'), 0) AS diajukan
+            FROM mr_risiko r
+            JOIN users u ON u.id = r.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT
+                r.id,
+                r.kode_risiko,
+                r.peristiwa_risiko,
+                r.besaran_risiko,
+                r.status_risiko,
+                r.created_at,
+                COALESCE(ld.nama_layanan, r.nama_layanan_pendukung,
+                    r.nama_layanan_prioritas) AS nama_layanan
+            FROM mr_risiko r
+            JOIN users u ON u.id = r.created_by
+            LEFT JOIN layanan_digital ld ON ld.id = r.layanan_id
+            WHERE (? = 1 OR u.instansi_id = ?)
+            ORDER BY r.created_at DESC, r.id DESC
+            LIMIT 5
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(p.status IN
+                    ('Analisis', 'Implementasi', 'Evaluasi')), 0) AS aktif,
+                COALESCE(SUM(p.status = 'Selesai'), 0) AS selesai
+            FROM mpr_perubahan p
+            JOIN users u ON u.id = p.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(p.sudah_terdokumentasi = 1), 0)
+                    AS terdokumentasi
+            FROM mpn_pengetahuan p
+            WHERE (? = 1 OR p.pemilik_instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(b.status = 'Active'), 0) AS aktif
+            FROM mkb_bcp b
+            LEFT JOIN mr_risiko r ON r.id = b.id_risiko
+            LEFT JOIN users u ON u.id = r.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM mkb_uji uj
+            JOIN mkb_insiden ins ON ins.id = uj.insiden_id
+            JOIN mkb_bia bia ON bia.id = ins.bia_id
+            LEFT JOIN mkb_layanan_prioritas ml
+                ON ml.id = bia.mkb_layanan_prioritas_id
+            LEFT JOIN layanan_prioritas lp
+                ON lp.id = bia.layanan_prioritas_id
+            LEFT JOIN layanan_digital ld
+                ON ld.id = lp.layanan_id
+            WHERE (
+                ? = 1
+                OR COALESCE(ml.instansi_id, ld.instansi_id) = ?
+            )
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM mrp_permintaan_layanan p
+            JOIN users u ON u.id = p.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM mrp_kueri k
+            JOIN users u ON u.id = k.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(i.status NOT IN
+                    ('Dipulihkan', 'Ditutup')), 0) AS aktif
+            FROM mrp_insiden i
+            JOIN users u ON u.id = i.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        ),
+
+        db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM mrp_masalah m
+            JOIN users u ON u.id = m.created_by
+            WHERE (? = 1 OR u.instansi_id = ?)
+            `,
+            [global, instansiId]
+        )
+    ]);
+
+    const risiko = risikoResult[0][0];
+    const perubahan = perubahanResult[0][0];
+    const pengetahuan = pengetahuanResult[0][0];
+    const bcp = bcpResult[0][0];
+    const uji = ujiResult[0][0];
+    const permintaan = Number(permintaanResult[0][0].total);
+    const kueri = Number(kueriResult[0][0].total);
+    const insiden = Number(insidenResult[0][0].total);
+    const masalah = Number(masalahResult[0][0].total);
+
+    const persen = (bagian, total) =>
+        total > 0
+            ? Number(((bagian / total) * 100).toFixed(1))
+            : 0;
+
+    return {
+        risiko: {
+            total: Number(risiko.total),
+            tinggi: Number(risiko.tinggi),
+            draft: Number(risiko.draft),
+            perlu_perbaikan: Number(risiko.perlu_perbaikan),
+            diajukan: Number(risiko.diajukan),
+            terbaru: risikoTerbaruResult[0]
+        },
+        perubahan: {
+            total: Number(perubahan.total),
+            aktif: Number(perubahan.aktif),
+            selesai: Number(perubahan.selesai),
+            persentase_selesai: persen(
+                Number(perubahan.selesai),
+                Number(perubahan.total)
+            )
+        },
+        pengetahuan: {
+            total: Number(pengetahuan.total),
+            terdokumentasi: Number(pengetahuan.terdokumentasi),
+            persentase_terdokumentasi: persen(
+                Number(pengetahuan.terdokumentasi),
+                Number(pengetahuan.total)
+            )
+        },
+        keberlangsungan: {
+            bcp_total: Number(bcp.total),
+            bcp_aktif: Number(bcp.aktif),
+            uji_total: Number(uji.total)
+        },
+        relasi_pengguna: {
+            permintaan,
+            kueri,
+            insiden,
+            masalah,
+            insiden_aktif: Number(insidenResult[0][0].aktif),
+            total: permintaan + kueri + insiden + masalah
+        }
+    };
+};
+
 exports.getSummary = async (req, res) => {
     try {
-        const [
-            risikoTotalRows,
-            risikoTinggiRows,
-            risikoTerbaruRows,
-            perubahanTotalRows,
-            perubahanAktifRows,
-            perubahanSelesaiRows,
-            pengetahuanTotalRows,
-            pengetahuanDokumentasiRows,
-            bcpTotalRows,
-            bcpAktifRows,
-            ujiTotalRows,
-            permintaanRows,
-            kueriRows,
-            insidenRows,
-            masalahRows,
-            insidenAktifRows
-        ] = await Promise.all([
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mr_risiko
-            `),
+        const scope = await getDashboardScope(req);
+        const result = await getScopedDashboardStats(scope);
 
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mr_risiko
-                WHERE LOWER(COALESCE(besaran_risiko, '')) IN (
-                    'tinggi',
-                    'sangat tinggi',
-                    'ekstrem'
-                )
-            `),
-
-            db.query(`
-                SELECT
-                    r.id,
-                    r.kode_risiko,
-                    r.peristiwa_risiko,
-                    r.besaran_risiko,
-                    r.status_risiko,
-                    r.created_at,
-                    ld.nama_layanan
-                FROM mr_risiko r
-                LEFT JOIN layanan_digital ld
-                    ON ld.id = r.layanan_id
-                ORDER BY r.created_at DESC, r.id DESC
-                LIMIT 5
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mpr_perubahan
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mpr_perubahan
-                WHERE status IN (
-                    'Analisis',
-                    'Implementasi',
-                    'Evaluasi'
-                )
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mpr_perubahan
-                WHERE status = 'Selesai'
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mpn_pengetahuan
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mpn_pengetahuan
-                WHERE sudah_terdokumentasi = 1
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mkb_bcp
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mkb_bcp
-                WHERE status NOT IN (
-                    'Selesai',
-                    'Tidak Aktif'
-                )
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mkb_uji
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mrp_permintaan_layanan
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mrp_kueri
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mrp_insiden
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mrp_masalah
-            `),
-
-            db.query(`
-                SELECT COUNT(*) AS total
-                FROM mrp_insiden
-                WHERE status NOT IN (
-                    'Dipulihkan',
-                    'Ditutup'
-                )
-            `)
-        ]);
-
-        const risikoTotal =
-            Number(risikoTotalRows[0][0]?.total || 0);
-
-        const risikoTinggi =
-            Number(risikoTinggiRows[0][0]?.total || 0);
-
-        const perubahanTotal =
-            Number(perubahanTotalRows[0][0]?.total || 0);
-
-        const perubahanAktif =
-            Number(perubahanAktifRows[0][0]?.total || 0);
-
-        const perubahanSelesai =
-            Number(perubahanSelesaiRows[0][0]?.total || 0);
-
-        const pengetahuanTotal =
-            Number(pengetahuanTotalRows[0][0]?.total || 0);
-
-        const pengetahuanTerdokumentasi =
-            Number(
-                pengetahuanDokumentasiRows[0][0]?.total || 0
-            );
-
-        const bcpTotal =
-            Number(bcpTotalRows[0][0]?.total || 0);
-
-        const bcpAktif =
-            Number(bcpAktifRows[0][0]?.total || 0);
-
-        const ujiTotal =
-            Number(ujiTotalRows[0][0]?.total || 0);
-
-        const permintaan =
-            Number(permintaanRows[0][0]?.total || 0);
-
-        const kueri =
-            Number(kueriRows[0][0]?.total || 0);
-
-        const insiden =
-            Number(insidenRows[0][0]?.total || 0);
-
-        const masalah =
-            Number(masalahRows[0][0]?.total || 0);
-
-        const insidenAktif =
-            Number(insidenAktifRows[0][0]?.total || 0);
-
-        const cakupanDokumentasi =
-            pengetahuanTotal > 0
-                ? Number(
-                    (
-                        pengetahuanTerdokumentasi /
-                        pengetahuanTotal *
-                        100
-                    ).toFixed(1)
-                )
-                : 0;
-
-        const progresPerubahan =
-            perubahanTotal > 0
-                ? Number(
-                    (
-                        perubahanSelesai /
-                        perubahanTotal *
-                        100
-                    ).toFixed(1)
-                )
-                : 0;
-
-        return res.status(200).json({
-            risiko: {
-                total: risikoTotal,
-                tinggi: risikoTinggi,
-                terbaru: risikoTerbaruRows[0]
-            },
-
-            perubahan: {
-                total: perubahanTotal,
-                aktif: perubahanAktif,
-                selesai: perubahanSelesai,
-                persentase_selesai: progresPerubahan
-            },
-
-            pengetahuan: {
-                total: pengetahuanTotal,
-                terdokumentasi: pengetahuanTerdokumentasi,
-                persentase_terdokumentasi: cakupanDokumentasi
-            },
-
-            keberlangsungan: {
-                bcp_total: bcpTotal,
-                bcp_aktif: bcpAktif,
-                uji_total: ujiTotal
-            },
-
-            relasi_pengguna: {
-                permintaan,
-                kueri,
-                insiden,
-                masalah,
-                insiden_aktif: insidenAktif,
-                total:
-                    permintaan +
-                    kueri +
-                    insiden +
-                    masalah
-            }
-        });
+        return res.status(200).json(result);
     } catch (error) {
         console.error('Dashboard summary error:', error);
 
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil data dashboard.',
-            error: error.message
+        return res.status(error.status || 500).json({
+            message: error.status
+                ? error.message
+                : 'Terjadi kesalahan saat mengambil data dashboard.'
         });
     }
 };
 
 exports.getPimpinanDashboard = async (req, res) => {
-  try {
-    const [
-      approvalRows,
-      highRiskRows,
-      changeTotalRows,
-      changeAktifRows,
-      latestRiskRows
-    ] = await Promise.all([
-      db.query(`
-        SELECT
-          r.id,
-          r.kode_risiko,
-          r.peristiwa_risiko,
-          r.besaran_risiko,
-          r.status_risiko,
-          r.created_at,
-          ld.nama_layanan
-        FROM mr_risiko r
+    try {
+        const scope = await getDashboardScope(req);
+        const stats = await getScopedDashboardStats(scope);
 
-        LEFT JOIN layanan_digital ld
-          ON ld.id = r.layanan_id
+        const [approvalRows] = await db.query(
+            `
+            SELECT
+                r.id,
+                r.kode_risiko,
+                r.peristiwa_risiko,
+                r.besaran_risiko,
+                r.status_risiko,
+                r.created_at,
+                COALESCE(ld.nama_layanan, r.nama_layanan_pendukung,
+                    r.nama_layanan_prioritas) AS nama_layanan
+            FROM mr_risiko r
+            JOIN users u ON u.id = r.created_by
+            LEFT JOIN layanan_digital ld ON ld.id = r.layanan_id
+            WHERE r.status_risiko = 'Diajukan'
+              AND (? = 1 OR u.instansi_id = ?)
+            ORDER BY r.created_at ASC, r.id ASC
+            `,
+            [scope.isAdmin ? 1 : 0, scope.instansiId]
+        );
 
-        WHERE r.status_risiko = 'Diajukan'
+        return res.status(200).json({
+            approval: {
+                total: approvalRows.length,
+                risiko: approvalRows
+            },
+            risiko: {
+                diajukan: approvalRows.length,
+                tinggi: stats.risiko.tinggi,
+                terbaru: stats.risiko.terbaru
+            },
+            perubahan: {
+                total: stats.perubahan.total,
+                aktif: stats.perubahan.aktif
+            }
+        });
+    } catch (error) {
+        console.error('Dashboard pimpinan error:', error);
 
-        ORDER BY
-          r.created_at ASC,
-          r.id ASC
-      `),
-
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mr_risiko
-        WHERE
-          status_risiko <> 'Ditolak'
-          AND CAST(
-            COALESCE(
-              besaran_risiko,
-              0
-            )
-            AS UNSIGNED
-          ) >= 17
-      `),
-
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mpr_perubahan
-      `),
-
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mpr_perubahan
-        WHERE status IN (
-          'Analisis',
-          'Implementasi',
-          'Evaluasi'
-        )
-      `),
-
-      db.query(`
-        SELECT
-          r.id,
-          r.kode_risiko,
-          r.peristiwa_risiko,
-          r.besaran_risiko,
-          r.status_risiko,
-          r.created_at,
-          ld.nama_layanan
-
-        FROM mr_risiko r
-
-        LEFT JOIN layanan_digital ld
-          ON ld.id = r.layanan_id
-
-        ORDER BY
-          r.created_at DESC,
-          r.id DESC
-
-        LIMIT 5
-      `)
-    ]);
-
-    const approvalList =
-      approvalRows[0];
-
-    const risikoTinggi =
-      Number(
-        highRiskRows[0][0]?.total ||
-          0
-      );
-
-    const perubahanTotal =
-      Number(
-        changeTotalRows[0][0]?.total ||
-          0
-      );
-
-    const perubahanAktif =
-      Number(
-        changeAktifRows[0][0]?.total ||
-          0
-      );
-
-    return res.status(200).json({
-      approval: {
-        total:
-          approvalList.length,
-        risiko:
-          approvalList
-      },
-
-      risiko: {
-        diajukan:
-          approvalList.length,
-        tinggi:
-          risikoTinggi,
-        terbaru:
-          latestRiskRows[0]
-      },
-
-      perubahan: {
-        total:
-          perubahanTotal,
-        aktif:
-          perubahanAktif
-      }
-    });
-  } catch (error) {
-    console.error(
-      'ERROR DASHBOARD PIMPINAN:',
-      error
-    );
-
-    return res.status(500).json({
-      message:
-        'Gagal mengambil dashboard pimpinan.',
-      error:
-        error.message
-    });
-  }
+        return res.status(error.status || 500).json({
+            message: error.status
+                ? error.message
+                : 'Gagal mengambil dashboard pimpinan.'
+        });
+    }
 };
 
 exports.getPengelolaDashboard = async (req, res) => {
-  try {
-    const [
-      totalRisikoRows,
-      draftRows,
-      rejectedRows,
-      latestRiskRows,
-      knowledgeRows,
-      documentedRows,
-      unreadRows
-    ] = await Promise.all([
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mr_risiko
-      `),
+    try {
+        const scope = await getDashboardScope(req);
+        const stats = await getScopedDashboardStats(scope);
 
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mr_risiko
-        WHERE status_risiko = 'Draft'
-      `),
+        const [notificationRows] = await db.query(
+            `
+            SELECT COUNT(*) AS total
+            FROM notifications
+            WHERE user_id = ?
+              AND is_read = 0
+            `,
+            [scope.userId]
+        );
 
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mr_risiko
-        WHERE status_risiko = 'Ditolak'
-      `),
+        return res.status(200).json({
+            risiko: {
+                total: stats.risiko.total,
+                draft: stats.risiko.draft,
+                perlu_perbaikan: stats.risiko.perlu_perbaikan,
+                terbaru: stats.risiko.terbaru
+            },
+            pengetahuan: {
+                total: stats.pengetahuan.total,
+                terdokumentasi: stats.pengetahuan.terdokumentasi
+            },
+            notifikasi: {
+                unread: Number(notificationRows[0]?.total || 0)
+            }
+        });
+    } catch (error) {
+        console.error('Dashboard pengelola error:', error);
 
-      db.query(`
-        SELECT
-          r.id,
-          r.kode_risiko,
-          r.peristiwa_risiko,
-          r.besaran_risiko,
-          r.status_risiko,
-          r.created_at,
-          ld.nama_layanan
-        FROM mr_risiko r
-        LEFT JOIN layanan_digital ld
-          ON ld.id = r.layanan_id
-        ORDER BY
-          r.created_at DESC,
-          r.id DESC
-        LIMIT 5
-      `),
-
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mpn_pengetahuan
-      `),
-
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM mpn_pengetahuan
-        WHERE sudah_terdokumentasi = 1
-      `),
-
-      db.query(`
-        SELECT COUNT(*) AS total
-        FROM notifications
-        WHERE user_id = ?
-          AND is_read = 0
-      `, [req.user.id])
-    ]);
-
-    return res.status(200).json({
-      risiko: {
-        total: Number(
-          totalRisikoRows[0][0]?.total || 0
-        ),
-        draft: Number(
-          draftRows[0][0]?.total || 0
-        ),
-        perlu_perbaikan: Number(
-          rejectedRows[0][0]?.total || 0
-        ),
-        terbaru: latestRiskRows[0]
-      },
-
-      pengetahuan: {
-        total: Number(
-          knowledgeRows[0][0]?.total || 0
-        ),
-        terdokumentasi: Number(
-          documentedRows[0][0]?.total || 0
-        )
-      },
-
-      notifikasi: {
-        unread: Number(
-          unreadRows[0][0]?.total || 0
-        )
-      }
-    });
-  } catch (error) {
-    console.error(
-      'ERROR DASHBOARD PENGELOLA:',
-      error
-    );
-
-    return res.status(500).json({
-      message:
-        'Gagal mengambil dashboard pengelola.',
-      error:
-        error.message
-    });
-  }
+        return res.status(error.status || 500).json({
+            message: error.status
+                ? error.message
+                : 'Gagal mengambil dashboard pengelola.'
+        });
+    }
 };
+
 
 exports.getAdminDashboard = async (req, res) => {
   try {

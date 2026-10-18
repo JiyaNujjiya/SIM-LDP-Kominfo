@@ -3,6 +3,40 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 
+const getUserInstansiId = async (req) => {
+  const role = String(req.user?.role || '')
+    .trim()
+    .toLowerCase();
+
+  if (role === 'admin') {
+    return null;
+  }
+
+  const namaInstansi = String(
+    req.user?.nama_instansi || ''
+  ).trim();
+
+  if (!namaInstansi) {
+    throw new Error('INSTANSI_AKUN_KOSONG');
+  }
+
+  const [instansi] = await db.query(
+    `
+    SELECT id
+    FROM instansi
+    WHERE LOWER(TRIM(nama_instansi)) = LOWER(TRIM(?))
+    LIMIT 1
+    `,
+    [namaInstansi]
+  );
+
+  if (instansi.length === 0) {
+    throw new Error('INSTANSI_AKUN_TIDAK_DITEMUKAN');
+  }
+
+  return Number(instansi[0].id);
+};
+
 exports.getInstansiOptions = async (req, res) => {
   try {
     const [rows] = await db.query(`
@@ -78,18 +112,42 @@ exports.getUnitOptions = async (req, res) => {
   }
 };
 
+
 exports.getUserOptions = async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      SELECT
-        id,
-        nama,
-        email,
-        role,
-        role_id
-      FROM users
-      ORDER BY nama ASC
-    `);
+    const instansiId = await getUserInstansiId(req);
+
+    let rows;
+
+    if (instansiId === null) {
+      [rows] = await db.query(`
+        SELECT
+          id,
+          nama,
+          email,
+          role,
+          role_id,
+          instansi_id
+        FROM users
+        ORDER BY nama ASC
+      `);
+    } else {
+      [rows] = await db.query(
+        `
+        SELECT
+          id,
+          nama,
+          email,
+          role,
+          role_id,
+          instansi_id
+        FROM users
+        WHERE instansi_id = ?
+        ORDER BY nama ASC
+        `,
+        [instansiId]
+      );
+    }
 
     return res.status(200).json({
       data: rows
@@ -97,21 +155,35 @@ exports.getUserOptions = async (req, res) => {
   } catch (error) {
     console.error('ERROR GET USER OPTIONS:', error);
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
     });
   }
 };
 
+
+
 exports.getPengetahuanOptions = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const instansiId = await getUserInstansiId(req);
+
+    const [rows] = await db.query(
+      `
       SELECT
         p.id,
         p.kode_pengetahuan,
         p.nama_pengetahuan,
         p.layanan_id,
-        l.nama_layanan,
+        COALESCE(p.nama_layanan, l.nama_layanan) AS nama_layanan,
         p.jenis_pengetahuan,
         p.sudah_terdokumentasi,
         p.aspek_pemdi,
@@ -121,14 +193,17 @@ exports.getPengetahuanOptions = async (req, res) => {
         p.pemilik_unit_kerja_id,
         uk.nama_unit AS pemilik_unit_kerja
       FROM mpn_pengetahuan p
-      JOIN layanan_digital l
+      LEFT JOIN layanan_digital l
         ON l.id = p.layanan_id
       LEFT JOIN instansi i
         ON i.id = p.pemilik_instansi_id
       LEFT JOIN unit_kerja uk
         ON uk.id = p.pemilik_unit_kerja_id
+      WHERE (? IS NULL OR p.pemilik_instansi_id = ?)
       ORDER BY p.nama_pengetahuan ASC
-    `);
+      `,
+      [instansiId, instansiId]
+    );
 
     return res.status(200).json({
       data: rows
@@ -136,15 +211,89 @@ exports.getPengetahuanOptions = async (req, res) => {
   } catch (error) {
     console.error('ERROR GET PENGETAHUAN OPTIONS:', error);
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
-      message: 'Terjadi kesalahan pada server'
+      message: 'Gagal mengambil pilihan pengetahuan'
     });
   }
 };
 
 exports.getAllPerencanaan = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    // ADMIN: lihat semua
+    if (isAdmin) {
+      const [rows] = await db.query(`
+        SELECT
+          p.id,
+          p.instansi_id,
+          i.nama_instansi,
+          p.tahun_perencanaan,
+          p.status,
+          p.created_by,
+          u.nama AS pembuat,
+          p.created_at,
+          p.updated_at
+        FROM mpn_perencanaan p
+        JOIN instansi i
+          ON i.id = p.instansi_id
+        JOIN users u
+          ON u.id = p.created_by
+        ORDER BY
+          p.tahun_perencanaan DESC,
+          p.created_at DESC
+      `);
+
+      return res.status(200).json({
+        data: rows
+      });
+    }
+
+    // NON-ADMIN: berdasarkan instansi login
+    const namaInstansi = String(
+      req.user?.nama_instansi || ''
+    ).trim();
+
+    if (!namaInstansi) {
+      return res.status(403).json({
+        message: 'Instansi akun belum ditentukan'
+      });
+    }
+
+    const [instansi] = await db.query(
+      `
+      SELECT id
+      FROM instansi
+      WHERE LOWER(TRIM(nama_instansi)) = LOWER(TRIM(?))
+      LIMIT 1
+      `,
+      [namaInstansi]
+    );
+
+    if (instansi.length === 0) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak ditemukan pada master instansi'
+      });
+    }
+
+    const instansiId = Number(instansi[0].id);
+
+    const [rows] = await db.query(
+      `
       SELECT
         p.id,
         p.instansi_id,
@@ -160,14 +309,23 @@ exports.getAllPerencanaan = async (req, res) => {
         ON i.id = p.instansi_id
       JOIN users u
         ON u.id = p.created_by
-      ORDER BY p.tahun_perencanaan DESC, p.created_at DESC
-    `);
+      WHERE p.instansi_id = ?
+      ORDER BY
+        p.tahun_perencanaan DESC,
+        p.created_at DESC
+      `,
+      [instansiId]
+    );
 
     return res.status(200).json({
       data: rows
     });
+
   } catch (error) {
-    console.error('ERROR GET PERENCANAAN:', error);
+    console.error(
+      'ERROR GET ALL PERENCANAAN:',
+      error
+    );
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -184,6 +342,78 @@ exports.getDetailPerencanaan = async (req, res) => {
         message: 'ID perencanaan tidak valid'
       });
     }
+
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    // ADMIN
+    if (isAdmin) {
+      const [rows] = await db.query(
+        `
+        SELECT
+          p.id,
+          p.instansi_id,
+          i.nama_instansi,
+          p.tahun_perencanaan,
+          p.status,
+          p.created_by,
+          u.nama AS pembuat,
+          p.created_at,
+          p.updated_at
+        FROM mpn_perencanaan p
+        JOIN instansi i
+          ON i.id = p.instansi_id
+        JOIN users u
+          ON u.id = p.created_by
+        WHERE p.id = ?
+        LIMIT 1
+        `,
+        [id]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({
+          message: 'Data perencanaan tidak ditemukan'
+        });
+      }
+
+      return res.status(200).json({
+        data: rows[0]
+      });
+    }
+
+    // NON-ADMIN
+    const namaInstansi = String(
+      req.user?.nama_instansi || ''
+    ).trim();
+
+    if (!namaInstansi) {
+      return res.status(403).json({
+        message: 'Instansi akun belum ditentukan'
+      });
+    }
+
+    const [instansi] = await db.query(
+      `
+      SELECT id
+      FROM instansi
+      WHERE LOWER(TRIM(nama_instansi)) = LOWER(TRIM(?))
+      LIMIT 1
+      `,
+      [namaInstansi]
+    );
+
+    if (instansi.length === 0) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak ditemukan pada master instansi'
+      });
+    }
+
+    const instansiId = Number(instansi[0].id);
 
     const [rows] = await db.query(
       `
@@ -203,22 +433,28 @@ exports.getDetailPerencanaan = async (req, res) => {
       JOIN users u
         ON u.id = p.created_by
       WHERE p.id = ?
+        AND p.instansi_id = ?
       LIMIT 1
       `,
-      [id]
+      [id, instansiId]
     );
 
     if (rows.length === 0) {
       return res.status(404).json({
-        message: 'Data perencanaan tidak ditemukan'
+        message:
+          'Data perencanaan tidak ditemukan atau bukan milik instansi Anda'
       });
     }
 
     return res.status(200).json({
       data: rows[0]
     });
+
   } catch (error) {
-    console.error('ERROR GET DETAIL PERENCANAAN:', error);
+    console.error(
+      'ERROR GET DETAIL PERENCANAAN:',
+      error
+    );
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -230,29 +466,31 @@ exports.createPerencanaan = async (req, res) => {
   try {
     const {
       instansi_id,
-      tahun_perencanaan,
-      status = 'Draft'
+      tahun_perencanaan
     } = req.body;
 
-    const created_by = req.user.id;
+    const createdBy = req.user?.id;
 
-    // Validasi field wajib
-    if (!instansi_id || !tahun_perencanaan) {
-      return res.status(400).json({
-        message: 'Instansi dan tahun perencanaan wajib diisi'
-      });
-    }
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
 
-    // Validasi ID instansi
-    const instansiId = Number(instansi_id);
+    const isAdmin = role === 'admin';
 
-    if (!Number.isInteger(instansiId) || instansiId <= 0) {
-      return res.status(400).json({
-        message: 'ID instansi tidak valid'
+    // Validasi user
+    if (!createdBy) {
+      return res.status(401).json({
+        message: 'User tidak terautentikasi'
       });
     }
 
     // Validasi tahun
+    if (!tahun_perencanaan) {
+      return res.status(400).json({
+        message: 'Tahun perencanaan wajib diisi'
+      });
+    }
+
     const tahun = Number(tahun_perencanaan);
 
     if (
@@ -265,34 +503,74 @@ exports.createPerencanaan = async (req, res) => {
       });
     }
 
-    // Validasi status
-    const statusValid = ['Draft', 'Aktif', 'Selesai'];
+    let instansiId;
 
-    if (!statusValid.includes(status)) {
-      return res.status(400).json({
-        message: 'Status harus Draft, Aktif, atau Selesai'
-      });
+    // ADMIN:
+    // boleh menentukan instansi dari request
+    if (isAdmin) {
+      instansiId = Number(instansi_id);
+
+      if (
+        !Number.isInteger(instansiId) ||
+        instansiId <= 0
+      ) {
+        return res.status(400).json({
+          message: 'ID instansi tidak valid'
+        });
+      }
+
+      const [instansi] = await db.query(
+        `
+        SELECT id
+        FROM instansi
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [instansiId]
+      );
+
+      if (instansi.length === 0) {
+        return res.status(400).json({
+          message: 'Instansi tidak ditemukan'
+        });
+      }
     }
 
-    // Cek apakah instansi benar-benar ada
-    const [instansi] = await db.query(
-      `
-      SELECT id
-      FROM instansi
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [instansiId]
-    );
+    // NON-ADMIN:
+    // instansi wajib mengikuti akun login
+    else {
+      const namaInstansi = String(
+        req.user?.nama_instansi || ''
+      ).trim();
 
-    if (instansi.length === 0) {
-      return res.status(400).json({
-        message: 'Instansi tidak ditemukan'
-      });
+      if (!namaInstansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan'
+        });
+      }
+
+      const [instansi] = await db.query(
+        `
+        SELECT id
+        FROM instansi
+        WHERE LOWER(TRIM(nama_instansi)) = LOWER(TRIM(?))
+        LIMIT 1
+        `,
+        [namaInstansi]
+      );
+
+      if (instansi.length === 0) {
+        return res.status(403).json({
+          message:
+            'Instansi akun tidak ditemukan pada master instansi'
+        });
+      }
+
+      instansiId = Number(instansi[0].id);
     }
 
-    // Cek duplicate instansi + tahun
-    const [existing] = await db.query(
+    // Cek duplicate
+    const [duplicate] = await db.query(
       `
       SELECT id
       FROM mpn_perencanaan
@@ -303,50 +581,51 @@ exports.createPerencanaan = async (req, res) => {
       [instansiId, tahun]
     );
 
-    if (existing.length > 0) {
+    if (duplicate.length > 0) {
       return res.status(409).json({
-        message: 'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
+        message:
+          'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
       });
     }
 
-    // Simpan perencanaan
+    // Simpan
     const [result] = await db.query(
       `
-      INSERT INTO mpn_perencanaan
-        (
-          instansi_id,
-          tahun_perencanaan,
-          status,
-          created_by
-        )
+      INSERT INTO mpn_perencanaan (
+        instansi_id,
+        tahun_perencanaan,
+        status,
+        created_by
+      )
       VALUES (?, ?, ?, ?)
       `,
       [
         instansiId,
         tahun,
-        status,
-        created_by
+        'Draft',
+        createdBy
       ]
     );
 
     return res.status(201).json({
-      message: 'Data perencanaan berhasil disimpan',
+      message: 'Data perencanaan berhasil ditambahkan',
       data: {
         id: result.insertId,
         instansi_id: instansiId,
-        tahun_perencanaan: tahun,
-        status: status,
-        created_by: created_by
+        tahun_perencanaan: tahun
       }
     });
 
   } catch (error) {
-    console.error('ERROR CREATE PERENCANAAN:', error);
+    console.error(
+      'ERROR CREATE PERENCANAAN:',
+      error
+    );
 
-    // Pengaman kalau duplicate lolos dari pengecekan sebelumnya
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
+        message:
+          'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
       });
     }
 
@@ -362,9 +641,14 @@ exports.updatePerencanaan = async (req, res) => {
 
     const {
       instansi_id,
-      tahun_perencanaan,
-      status
+      tahun_perencanaan
     } = req.body;
+
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
 
     // Validasi ID perencanaan
     if (!Number.isInteger(id) || id <= 0) {
@@ -376,7 +660,10 @@ exports.updatePerencanaan = async (req, res) => {
     // Cek apakah data perencanaan ada
     const [perencanaan] = await db.query(
       `
-      SELECT id
+      SELECT
+        id,
+        instansi_id,
+        tahun_perencanaan
       FROM mpn_perencanaan
       WHERE id = ?
       LIMIT 1
@@ -390,24 +677,15 @@ exports.updatePerencanaan = async (req, res) => {
       });
     }
 
-    // Validasi field wajib
-    if (!instansi_id || !tahun_perencanaan || !status) {
+    // Validasi tahun
+    if (!tahun_perencanaan) {
       return res.status(400).json({
-        message: 'Instansi, tahun perencanaan, dan status wajib diisi'
+        message: 'Tahun perencanaan wajib diisi'
       });
     }
 
-    const instansiId = Number(instansi_id);
     const tahun = Number(tahun_perencanaan);
 
-    // Validasi instansi_id
-    if (!Number.isInteger(instansiId) || instansiId <= 0) {
-      return res.status(400).json({
-        message: 'ID instansi tidak valid'
-      });
-    }
-
-    // Validasi tahun
     if (
       !Number.isInteger(tahun) ||
       tahun < 1901 ||
@@ -418,30 +696,80 @@ exports.updatePerencanaan = async (req, res) => {
       });
     }
 
-    // Validasi status
-    const statusValid = ['Draft', 'Aktif', 'Selesai'];
+    let instansiId;
 
-    if (!statusValid.includes(status)) {
-      return res.status(400).json({
-        message: 'Status harus Draft, Aktif, atau Selesai'
-      });
+    // ADMIN:
+    // boleh menentukan instansi dari request
+    if (isAdmin) {
+      instansiId = Number(instansi_id);
+
+      if (
+        !Number.isInteger(instansiId) ||
+        instansiId <= 0
+      ) {
+        return res.status(400).json({
+          message: 'ID instansi tidak valid'
+        });
+      }
+
+      const [instansi] = await db.query(
+        `
+        SELECT id
+        FROM instansi
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [instansiId]
+      );
+
+      if (instansi.length === 0) {
+        return res.status(400).json({
+          message: 'Instansi tidak ditemukan'
+        });
+      }
     }
 
-    // Cek instansi
-    const [instansi] = await db.query(
-      `
-      SELECT id
-      FROM instansi
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [instansiId]
-    );
+    // NON-ADMIN:
+    // instansi harus berasal dari akun login
+    else {
+      const namaInstansi = String(
+        req.user?.nama_instansi || ''
+      ).trim();
 
-    if (instansi.length === 0) {
-      return res.status(400).json({
-        message: 'Instansi tidak ditemukan'
-      });
+      if (!namaInstansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan'
+        });
+      }
+
+      const [instansi] = await db.query(
+        `
+        SELECT id
+        FROM instansi
+        WHERE LOWER(TRIM(nama_instansi)) = LOWER(TRIM(?))
+        LIMIT 1
+        `,
+        [namaInstansi]
+      );
+
+      if (instansi.length === 0) {
+        return res.status(403).json({
+          message: 'Instansi akun tidak ditemukan pada master instansi'
+        });
+      }
+
+      instansiId = Number(instansi[0].id);
+
+      // Pastikan record yang diedit memang milik instansi user
+      if (
+        Number(perencanaan[0].instansi_id) !==
+        instansiId
+      ) {
+        return res.status(403).json({
+          message:
+            'Anda tidak memiliki akses untuk mengubah perencanaan instansi lain'
+        });
+      }
     }
 
     // Cek duplicate selain data yang sedang diedit
@@ -459,24 +787,23 @@ exports.updatePerencanaan = async (req, res) => {
 
     if (duplicate.length > 0) {
       return res.status(409).json({
-        message: 'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
+        message:
+          'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
       });
     }
 
-    // Update data
+    // Update
     await db.query(
       `
       UPDATE mpn_perencanaan
       SET
         instansi_id = ?,
-        tahun_perencanaan = ?,
-        status = ?
+        tahun_perencanaan = ?
       WHERE id = ?
       `,
       [
         instansiId,
         tahun,
-        status,
         id
       ]
     );
@@ -486,17 +813,20 @@ exports.updatePerencanaan = async (req, res) => {
       data: {
         id,
         instansi_id: instansiId,
-        tahun_perencanaan: tahun,
-        status
+        tahun_perencanaan: tahun
       }
     });
 
   } catch (error) {
-    console.error('ERROR UPDATE PERENCANAAN:', error);
+    console.error(
+      'ERROR UPDATE PERENCANAAN:',
+      error
+    );
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
+        message:
+          'Perencanaan untuk instansi dan tahun tersebut sudah tersedia'
       });
     }
 
@@ -516,10 +846,18 @@ exports.deletePerencanaan = async (req, res) => {
       });
     }
 
-    // Cek data
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    // Ambil data terlebih dahulu
     const [perencanaan] = await db.query(
       `
-      SELECT id
+      SELECT
+        id,
+        instansi_id
       FROM mpn_perencanaan
       WHERE id = ?
       LIMIT 1
@@ -533,7 +871,48 @@ exports.deletePerencanaan = async (req, res) => {
       });
     }
 
-    // Hapus data
+    // NON-ADMIN: cek kepemilikan instansi
+    if (!isAdmin) {
+      const namaInstansi = String(
+        req.user?.nama_instansi || ''
+      ).trim();
+
+      if (!namaInstansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan'
+        });
+      }
+
+      const [instansi] = await db.query(
+        `
+        SELECT id
+        FROM instansi
+        WHERE LOWER(TRIM(nama_instansi)) = LOWER(TRIM(?))
+        LIMIT 1
+        `,
+        [namaInstansi]
+      );
+
+      if (instansi.length === 0) {
+        return res.status(403).json({
+          message:
+            'Instansi akun tidak ditemukan pada master instansi'
+        });
+      }
+
+      const instansiId = Number(instansi[0].id);
+
+      if (
+        Number(perencanaan[0].instansi_id) !==
+        instansiId
+      ) {
+        return res.status(403).json({
+          message:
+            'Anda tidak memiliki akses untuk menghapus perencanaan instansi lain'
+        });
+      }
+    }
+
     await db.query(
       `
       DELETE FROM mpn_perencanaan
@@ -547,17 +926,10 @@ exports.deletePerencanaan = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('ERROR DELETE PERENCANAAN:', error);
-
-    // Jika masih dipakai tabel lain melalui foreign key
-    if (
-      error.code === 'ER_ROW_IS_REFERENCED_2' ||
-      error.code === 'ER_ROW_IS_REFERENCED'
-    ) {
-      return res.status(409).json({
-        message: 'Data perencanaan tidak dapat dihapus karena masih digunakan'
-      });
-    }
+    console.error(
+      'ERROR DELETE PERENCANAAN:',
+      error
+    );
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -569,26 +941,46 @@ exports.getIndikatorPerencanaan = async (req, res) => {
   try {
     const perencanaanId = Number(req.params.id);
 
-    if (!Number.isInteger(perencanaanId) || perencanaanId <= 0) {
+    if (
+      !Number.isInteger(perencanaanId) ||
+      perencanaanId <= 0
+    ) {
       return res.status(400).json({
         message: 'ID perencanaan tidak valid'
       });
     }
 
-    // Pastikan perencanaan ada
-    const [perencanaan] = await db.query(
-      `
-      SELECT id
-      FROM mpn_perencanaan
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [perencanaanId]
-    );
+    const instansiId = await getUserInstansiId(req);
+
+    let perencanaan;
+
+    if (instansiId === null) {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [perencanaanId]
+      );
+    } else {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+          AND instansi_id = ?
+        LIMIT 1
+        `,
+        [perencanaanId, instansiId]
+      );
+    }
 
     if (perencanaan.length === 0) {
       return res.status(404).json({
-        message: 'Data perencanaan tidak ditemukan'
+        message:
+          'Data perencanaan tidak ditemukan atau bukan milik instansi Anda'
       });
     }
 
@@ -614,7 +1006,20 @@ exports.getIndikatorPerencanaan = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('ERROR GET INDIKATOR PERENCANAAN:', error);
+    console.error(
+      'ERROR GET INDIKATOR PERENCANAAN:',
+      error
+    );
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -632,13 +1037,15 @@ exports.createIndikatorPerencanaan = async (req, res) => {
       nilai_target
     } = req.body;
 
-    if (!Number.isInteger(perencanaanId) || perencanaanId <= 0) {
+    if (
+      !Number.isInteger(perencanaanId) ||
+      perencanaanId <= 0
+    ) {
       return res.status(400).json({
         message: 'ID perencanaan tidak valid'
       });
     }
 
-    // Jangan pakai !nilai_saat_ini karena angka 0 valid
     if (
       !kode_indikator ||
       nilai_saat_ini === undefined ||
@@ -649,7 +1056,8 @@ exports.createIndikatorPerencanaan = async (req, res) => {
       nilai_target === ''
     ) {
       return res.status(400).json({
-        message: 'Kode indikator, nilai saat ini, dan nilai target wajib diisi'
+        message:
+          'Kode indikator, nilai saat ini, dan nilai target wajib diisi'
       });
     }
 
@@ -676,7 +1084,6 @@ exports.createIndikatorPerencanaan = async (req, res) => {
       });
     }
 
-    // Validasi range berdasarkan jenis indikator
     if (kode_indikator === 'CAKUPAN_DOKUMENTASI') {
       if (
         nilaiSaatIni < 0 ||
@@ -685,7 +1092,8 @@ exports.createIndikatorPerencanaan = async (req, res) => {
         nilaiTarget > 100
       ) {
         return res.status(400).json({
-          message: 'Nilai CAKUPAN_DOKUMENTASI harus antara 0 dan 100'
+          message:
+            'Nilai CAKUPAN_DOKUMENTASI harus antara 0 dan 100'
         });
       }
     }
@@ -698,29 +1106,46 @@ exports.createIndikatorPerencanaan = async (req, res) => {
         nilaiTarget > 5
       ) {
         return res.status(400).json({
-          message: 'Nilai KESESUAIAN_PENGGUNA harus antara 1 dan 5'
+          message:
+            'Nilai KESESUAIAN_PENGGUNA harus antara 1 dan 5'
         });
       }
     }
 
-    // Pastikan perencanaan ada
-    const [perencanaan] = await db.query(
-      `
-      SELECT id
-      FROM mpn_perencanaan
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [perencanaanId]
-    );
+    const instansiId = await getUserInstansiId(req);
+
+    let perencanaan;
+
+    if (instansiId === null) {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [perencanaanId]
+      );
+    } else {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+          AND instansi_id = ?
+        LIMIT 1
+        `,
+        [perencanaanId, instansiId]
+      );
+    }
 
     if (perencanaan.length === 0) {
       return res.status(404).json({
-        message: 'Data perencanaan tidak ditemukan'
+        message:
+          'Data perencanaan tidak ditemukan atau bukan milik instansi Anda'
       });
     }
 
-    // Cek duplicate indikator
     const [existing] = await db.query(
       `
       SELECT id
@@ -734,7 +1159,8 @@ exports.createIndikatorPerencanaan = async (req, res) => {
 
     if (existing.length > 0) {
       return res.status(409).json({
-        message: 'Indikator tersebut sudah tersedia pada perencanaan ini'
+        message:
+          'Indikator tersebut sudah tersedia pada perencanaan ini'
       });
     }
 
@@ -769,11 +1195,25 @@ exports.createIndikatorPerencanaan = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('ERROR CREATE INDIKATOR PERENCANAAN:', error);
+    console.error(
+      'ERROR CREATE INDIKATOR PERENCANAAN:',
+      error
+    );
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Indikator tersebut sudah tersedia pada perencanaan ini'
+        message:
+          'Indikator tersebut sudah tersedia pada perencanaan ini'
       });
     }
 
@@ -804,11 +1244,14 @@ exports.updateIndikatorPerencanaan = async (req, res) => {
     const [indikator] = await db.query(
       `
       SELECT
-        id,
-        perencanaan_id,
-        kode_indikator
-      FROM mpn_indikator_perencanaan
-      WHERE id = ?
+        ip.id,
+        ip.perencanaan_id,
+        ip.kode_indikator,
+        p.instansi_id
+      FROM mpn_indikator_perencanaan ip
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE ip.id = ?
       LIMIT 1
       `,
       [id]
@@ -817,6 +1260,18 @@ exports.updateIndikatorPerencanaan = async (req, res) => {
     if (indikator.length === 0) {
       return res.status(404).json({
         message: 'Data indikator tidak ditemukan'
+      });
+    }
+
+    const instansiId = await getUserInstansiId(req);
+
+    if (
+      instansiId !== null &&
+      Number(indikator[0].instansi_id) !== instansiId
+    ) {
+      return res.status(403).json({
+        message:
+          'Anda tidak memiliki akses untuk mengubah indikator instansi lain'
       });
     }
 
@@ -943,6 +1398,16 @@ exports.updateIndikatorPerencanaan = async (req, res) => {
       });
     }
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
     });
@@ -961,9 +1426,14 @@ exports.deleteIndikatorPerencanaan = async (req, res) => {
 
     const [indikator] = await db.query(
       `
-      SELECT id
-      FROM mpn_indikator_perencanaan
-      WHERE id = ?
+      SELECT
+        ip.id,
+        ip.perencanaan_id,
+        p.instansi_id
+      FROM mpn_indikator_perencanaan ip
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE ip.id = ?
       LIMIT 1
       `,
       [id]
@@ -972,6 +1442,18 @@ exports.deleteIndikatorPerencanaan = async (req, res) => {
     if (indikator.length === 0) {
       return res.status(404).json({
         message: 'Data indikator tidak ditemukan'
+      });
+    }
+
+    const instansiId = await getUserInstansiId(req);
+
+    if (
+      instansiId !== null &&
+      Number(indikator[0].instansi_id) !== instansiId
+    ) {
+      return res.status(403).json({
+        message:
+          'Anda tidak memiliki akses untuk menghapus indikator instansi lain'
       });
     }
 
@@ -989,6 +1471,16 @@ exports.deleteIndikatorPerencanaan = async (req, res) => {
 
   } catch (error) {
     console.error('ERROR DELETE INDIKATOR PERENCANAAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (
       error.code === 'ER_ROW_IS_REFERENCED_2' ||
@@ -1012,7 +1504,7 @@ exports.getAllPengetahuan = async (req, res) => {
         p.id,
         p.kode_pengetahuan,
         p.layanan_id,
-        l.nama_layanan,
+        COALESCE(p.nama_layanan, l.nama_layanan) AS nama_layanan,
         p.nama_pengetahuan,
         p.jenis_pengetahuan,
         p.sudah_terdokumentasi,
@@ -1027,7 +1519,7 @@ exports.getAllPengetahuan = async (req, res) => {
         p.created_at,
         p.updated_at
       FROM mpn_pengetahuan p
-      JOIN layanan_digital l
+      LEFT JOIN layanan_digital l
         ON l.id = p.layanan_id
       LEFT JOIN instansi i
         ON i.id = p.pemilik_instansi_id
@@ -1055,7 +1547,7 @@ exports.createPengetahuan = async (req, res) => {
   try {
     const {
       kode_pengetahuan,
-      layanan_id,
+      nama_layanan,
       nama_pengetahuan,
       jenis_pengetahuan = 'Eksplisit',
       sudah_terdokumentasi = 0,
@@ -1068,17 +1560,13 @@ exports.createPengetahuan = async (req, res) => {
     const created_by = req.user.id;
 
     // Field wajib
-    if (!kode_pengetahuan || !layanan_id || !nama_pengetahuan) {
+    if (
+      !String(kode_pengetahuan || '').trim() ||
+      !String(nama_layanan || '').trim() ||
+      !String(nama_pengetahuan || '').trim()
+    ) {
       return res.status(400).json({
-        message: 'Kode pengetahuan, layanan, dan nama pengetahuan wajib diisi'
-      });
-    }
-
-    const layananId = Number(layanan_id);
-
-    if (!Number.isInteger(layananId) || layananId <= 0) {
-      return res.status(400).json({
-        message: 'ID layanan tidak valid'
+        message: 'ID pengetahuan, nama layanan, dan nama pengetahuan wajib diisi'
       });
     }
 
@@ -1097,23 +1585,6 @@ exports.createPengetahuan = async (req, res) => {
     if (![0, 1].includes(terdokumentasi)) {
       return res.status(400).json({
         message: 'Status sudah terdokumentasi harus 0 atau 1'
-      });
-    }
-
-    // Cek layanan
-    const [layanan] = await db.query(
-      `
-      SELECT id
-      FROM layanan_digital
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [layananId]
-    );
-
-    if (layanan.length === 0) {
-      return res.status(400).json({
-        message: 'Layanan tidak ditemukan'
       });
     }
 
@@ -1188,12 +1659,19 @@ exports.createPengetahuan = async (req, res) => {
       }
     }
 
+    const instansiAkunId = await getUserInstansiId(req);
+
+    const instansiPemilikId =
+      instansiAkunId ??
+      (pemilik_instansi_id ? Number(pemilik_instansi_id) : null);
+
     const [result] = await db.query(
       `
       INSERT INTO mpn_pengetahuan
       (
         kode_pengetahuan,
         layanan_id,
+        nama_layanan,
         nama_pengetahuan,
         jenis_pengetahuan,
         sudah_terdokumentasi,
@@ -1203,17 +1681,18 @@ exports.createPengetahuan = async (req, res) => {
         pemilik_unit_kerja_id,
         created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
-        kode_pengetahuan,
-        layananId,
-        nama_pengetahuan,
+        kode_pengetahuan.trim(),
+        null,
+        nama_layanan.trim(),
+        nama_pengetahuan.trim(),
         jenis_pengetahuan,
         terdokumentasi,
         aspek_pemdi,
         indikator_pemdi,
-        pemilik_instansi_id || null,
+        instansiPemilikId,
         pemilik_unit_kerja_id || null,
         created_by
       ]
@@ -1224,13 +1703,14 @@ exports.createPengetahuan = async (req, res) => {
       data: {
         id: result.insertId,
         kode_pengetahuan,
-        layanan_id: layananId,
+        layanan_id: null,
+        nama_layanan: nama_layanan.trim(),
         nama_pengetahuan,
         jenis_pengetahuan,
         sudah_terdokumentasi: terdokumentasi,
         aspek_pemdi,
         indikator_pemdi,
-        pemilik_instansi_id: pemilik_instansi_id || null,
+        pemilik_instansi_id: instansiPemilikId,
         pemilik_unit_kerja_id: pemilik_unit_kerja_id || null,
         created_by
       }
@@ -1251,9 +1731,28 @@ exports.createPengetahuan = async (req, res) => {
   }
 };
 
-exports.getRencanaDokumentasi = async (req, res) => {
+
+exports.createRencanaDokumentasiGabungan = async (req, res) => {
+  let connection;
+
   try {
     const perencanaanId = Number(req.params.id);
+    const {
+      kode_pengetahuan,
+      nama_layanan,
+      nama_pengetahuan,
+      jenis_pengetahuan = 'Eksplisit',
+      sudah_terdokumentasi = 0,
+      aspek_pemdi = null,
+      indikator_pemdi = null,
+      ditargetkan_tahun_ini = 1,
+      penanggung_jawab_id,
+      target_waktu_dokumentasi = null,
+      tipe_dokumentasi
+    } = req.body;
+
+    const createdBy = Number(req.user?.id);
+    const instansiAkunId = await getUserInstansiId(req);
 
     if (!Number.isInteger(perencanaanId) || perencanaanId <= 0) {
       return res.status(400).json({
@@ -1261,10 +1760,58 @@ exports.getRencanaDokumentasi = async (req, res) => {
       });
     }
 
-    // Pastikan perencanaan ada
-    const [perencanaan] = await db.query(
+    if (
+      !String(kode_pengetahuan || '').trim() ||
+      !String(nama_layanan || '').trim() ||
+      !String(nama_pengetahuan || '').trim()
+    ) {
+      return res.status(400).json({
+        message: 'ID pengetahuan, nama layanan, dan nama pengetahuan wajib diisi'
+      });
+    }
+
+    if (!['Eksplisit', 'Implisit'].includes(jenis_pengetahuan)) {
+      return res.status(400).json({
+        message: 'Jenis pengetahuan tidak valid'
+      });
+    }
+
+    const terdokumentasi = Number(sudah_terdokumentasi);
+    const ditargetkan = Number(ditargetkan_tahun_ini);
+    const penanggungJawabId = Number(penanggung_jawab_id);
+
+    if (![0, 1].includes(terdokumentasi) || ![0, 1].includes(ditargetkan)) {
+      return res.status(400).json({
+        message: 'Status dokumentasi dan target harus Ya atau Tidak'
+      });
+    }
+
+    if (!Number.isInteger(penanggungJawabId) || penanggungJawabId <= 0) {
+      return res.status(400).json({
+        message: 'Penanggung jawab dokumentasi wajib dipilih'
+      });
+    }
+
+    const tipeValid = ['Teks', 'Gambar', 'Audio', 'Video'];
+
+    if (
+      !Array.isArray(tipe_dokumentasi) ||
+      tipe_dokumentasi.length === 0 ||
+      tipe_dokumentasi.some((tipe) => !tipeValid.includes(tipe))
+    ) {
+      return res.status(400).json({
+        message: 'Pilih minimal satu tipe dokumentasi yang valid'
+      });
+    }
+
+    const tipeUnik = [...new Set(tipe_dokumentasi)];
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const [perencanaan] = await connection.query(
       `
-      SELECT id
+      SELECT id, instansi_id
       FROM mpn_perencanaan
       WHERE id = ?
       LIMIT 1
@@ -1273,36 +1820,252 @@ exports.getRencanaDokumentasi = async (req, res) => {
     );
 
     if (perencanaan.length === 0) {
+      await connection.rollback();
       return res.status(404).json({
         message: 'Data perencanaan tidak ditemukan'
       });
     }
 
-    // Ambil rencana dokumentasi
+    const instansiId = Number(perencanaan[0].instansi_id);
+
+    if (instansiAkunId !== null && instansiAkunId !== instansiId) {
+      await connection.rollback();
+      return res.status(403).json({
+        message: 'Anda tidak memiliki akses ke perencanaan instansi lain'
+      });
+    }
+
+    const [penanggungJawab] = await connection.query(
+      `
+      SELECT id
+      FROM users
+      WHERE id = ?
+        AND instansi_id = ?
+      LIMIT 1
+      `,
+      [penanggungJawabId, instansiId]
+    );
+
+    if (penanggungJawab.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: 'Penanggung jawab harus berasal dari instansi yang sama'
+      });
+    }
+
+    const [existing] = await connection.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE kode_pengetahuan = ?
+      LIMIT 1
+      `,
+      [String(kode_pengetahuan).trim()]
+    );
+
+    if (existing.length > 0) {
+      await connection.rollback();
+      return res.status(409).json({
+        message: 'ID pengetahuan sudah digunakan'
+      });
+    }
+
+    const [pengetahuanResult] = await connection.query(
+      `
+      INSERT INTO mpn_pengetahuan (
+        kode_pengetahuan,
+        layanan_id,
+        nama_layanan,
+        nama_pengetahuan,
+        jenis_pengetahuan,
+        sudah_terdokumentasi,
+        aspek_pemdi,
+        indikator_pemdi,
+        pemilik_instansi_id,
+        pemilik_unit_kerja_id,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        String(kode_pengetahuan).trim(),
+        null,
+        String(nama_layanan).trim(),
+        String(nama_pengetahuan).trim(),
+        jenis_pengetahuan,
+        terdokumentasi,
+        aspek_pemdi || null,
+        indikator_pemdi || null,
+        instansiId,
+        null,
+        createdBy
+      ]
+    );
+
+    const pengetahuanId = pengetahuanResult.insertId;
+
+    const [rencanaResult] = await connection.query(
+      `
+      INSERT INTO mpn_rencana_dokumentasi (
+        perencanaan_id,
+        pengetahuan_id,
+        ditargetkan_tahun_ini,
+        penanggung_jawab_id,
+        target_waktu_dokumentasi
+      )
+      VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        perencanaanId,
+        pengetahuanId,
+        ditargetkan,
+        penanggungJawabId,
+        target_waktu_dokumentasi || null
+      ]
+    );
+
+    const rencanaId = rencanaResult.insertId;
+
+    for (const tipe of tipeUnik) {
+      await connection.query(
+        `
+        INSERT INTO mpn_rencana_tipe_dokumentasi (
+          rencana_dokumentasi_id,
+          tipe_dokumentasi
+        )
+        VALUES (?, ?)
+        `,
+        [rencanaId, tipe]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(201).json({
+      message: 'Rencana dokumentasi berhasil disimpan',
+      data: {
+        id: rencanaId,
+        pengetahuan_id: pengetahuanId,
+        perencanaan_id: perencanaanId,
+        kode_pengetahuan: String(kode_pengetahuan).trim(),
+        nama_layanan: String(nama_layanan).trim(),
+        nama_pengetahuan: String(nama_pengetahuan).trim(),
+        pemilik_instansi_id: instansiId,
+        tipe_dokumentasi: tipeUnik
+      }
+    });
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error('ERROR CREATE RENCANA GABUNGAN:', error);
+
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        message: 'ID pengetahuan atau rencana dokumentasi sudah digunakan'
+      });
+    }
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Gagal menyimpan rencana dokumentasi'
+    });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+
+exports.getRencanaDokumentasi = async (req, res) => {
+  try {
+    const perencanaanId = Number(req.params.id);
+
+    if (
+      !Number.isInteger(perencanaanId) ||
+      perencanaanId <= 0
+    ) {
+      return res.status(400).json({
+        message: 'ID perencanaan tidak valid'
+      });
+    }
+
+    const instansiId = await getUserInstansiId(req);
+
+    let perencanaan;
+
+    if (instansiId === null) {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [perencanaanId]
+      );
+    } else {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+          AND instansi_id = ?
+        LIMIT 1
+        `,
+        [perencanaanId, instansiId]
+      );
+    }
+
+    if (perencanaan.length === 0) {
+      return res.status(404).json({
+        message:
+          'Data perencanaan tidak ditemukan atau bukan milik instansi Anda'
+      });
+    }
+
+    
     const [rows] = await db.query(
       `
-      SELECT
-        rd.id,
-        rd.perencanaan_id,
-        rd.pengetahuan_id,
-        p.kode_pengetahuan,
-        p.nama_pengetahuan,
-        rd.ditargetkan_tahun_ini,
-        rd.penanggung_jawab_id,
-        u.nama AS penanggung_jawab,
-        DATE_FORMAT(rd.target_waktu_dokumentasi, '%Y-%m-%d') AS target_waktu_dokumentasi
-      FROM mpn_rencana_dokumentasi rd
-      JOIN mpn_pengetahuan p
-        ON p.id = rd.pengetahuan_id
-      LEFT JOIN users u
-        ON u.id = rd.penanggung_jawab_id
-      WHERE rd.perencanaan_id = ?
-      ORDER BY rd.id ASC
+        SELECT
+          rd.id,
+          rd.perencanaan_id,
+          rd.pengetahuan_id,
+          p.kode_pengetahuan,
+          p.nama_layanan,
+          p.nama_pengetahuan,
+          p.jenis_pengetahuan,
+          p.sudah_terdokumentasi,
+          p.aspek_pemdi,
+          p.indikator_pemdi,
+          rd.ditargetkan_tahun_ini,
+          rd.penanggung_jawab_id,
+          u.nama AS penanggung_jawab,
+          DATE_FORMAT(
+            rd.target_waktu_dokumentasi,
+            '%Y-%m-%d'
+          ) AS target_waktu_dokumentasi
+        FROM mpn_rencana_dokumentasi rd
+        JOIN mpn_pengetahuan p
+          ON p.id = rd.pengetahuan_id
+        LEFT JOIN users u
+          ON u.id = rd.penanggung_jawab_id
+        WHERE rd.perencanaan_id = ?
+        ORDER BY rd.id ASC
       `,
       [perencanaanId]
     );
 
-    // Ambil tipe dokumentasi
     for (const row of rows) {
       const [tipe] = await db.query(
         `
@@ -1324,7 +2087,20 @@ exports.getRencanaDokumentasi = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('ERROR GET RENCANA DOKUMENTASI:', error);
+    console.error(
+      'ERROR GET RENCANA DOKUMENTASI:',
+      error
+    );
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -1346,7 +2122,10 @@ exports.createRencanaDokumentasi = async (req, res) => {
       tipe_dokumentasi
     } = req.body;
 
-    if (!Number.isInteger(perencanaanId) || perencanaanId <= 0) {
+    if (
+      !Number.isInteger(perencanaanId) ||
+      perencanaanId <= 0
+    ) {
       return res.status(400).json({
         message: 'ID perencanaan tidak valid'
       });
@@ -1354,22 +2133,26 @@ exports.createRencanaDokumentasi = async (req, res) => {
 
     const pengetahuanId = Number(pengetahuan_id);
 
-    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
+    if (
+      !Number.isInteger(pengetahuanId) ||
+      pengetahuanId <= 0
+    ) {
       return res.status(400).json({
         message: 'ID pengetahuan tidak valid'
       });
     }
 
-    // Validasi ditargetkan tahun ini
-    const ditargetkan = Number(ditargetkan_tahun_ini);
+    const ditargetkan = Number(
+      ditargetkan_tahun_ini
+    );
 
     if (![0, 1].includes(ditargetkan)) {
       return res.status(400).json({
-        message: 'Ditargetkan tahun ini harus bernilai 0 atau 1'
+        message:
+          'Ditargetkan tahun ini harus bernilai 0 atau 1'
       });
     }
 
-    // Validasi tipe dokumentasi
     if (
       !Array.isArray(tipe_dokumentasi) ||
       tipe_dokumentasi.length === 0
@@ -1386,7 +2169,9 @@ exports.createRencanaDokumentasi = async (req, res) => {
       'Video'
     ];
 
-    const tipeUnik = [...new Set(tipe_dokumentasi)];
+    const tipeUnik = [
+      ...new Set(tipe_dokumentasi)
+    ];
 
     const tipeTidakValid = tipeUnik.some(
       tipe => !tipeValid.includes(tipe)
@@ -1398,20 +2183,38 @@ exports.createRencanaDokumentasi = async (req, res) => {
       });
     }
 
-    // Cek perencanaan
-    const [perencanaan] = await db.query(
-      `
-      SELECT id
-      FROM mpn_perencanaan
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [perencanaanId]
-    );
+    // Cek instansi perencanaan
+    const instansiId = await getUserInstansiId(req);
+
+    let perencanaan;
+
+    if (instansiId === null) {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+        LIMIT 1
+        `,
+        [perencanaanId]
+      );
+    } else {
+      [perencanaan] = await db.query(
+        `
+        SELECT id
+        FROM mpn_perencanaan
+        WHERE id = ?
+          AND instansi_id = ?
+        LIMIT 1
+        `,
+        [perencanaanId, instansiId]
+      );
+    }
 
     if (perencanaan.length === 0) {
       return res.status(404).json({
-        message: 'Data perencanaan tidak ditemukan'
+        message:
+          'Data perencanaan tidak ditemukan atau bukan milik instansi Anda'
       });
     }
 
@@ -1432,21 +2235,24 @@ exports.createRencanaDokumentasi = async (req, res) => {
       });
     }
 
-    // Validasi penanggung jawab jika diisi
+    // Penanggung jawab
     let penanggungJawabId = null;
 
     if (
       penanggung_jawab_id !== null &&
       penanggung_jawab_id !== ''
     ) {
-      penanggungJawabId = Number(penanggung_jawab_id);
+      penanggungJawabId = Number(
+        penanggung_jawab_id
+      );
 
       if (
         !Number.isInteger(penanggungJawabId) ||
         penanggungJawabId <= 0
       ) {
         return res.status(400).json({
-          message: 'ID penanggung jawab tidak valid'
+          message:
+            'ID penanggung jawab tidak valid'
         });
       }
 
@@ -1462,12 +2268,13 @@ exports.createRencanaDokumentasi = async (req, res) => {
 
       if (user.length === 0) {
         return res.status(400).json({
-          message: 'Penanggung jawab tidak ditemukan'
+          message:
+            'Penanggung jawab tidak ditemukan'
         });
       }
     }
 
-    // Cek duplicate perencanaan + pengetahuan
+    // Duplicate
     const [existing] = await db.query(
       `
       SELECT id
@@ -1481,7 +2288,8 @@ exports.createRencanaDokumentasi = async (req, res) => {
 
     if (existing.length > 0) {
       return res.status(409).json({
-        message: 'Pengetahuan tersebut sudah memiliki rencana dokumentasi pada perencanaan ini'
+        message:
+          'Pengetahuan tersebut sudah memiliki rencana dokumentasi pada perencanaan ini'
       });
     }
 
@@ -1510,7 +2318,8 @@ exports.createRencanaDokumentasi = async (req, res) => {
       ]
     );
 
-    const rencanaDokumentasiId = result.insertId;
+    const rencanaDokumentasiId =
+      result.insertId;
 
     for (const tipe of tipeUnik) {
       await connection.query(
@@ -1532,13 +2341,15 @@ exports.createRencanaDokumentasi = async (req, res) => {
     await connection.commit();
 
     return res.status(201).json({
-      message: 'Rencana dokumentasi berhasil disimpan',
+      message:
+        'Rencana dokumentasi berhasil disimpan',
       data: {
         id: rencanaDokumentasiId,
         perencanaan_id: perencanaanId,
         pengetahuan_id: pengetahuanId,
         ditargetkan_tahun_ini: ditargetkan,
-        penanggung_jawab_id: penanggungJawabId,
+        penanggung_jawab_id:
+          penanggungJawabId,
         target_waktu_dokumentasi:
           target_waktu_dokumentasi || null,
         tipe_dokumentasi: tipeUnik
@@ -1550,11 +2361,25 @@ exports.createRencanaDokumentasi = async (req, res) => {
       await connection.rollback();
     }
 
-    console.error('ERROR CREATE RENCANA DOKUMENTASI:', error);
+    console.error(
+      'ERROR CREATE RENCANA DOKUMENTASI:',
+      error
+    );
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Pengetahuan tersebut sudah memiliki rencana dokumentasi pada perencanaan ini'
+        message:
+          'Pengetahuan tersebut sudah memiliki rencana dokumentasi pada perencanaan ini'
       });
     }
 
@@ -1569,14 +2394,22 @@ exports.createRencanaDokumentasi = async (req, res) => {
   }
 };
 
+
 exports.updateRencanaDokumentasi = async (req, res) => {
   let connection;
+  let transactionStarted = false;
 
   try {
     const id = Number(req.params.id);
 
     const {
-      pengetahuan_id,
+      kode_pengetahuan,
+      nama_layanan,
+      nama_pengetahuan,
+      jenis_pengetahuan,
+      sudah_terdokumentasi,
+      aspek_pemdi,
+      indikator_pemdi,
       ditargetkan_tahun_ini,
       penanggung_jawab_id,
       target_waktu_dokumentasi = null,
@@ -1589,158 +2422,222 @@ exports.updateRencanaDokumentasi = async (req, res) => {
       });
     }
 
-    // Cek data rencana
-    const [rencana] = await db.query(
-      `
-      SELECT
-        id,
-        perencanaan_id
-      FROM mpn_rencana_dokumentasi
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
+    const kode = String(kode_pengetahuan || '').trim();
+    const layanan = String(nama_layanan || '').trim();
+    const nama = String(nama_pengetahuan || '').trim();
 
-    if (rencana.length === 0) {
-      return res.status(404).json({
-        message: 'Rencana dokumentasi tidak ditemukan'
-      });
-    }
-
-    const perencanaanId = rencana[0].perencanaan_id;
-
-    // Validasi pengetahuan
-    const pengetahuanId = Number(pengetahuan_id);
-
-    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
+    if (!kode || !layanan || !nama) {
       return res.status(400).json({
-        message: 'ID pengetahuan tidak valid'
+        message: 'ID Pengetahuan, Nama Layanan, dan Nama Pengetahuan wajib diisi'
       });
     }
 
-    // Validasi ditargetkan tahun ini
+    if (!['Eksplisit', 'Implisit'].includes(jenis_pengetahuan)) {
+      return res.status(400).json({
+        message: 'Jenis pengetahuan tidak valid'
+      });
+    }
+
+    const terdokumentasi = Number(sudah_terdokumentasi);
     const ditargetkan = Number(ditargetkan_tahun_ini);
+    const penanggungJawabId = Number(penanggung_jawab_id);
 
-    if (![0, 1].includes(ditargetkan)) {
+    if (
+      ![0, 1].includes(terdokumentasi) ||
+      ![0, 1].includes(ditargetkan)
+    ) {
       return res.status(400).json({
-        message: 'Ditargetkan tahun ini harus bernilai 0 atau 1'
+        message: 'Status dokumentasi dan target tidak valid'
       });
     }
-
-    // Penanggung jawab wajib
-    const penanggungJawabId = Number(penanggung_jawab_id);
 
     if (
       !Number.isInteger(penanggungJawabId) ||
       penanggungJawabId <= 0
     ) {
       return res.status(400).json({
-        message: 'Penanggung jawab wajib diisi dan harus valid'
+        message: 'Penanggung jawab dokumentasi wajib dipilih'
       });
     }
 
-    // Validasi tipe dokumentasi
+    const tipeValid = ['Teks', 'Gambar', 'Audio', 'Video'];
+
     if (
       !Array.isArray(tipe_dokumentasi) ||
-      tipe_dokumentasi.length === 0
+      tipe_dokumentasi.length === 0 ||
+      tipe_dokumentasi.some((tipe) => !tipeValid.includes(tipe))
     ) {
       return res.status(400).json({
-        message: 'Tipe dokumentasi wajib diisi'
+        message: 'Pilih minimal satu tipe dokumentasi yang valid'
       });
     }
-
-    const tipeValid = [
-      'Teks',
-      'Gambar',
-      'Audio',
-      'Video'
-    ];
 
     const tipeUnik = [...new Set(tipe_dokumentasi)];
+    const instansiAkunId = await getUserInstansiId(req);
 
-    if (
-      tipeUnik.some(tipe => !tipeValid.includes(tipe))
-    ) {
-      return res.status(400).json({
-        message: 'Tipe dokumentasi tidak valid'
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    transactionStarted = true;
+
+    const [rencana] = await connection.query(
+      `
+      SELECT
+        rd.id,
+        rd.perencanaan_id,
+        rd.pengetahuan_id,
+        p.instansi_id
+      FROM mpn_rencana_dokumentasi rd
+      JOIN mpn_perencanaan p
+        ON p.id = rd.perencanaan_id
+      WHERE rd.id = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [id]
+    );
+
+    if (rencana.length === 0) {
+      await connection.rollback();
+      transactionStarted = false;
+
+      return res.status(404).json({
+        message: 'Rencana dokumentasi tidak ditemukan'
       });
     }
 
-    // Cek pengetahuan
-    const [pengetahuan] = await db.query(
+    const instansiId = Number(rencana[0].instansi_id);
+    const pengetahuanId = Number(rencana[0].pengetahuan_id);
+
+    if (
+      instansiAkunId !== null &&
+      instansiAkunId !== instansiId
+    ) {
+      await connection.rollback();
+      transactionStarted = false;
+
+      return res.status(403).json({
+        message: 'Anda tidak memiliki akses ke data instansi lain'
+      });
+    }
+
+    const [pengetahuan] = await connection.query(
       `
-      SELECT id
+      SELECT id, pemilik_instansi_id
       FROM mpn_pengetahuan
       WHERE id = ?
       LIMIT 1
+      FOR UPDATE
       `,
       [pengetahuanId]
     );
 
-    if (pengetahuan.length === 0) {
-      return res.status(400).json({
-        message: 'Data pengetahuan tidak ditemukan'
+    if (
+      pengetahuan.length === 0 ||
+      Number(pengetahuan[0].pemilik_instansi_id) !== instansiId
+    ) {
+      await connection.rollback();
+      transactionStarted = false;
+
+      return res.status(403).json({
+        message: 'Pengetahuan bukan milik instansi perencanaan'
       });
     }
 
-    // Cek user penanggung jawab
-    const [user] = await db.query(
+    const [pemakaianLain] = await connection.query(
+      `
+      SELECT id
+      FROM mpn_rencana_dokumentasi
+      WHERE pengetahuan_id = ?
+        AND id <> ?
+      LIMIT 1
+      `,
+      [pengetahuanId, id]
+    );
+
+    if (pemakaianLain.length > 0) {
+      await connection.rollback();
+      transactionStarted = false;
+
+      return res.status(409).json({
+        message: 'Pengetahuan ini digunakan pada rencana lain dan tidak dapat diedit bersama'
+      });
+    }
+
+    const [duplikat] = await connection.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE kode_pengetahuan = ?
+        AND id <> ?
+      LIMIT 1
+      `,
+      [kode, pengetahuanId]
+    );
+
+    if (duplikat.length > 0) {
+      await connection.rollback();
+      transactionStarted = false;
+
+      return res.status(409).json({
+        message: 'ID Pengetahuan sudah digunakan'
+      });
+    }
+
+    const [penanggungJawab] = await connection.query(
       `
       SELECT id
       FROM users
       WHERE id = ?
+        AND instansi_id = ?
       LIMIT 1
       `,
-      [penanggungJawabId]
+      [penanggungJawabId, instansiId]
     );
 
-    if (user.length === 0) {
+    if (penanggungJawab.length === 0) {
+      await connection.rollback();
+      transactionStarted = false;
+
       return res.status(400).json({
-        message: 'Penanggung jawab tidak ditemukan'
+        message: 'Penanggung jawab harus berasal dari instansi yang sama'
       });
     }
 
-    // Cek duplicate dalam perencanaan yang sama,
-    // kecuali data yang sedang diedit
-    const [duplicate] = await db.query(
+    await connection.query(
       `
-      SELECT id
-      FROM mpn_rencana_dokumentasi
-      WHERE perencanaan_id = ?
-        AND pengetahuan_id = ?
-        AND id <> ?
-      LIMIT 1
+      UPDATE mpn_pengetahuan
+      SET
+        kode_pengetahuan = ?,
+        nama_layanan = ?,
+        nama_pengetahuan = ?,
+        jenis_pengetahuan = ?,
+        sudah_terdokumentasi = ?,
+        aspek_pemdi = ?,
+        indikator_pemdi = ?
+      WHERE id = ?
       `,
       [
-        perencanaanId,
-        pengetahuanId,
-        id
+        kode,
+        layanan,
+        nama,
+        jenis_pengetahuan,
+        terdokumentasi,
+        aspek_pemdi || null,
+        indikator_pemdi || null,
+        pengetahuanId
       ]
     );
-
-    if (duplicate.length > 0) {
-      return res.status(409).json({
-        message: 'Pengetahuan tersebut sudah memiliki rencana dokumentasi pada perencanaan ini'
-      });
-    }
-
-    connection = await db.getConnection();
-
-    await connection.beginTransaction();
 
     await connection.query(
       `
       UPDATE mpn_rencana_dokumentasi
       SET
-        pengetahuan_id = ?,
         ditargetkan_tahun_ini = ?,
         penanggung_jawab_id = ?,
         target_waktu_dokumentasi = ?
       WHERE id = ?
       `,
       [
-        pengetahuanId,
         ditargetkan,
         penanggungJawabId,
         target_waktu_dokumentasi || null,
@@ -1748,7 +2645,6 @@ exports.updateRencanaDokumentasi = async (req, res) => {
       ]
     );
 
-    // Hapus tipe lama
     await connection.query(
       `
       DELETE FROM mpn_rencana_tipe_dokumentasi
@@ -1757,12 +2653,10 @@ exports.updateRencanaDokumentasi = async (req, res) => {
       [id]
     );
 
-    // Simpan tipe baru
     for (const tipe of tipeUnik) {
       await connection.query(
         `
-        INSERT INTO mpn_rencana_tipe_dokumentasi
-        (
+        INSERT INTO mpn_rencana_tipe_dokumentasi (
           rencana_dokumentasi_id,
           tipe_dokumentasi
         )
@@ -1773,44 +2667,58 @@ exports.updateRencanaDokumentasi = async (req, res) => {
     }
 
     await connection.commit();
+    transactionStarted = false;
 
     return res.status(200).json({
       message: 'Rencana dokumentasi berhasil diperbarui',
       data: {
         id,
-        perencanaan_id: perencanaanId,
         pengetahuan_id: pengetahuanId,
+        kode_pengetahuan: kode,
+        nama_layanan: layanan,
+        nama_pengetahuan: nama,
+        jenis_pengetahuan,
+        sudah_terdokumentasi: terdokumentasi,
+        aspek_pemdi,
+        indikator_pemdi,
         ditargetkan_tahun_ini: ditargetkan,
         penanggung_jawab_id: penanggungJawabId,
-        target_waktu_dokumentasi:
-          target_waktu_dokumentasi || null,
+        target_waktu_dokumentasi: target_waktu_dokumentasi || null,
         tipe_dokumentasi: tipeUnik
       }
     });
-
   } catch (error) {
-    if (connection) {
+    if (connection && transactionStarted) {
       await connection.rollback();
     }
 
     console.error('ERROR UPDATE RENCANA DOKUMENTASI:', error);
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message: 'Pengetahuan tersebut sudah memiliki rencana dokumentasi pada perencanaan ini'
+        message: 'ID Pengetahuan sudah digunakan'
       });
     }
 
     return res.status(500).json({
-      message: 'Terjadi kesalahan pada server'
+      message: 'Gagal memperbarui rencana dokumentasi'
     });
-
   } finally {
     if (connection) {
       connection.release();
     }
   }
 };
+
 
 exports.deleteRencanaDokumentasi = async (req, res) => {
   try {
@@ -1824,9 +2732,14 @@ exports.deleteRencanaDokumentasi = async (req, res) => {
 
     const [rencana] = await db.query(
       `
-      SELECT id
-      FROM mpn_rencana_dokumentasi
-      WHERE id = ?
+      SELECT
+        rd.id,
+        rd.perencanaan_id,
+        p.instansi_id
+      FROM mpn_rencana_dokumentasi rd
+      JOIN mpn_perencanaan p
+        ON p.id = rd.perencanaan_id
+      WHERE rd.id = ?
       LIMIT 1
       `,
       [id]
@@ -1835,6 +2748,19 @@ exports.deleteRencanaDokumentasi = async (req, res) => {
     if (rencana.length === 0) {
       return res.status(404).json({
         message: 'Rencana dokumentasi tidak ditemukan'
+      });
+    }
+
+    const instansiId =
+      await getUserInstansiId(req);
+
+    if (
+      instansiId !== null &&
+      Number(rencana[0].instansi_id) !== instansiId
+    ) {
+      return res.status(403).json({
+        message:
+          'Anda tidak memiliki akses untuk menghapus rencana dokumentasi instansi lain'
       });
     }
 
@@ -1854,6 +2780,16 @@ exports.deleteRencanaDokumentasi = async (req, res) => {
     console.error('ERROR DELETE RENCANA DOKUMENTASI:', error);
 
     if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message:
+          'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
+    if (
       error.code === 'ER_ROW_IS_REFERENCED_2' ||
       error.code === 'ER_ROW_IS_REFERENCED'
     ) {
@@ -1868,9 +2804,12 @@ exports.deleteRencanaDokumentasi = async (req, res) => {
   }
 };
 
+
 exports.getAllPengumpulanPengolahan = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const instansiId = await getUserInstansiId(req);
+
+    const query = `
       SELECT
         pp.id,
         pp.rencana_dokumentasi_id,
@@ -1884,7 +2823,10 @@ exports.getAllPengumpulanPengolahan = async (req, res) => {
         ) AS tanggal_pengumpulan,
 
         pp.unit_pengumpulan_id,
-        uk.nama_unit AS unit_pengumpulan,
+        COALESCE(
+          pp.unit_pengumpulan,
+          uk.nama_unit
+        ) AS unit_pengumpulan,
 
         pp.lokasi_penyimpanan,
         pp.keterangan_lokasi_lainnya,
@@ -1906,7 +2848,7 @@ exports.getAllPengumpulanPengolahan = async (req, res) => {
       JOIN mpn_pengetahuan p
         ON p.id = pp.pengetahuan_id
 
-      JOIN unit_kerja uk
+      LEFT JOIN unit_kerja uk
         ON uk.id = pp.unit_pengumpulan_id
 
       LEFT JOIN mpn_pengetahuan ph
@@ -1915,21 +2857,36 @@ exports.getAllPengumpulanPengolahan = async (req, res) => {
       JOIN users u
         ON u.id = pp.created_by
 
+      WHERE (? IS NULL OR p.pemilik_instansi_id = ?)
+
       ORDER BY pp.created_at DESC
-    `);
+    `;
+
+    const [rows] = await db.query(query, [
+      instansiId,
+      instansiId
+    ]);
 
     return res.status(200).json({
       data: rows
     });
-
   } catch (error) {
     console.error(
       'ERROR GET PENGUMPULAN PENGOLAHAN:',
       error
     );
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
-      message: 'Terjadi kesalahan pada server'
+      message: 'Gagal mengambil data pengumpulan dan pengolahan'
     });
   }
 };
@@ -1940,7 +2897,7 @@ exports.createPengumpulanPengolahan = async (req, res) => {
       rencana_dokumentasi_id = null,
       pengetahuan_id,
       tanggal_pengumpulan,
-      unit_pengumpulan_id,
+      unit_pengumpulan,
       lokasi_penyimpanan = null,
       keterangan_lokasi_lainnya = null,
       status_publikasi_simpan = null,
@@ -1949,54 +2906,47 @@ exports.createPengumpulanPengolahan = async (req, res) => {
       pengetahuan_hasil_id = null
     } = req.body;
 
-    const created_by = req.user.id;
-
-    // =========================
-    // VALIDASI FIELD WAJIB
-    // =========================
-
+    const createdBy = Number(req.user?.id);
+    const instansiId = await getUserInstansiId(req);
     const pengetahuanId = Number(pengetahuan_id);
-    const unitPengumpulanId = Number(unit_pengumpulan_id);
+    const unitPengumpulan = String(unit_pengumpulan || '').trim();
 
-    if (
-      !Number.isInteger(pengetahuanId) ||
-      pengetahuanId <= 0
-    ) {
-      return res.status(400).json({
-        message: 'ID pengetahuan wajib diisi dan harus valid'
+    if (!Number.isInteger(createdBy) || createdBy <= 0) {
+      return res.status(401).json({
+        message: 'Pengguna belum terautentikasi'
       });
     }
 
-    if (!tanggal_pengumpulan) {
+    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
       return res.status(400).json({
-        message: 'Tanggal pengumpulan wajib diisi'
+        message: 'Pengetahuan wajib dipilih'
       });
     }
 
     if (
+      typeof tanggal_pengumpulan !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pengumpulan)
     ) {
       return res.status(400).json({
-        message: 'Format tanggal pengumpulan harus YYYY-MM-DD'
+        message: 'Tanggal pengumpulan wajib diisi dengan benar'
       });
     }
 
-    if (
-      !Number.isInteger(unitPengumpulanId) ||
-      unitPengumpulanId <= 0
-    ) {
+    if (!unitPengumpulan) {
       return res.status(400).json({
-        message: 'Unit pengumpulan wajib diisi dan harus valid'
+        message: 'Unit Pengumpulan wajib diisi'
       });
     }
 
-    // =========================
-    // CEK PENGETAHUAN
-    // =========================
+    if (unitPengumpulan.length > 255) {
+      return res.status(400).json({
+        message: 'Unit Pengumpulan maksimal 255 karakter'
+      });
+    }
 
     const [pengetahuan] = await db.query(
       `
-      SELECT id
+      SELECT id, pemilik_instansi_id
       FROM mpn_pengetahuan
       WHERE id = ?
       LIMIT 1
@@ -2010,30 +2960,27 @@ exports.createPengumpulanPengolahan = async (req, res) => {
       });
     }
 
-    // =========================
-    // CEK UNIT KERJA
-    // =========================
-
-    const [unit] = await db.query(
-      `
-      SELECT id
-      FROM unit_kerja
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [unitPengumpulanId]
-    );
-
-    if (unit.length === 0) {
-      return res.status(400).json({
-        message: 'Unit pengumpulan tidak ditemukan'
+    if (
+      instansiId !== null &&
+      Number(pengetahuan[0].pemilik_instansi_id) !== instansiId
+    ) {
+      return res.status(403).json({
+        message: 'Pengetahuan bukan milik instansi Anda'
       });
     }
 
-    // =========================
-    // CEK RENCANA DOKUMENTASI
-    // jika dikirim
-    // =========================
+    const instansiPengetahuanId = Number(
+      pengetahuan[0].pemilik_instansi_id
+    );
+
+    if (
+      !Number.isInteger(instansiPengetahuanId) ||
+      instansiPengetahuanId <= 0
+    ) {
+      return res.status(400).json({
+        message: 'Instansi pemilik pengetahuan belum ditentukan'
+      });
+    }
 
     let rencanaDokumentasiId = null;
 
@@ -2041,8 +2988,7 @@ exports.createPengumpulanPengolahan = async (req, res) => {
       rencana_dokumentasi_id !== null &&
       rencana_dokumentasi_id !== ''
     ) {
-      rencanaDokumentasiId =
-        Number(rencana_dokumentasi_id);
+      rencanaDokumentasiId = Number(rencana_dokumentasi_id);
 
       if (
         !Number.isInteger(rencanaDokumentasiId) ||
@@ -2056,10 +3002,13 @@ exports.createPengumpulanPengolahan = async (req, res) => {
       const [rencana] = await db.query(
         `
         SELECT
-          id,
-          pengetahuan_id
-        FROM mpn_rencana_dokumentasi
-        WHERE id = ?
+          rd.id,
+          rd.pengetahuan_id,
+          p.instansi_id
+        FROM mpn_rencana_dokumentasi rd
+        JOIN mpn_perencanaan p
+          ON p.id = rd.perencanaan_id
+        WHERE rd.id = ?
         LIMIT 1
         `,
         [rencanaDokumentasiId]
@@ -2071,22 +3020,15 @@ exports.createPengumpulanPengolahan = async (req, res) => {
         });
       }
 
-      // Business rule:
-      // rencana harus merujuk pengetahuan yang sama
       if (
-        Number(rencana[0].pengetahuan_id) !==
-        pengetahuanId
+        Number(rencana[0].pengetahuan_id) !== pengetahuanId ||
+        Number(rencana[0].instansi_id) !== instansiPengetahuanId
       ) {
         return res.status(400).json({
-          message: 'Pengetahuan tidak sesuai dengan rencana dokumentasi'
+          message: 'Rencana dokumentasi tidak sesuai dengan pengetahuan'
         });
       }
     }
-
-    // =========================
-    // CEK PENGETAHUAN HASIL
-    // jika dikirim
-    // =========================
 
     let pengetahuanHasilId = null;
 
@@ -2094,8 +3036,7 @@ exports.createPengumpulanPengolahan = async (req, res) => {
       pengetahuan_hasil_id !== null &&
       pengetahuan_hasil_id !== ''
     ) {
-      pengetahuanHasilId =
-        Number(pengetahuan_hasil_id);
+      pengetahuanHasilId = Number(pengetahuan_hasil_id);
 
       if (
         !Number.isInteger(pengetahuanHasilId) ||
@@ -2111,25 +3052,22 @@ exports.createPengumpulanPengolahan = async (req, res) => {
         SELECT id
         FROM mpn_pengetahuan
         WHERE id = ?
+          AND pemilik_instansi_id = ?
         LIMIT 1
         `,
-        [pengetahuanHasilId]
+        [pengetahuanHasilId, instansiPengetahuanId]
       );
 
       if (hasil.length === 0) {
         return res.status(400).json({
-          message: 'Data pengetahuan hasil tidak ditemukan'
+          message: 'Pengetahuan hasil tidak ditemukan pada instansi ini'
         });
       }
     }
 
-    // =========================
-    // VALIDASI PANJANG VARCHAR
-    // =========================
-
     if (
       lokasi_penyimpanan &&
-      lokasi_penyimpanan.length > 255
+      String(lokasi_penyimpanan).length > 255
     ) {
       return res.status(400).json({
         message: 'Lokasi penyimpanan maksimal 255 karakter'
@@ -2138,7 +3076,7 @@ exports.createPengumpulanPengolahan = async (req, res) => {
 
     if (
       status_publikasi_simpan &&
-      status_publikasi_simpan.length > 100
+      String(status_publikasi_simpan).length > 100
     ) {
       return res.status(400).json({
         message: 'Status publikasi/simpan maksimal 100 karakter'
@@ -2147,25 +3085,21 @@ exports.createPengumpulanPengolahan = async (req, res) => {
 
     if (
       metode_pengolahan &&
-      metode_pengolahan.length > 150
+      String(metode_pengolahan).length > 150
     ) {
       return res.status(400).json({
         message: 'Metode pengolahan maksimal 150 karakter'
       });
     }
 
-    // =========================
-    // INSERT
-    // =========================
-
     const [result] = await db.query(
       `
-      INSERT INTO mpn_pengumpulan_pengolahan
-      (
+      INSERT INTO mpn_pengumpulan_pengolahan (
         rencana_dokumentasi_id,
         pengetahuan_id,
         tanggal_pengumpulan,
         unit_pengumpulan_id,
+        unit_pengumpulan,
         lokasi_penyimpanan,
         keterangan_lokasi_lainnya,
         status_publikasi_simpan,
@@ -2174,20 +3108,21 @@ exports.createPengumpulanPengolahan = async (req, res) => {
         pengetahuan_hasil_id,
         created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         rencanaDokumentasiId,
         pengetahuanId,
         tanggal_pengumpulan,
-        unitPengumpulanId,
+        null,
+        unitPengumpulan,
         lokasi_penyimpanan || null,
         keterangan_lokasi_lainnya || null,
         status_publikasi_simpan || null,
         metode_pengolahan || null,
         deskripsi_pengolahan || null,
         pengetahuanHasilId,
-        created_by
+        createdBy
       ]
     );
 
@@ -2198,27 +3133,28 @@ exports.createPengumpulanPengolahan = async (req, res) => {
         rencana_dokumentasi_id: rencanaDokumentasiId,
         pengetahuan_id: pengetahuanId,
         tanggal_pengumpulan,
-        unit_pengumpulan_id: unitPengumpulanId,
-        lokasi_penyimpanan:
-          lokasi_penyimpanan || null,
-        keterangan_lokasi_lainnya:
-          keterangan_lokasi_lainnya || null,
-        status_publikasi_simpan:
-          status_publikasi_simpan || null,
-        metode_pengolahan:
-          metode_pengolahan || null,
-        deskripsi_pengolahan:
-          deskripsi_pengolahan || null,
+        unit_pengumpulan_id: null,
+        unit_pengumpulan: unitPengumpulan,
+        lokasi_penyimpanan: lokasi_penyimpanan || null,
+        keterangan_lokasi_lainnya: keterangan_lokasi_lainnya || null,
+        status_publikasi_simpan: status_publikasi_simpan || null,
+        metode_pengolahan: metode_pengolahan || null,
+        deskripsi_pengolahan: deskripsi_pengolahan || null,
         pengetahuan_hasil_id: pengetahuanHasilId,
-        created_by
+        created_by: createdBy
       }
     });
-
   } catch (error) {
-    console.error(
-      'ERROR CREATE PENGUMPULAN PENGOLAHAN:',
-      error
-    );
+    console.error('ERROR CREATE PENGUMPULAN PENGOLAHAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -2252,7 +3188,7 @@ exports.getDetailPengumpulanPengolahan = async (req, res) => {
         ) AS tanggal_pengumpulan,
 
         pp.unit_pengumpulan_id,
-        uk.nama_unit AS unit_pengumpulan,
+        COALESCE(pp.unit_pengumpulan, uk.nama_unit) AS unit_pengumpulan,
 
         pp.lokasi_penyimpanan,
         pp.keterangan_lokasi_lainnya,
@@ -2274,7 +3210,7 @@ exports.getDetailPengumpulanPengolahan = async (req, res) => {
       JOIN mpn_pengetahuan p
         ON p.id = pp.pengetahuan_id
 
-      JOIN unit_kerja uk
+      LEFT JOIN unit_kerja uk
         ON uk.id = pp.unit_pengumpulan_id
 
       LEFT JOIN mpn_pengetahuan ph
@@ -2311,6 +3247,7 @@ exports.getDetailPengumpulanPengolahan = async (req, res) => {
   }
 };
 
+
 exports.updatePengumpulanPengolahan = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2319,7 +3256,7 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       rencana_dokumentasi_id = null,
       pengetahuan_id,
       tanggal_pengumpulan,
-      unit_pengumpulan_id,
+      unit_pengumpulan,
       lokasi_penyimpanan = null,
       keterangan_lokasi_lainnya = null,
       status_publikasi_simpan = null,
@@ -2328,21 +3265,26 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       pengetahuan_hasil_id = null
     } = req.body;
 
-    // =========================
-    // CEK ID
-    // =========================
-
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({
         message: 'ID pengumpulan dan pengolahan tidak valid'
       });
     }
 
+    const instansiAkunId = await getUserInstansiId(req);
+    const pengetahuanId = Number(pengetahuan_id);
+    const unitPengumpulan = String(unit_pengumpulan || '').trim();
+
     const [existingData] = await db.query(
       `
-      SELECT id
-      FROM mpn_pengumpulan_pengolahan
-      WHERE id = ?
+      SELECT
+        pp.id,
+        pp.pengetahuan_id,
+        p.pemilik_instansi_id
+      FROM mpn_pengumpulan_pengolahan pp
+      JOIN mpn_pengetahuan p
+        ON p.id = pp.pengetahuan_id
+      WHERE pp.id = ?
       LIMIT 1
       `,
       [id]
@@ -2354,52 +3296,60 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       });
     }
 
-    // =========================
-    // VALIDASI FIELD WAJIB
-    // =========================
-
-    const pengetahuanId = Number(pengetahuan_id);
-    const unitPengumpulanId = Number(unit_pengumpulan_id);
+    const instansiDataId = Number(
+      existingData[0].pemilik_instansi_id
+    );
 
     if (
-      !Number.isInteger(pengetahuanId) ||
-      pengetahuanId <= 0
+      instansiAkunId !== null &&
+      instansiDataId !== instansiAkunId
     ) {
-      return res.status(400).json({
-        message: 'ID pengetahuan wajib diisi dan harus valid'
+      return res.status(403).json({
+        message: 'Anda tidak memiliki akses untuk mengubah data instansi lain'
       });
     }
 
-    if (!tanggal_pengumpulan) {
+    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
       return res.status(400).json({
-        message: 'Tanggal pengumpulan wajib diisi'
+        message: 'Pengetahuan wajib dipilih'
       });
     }
 
     if (
+      typeof tanggal_pengumpulan !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pengumpulan)
     ) {
       return res.status(400).json({
-        message: 'Format tanggal pengumpulan harus YYYY-MM-DD'
+        message: 'Tanggal pengumpulan wajib diisi dengan format yang benar'
       });
     }
+
+    const tanggal = new Date(`${tanggal_pengumpulan}T00:00:00Z`);
 
     if (
-      !Number.isInteger(unitPengumpulanId) ||
-      unitPengumpulanId <= 0
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_pengumpulan
     ) {
       return res.status(400).json({
-        message: 'Unit pengumpulan wajib diisi dan harus valid'
+        message: 'Tanggal pengumpulan tidak valid'
       });
     }
 
-    // =========================
-    // CEK PENGETAHUAN
-    // =========================
+    if (!unitPengumpulan) {
+      return res.status(400).json({
+        message: 'Unit Pengumpulan wajib diisi'
+      });
+    }
+
+    if (unitPengumpulan.length > 255) {
+      return res.status(400).json({
+        message: 'Unit Pengumpulan maksimal 255 karakter'
+      });
+    }
 
     const [pengetahuan] = await db.query(
       `
-      SELECT id
+      SELECT id, pemilik_instansi_id
       FROM mpn_pengetahuan
       WHERE id = ?
       LIMIT 1
@@ -2413,29 +3363,21 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       });
     }
 
-    // =========================
-    // CEK UNIT KERJA
-    // =========================
-
-    const [unit] = await db.query(
-      `
-      SELECT id
-      FROM unit_kerja
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [unitPengumpulanId]
+    const instansiPengetahuanId = Number(
+      pengetahuan[0].pemilik_instansi_id
     );
 
-    if (unit.length === 0) {
-      return res.status(400).json({
-        message: 'Unit pengumpulan tidak ditemukan'
+    if (
+      instansiPengetahuanId !== instansiDataId ||
+      (
+        instansiAkunId !== null &&
+        instansiPengetahuanId !== instansiAkunId
+      )
+    ) {
+      return res.status(403).json({
+        message: 'Pengetahuan harus berasal dari instansi yang sama'
       });
     }
-
-    // =========================
-    // CEK RENCANA DOKUMENTASI
-    // =========================
 
     let rencanaDokumentasiId = null;
 
@@ -2443,8 +3385,7 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       rencana_dokumentasi_id !== null &&
       rencana_dokumentasi_id !== ''
     ) {
-      rencanaDokumentasiId =
-        Number(rencana_dokumentasi_id);
+      rencanaDokumentasiId = Number(rencana_dokumentasi_id);
 
       if (
         !Number.isInteger(rencanaDokumentasiId) ||
@@ -2458,10 +3399,13 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       const [rencana] = await db.query(
         `
         SELECT
-          id,
-          pengetahuan_id
-        FROM mpn_rencana_dokumentasi
-        WHERE id = ?
+          rd.id,
+          rd.pengetahuan_id,
+          p.instansi_id
+        FROM mpn_rencana_dokumentasi rd
+        JOIN mpn_perencanaan p
+          ON p.id = rd.perencanaan_id
+        WHERE rd.id = ?
         LIMIT 1
         `,
         [rencanaDokumentasiId]
@@ -2474,18 +3418,14 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       }
 
       if (
-        Number(rencana[0].pengetahuan_id) !==
-        pengetahuanId
+        Number(rencana[0].pengetahuan_id) !== pengetahuanId ||
+        Number(rencana[0].instansi_id) !== instansiDataId
       ) {
         return res.status(400).json({
-          message: 'Pengetahuan tidak sesuai dengan rencana dokumentasi'
+          message: 'Rencana dokumentasi tidak sesuai dengan pengetahuan'
         });
       }
     }
-
-    // =========================
-    // CEK PENGETAHUAN HASIL
-    // =========================
 
     let pengetahuanHasilId = null;
 
@@ -2493,8 +3433,7 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
       pengetahuan_hasil_id !== null &&
       pengetahuan_hasil_id !== ''
     ) {
-      pengetahuanHasilId =
-        Number(pengetahuan_hasil_id);
+      pengetahuanHasilId = Number(pengetahuan_hasil_id);
 
       if (
         !Number.isInteger(pengetahuanHasilId) ||
@@ -2510,25 +3449,25 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
         SELECT id
         FROM mpn_pengetahuan
         WHERE id = ?
+          AND pemilik_instansi_id = ?
         LIMIT 1
         `,
-        [pengetahuanHasilId]
+        [pengetahuanHasilId, instansiDataId]
       );
 
       if (hasil.length === 0) {
         return res.status(400).json({
-          message: 'Data pengetahuan hasil tidak ditemukan'
+          message: 'Pengetahuan hasil tidak ditemukan pada instansi ini'
         });
       }
     }
 
-    // =========================
-    // VALIDASI PANJANG FIELD
-    // =========================
-
     if (
-      lokasi_penyimpanan &&
-      lokasi_penyimpanan.length > 255
+      lokasi_penyimpanan !== null &&
+      (
+        typeof lokasi_penyimpanan !== 'string' ||
+        lokasi_penyimpanan.length > 255
+      )
     ) {
       return res.status(400).json({
         message: 'Lokasi penyimpanan maksimal 255 karakter'
@@ -2536,8 +3475,11 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
     }
 
     if (
-      status_publikasi_simpan &&
-      status_publikasi_simpan.length > 100
+      status_publikasi_simpan !== null &&
+      (
+        typeof status_publikasi_simpan !== 'string' ||
+        status_publikasi_simpan.length > 100
+      )
     ) {
       return res.status(400).json({
         message: 'Status publikasi/simpan maksimal 100 karakter'
@@ -2545,26 +3487,26 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
     }
 
     if (
-      metode_pengolahan &&
-      metode_pengolahan.length > 150
+      metode_pengolahan !== null &&
+      (
+        typeof metode_pengolahan !== 'string' ||
+        metode_pengolahan.length > 150
+      )
     ) {
       return res.status(400).json({
         message: 'Metode pengolahan maksimal 150 karakter'
       });
     }
 
-    // =========================
-    // UPDATE
-    // =========================
-
-    await db.query(
+    const [result] = await db.query(
       `
       UPDATE mpn_pengumpulan_pengolahan
       SET
         rencana_dokumentasi_id = ?,
         pengetahuan_id = ?,
         tanggal_pengumpulan = ?,
-        unit_pengumpulan_id = ?,
+        unit_pengumpulan_id = NULL,
+        unit_pengumpulan = ?,
         lokasi_penyimpanan = ?,
         keterangan_lokasi_lainnya = ?,
         status_publikasi_simpan = ?,
@@ -2572,21 +3514,33 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
         deskripsi_pengolahan = ?,
         pengetahuan_hasil_id = ?
       WHERE id = ?
+        AND pengetahuan_id IN (
+          SELECT id
+          FROM mpn_pengetahuan
+          WHERE pemilik_instansi_id = ?
+        )
       `,
       [
         rencanaDokumentasiId,
         pengetahuanId,
         tanggal_pengumpulan,
-        unitPengumpulanId,
+        unitPengumpulan,
         lokasi_penyimpanan || null,
         keterangan_lokasi_lainnya || null,
         status_publikasi_simpan || null,
         metode_pengolahan || null,
         deskripsi_pengolahan || null,
         pengetahuanHasilId,
-        id
+        id,
+        instansiDataId
       ]
     );
+
+    if (result.affectedRows === 0) {
+      return res.status(409).json({
+        message: 'Data tidak dapat diperbarui'
+      });
+    }
 
     return res.status(200).json({
       message: 'Data pengumpulan dan pengolahan berhasil diperbarui',
@@ -2595,26 +3549,27 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
         rencana_dokumentasi_id: rencanaDokumentasiId,
         pengetahuan_id: pengetahuanId,
         tanggal_pengumpulan,
-        unit_pengumpulan_id: unitPengumpulanId,
-        lokasi_penyimpanan:
-          lokasi_penyimpanan || null,
-        keterangan_lokasi_lainnya:
-          keterangan_lokasi_lainnya || null,
-        status_publikasi_simpan:
-          status_publikasi_simpan || null,
-        metode_pengolahan:
-          metode_pengolahan || null,
-        deskripsi_pengolahan:
-          deskripsi_pengolahan || null,
+        unit_pengumpulan_id: null,
+        unit_pengumpulan: unitPengumpulan,
+        lokasi_penyimpanan: lokasi_penyimpanan || null,
+        keterangan_lokasi_lainnya: keterangan_lokasi_lainnya || null,
+        status_publikasi_simpan: status_publikasi_simpan || null,
+        metode_pengolahan: metode_pengolahan || null,
+        deskripsi_pengolahan: deskripsi_pengolahan || null,
         pengetahuan_hasil_id: pengetahuanHasilId
       }
     });
-
   } catch (error) {
-    console.error(
-      'ERROR UPDATE PENGUMPULAN PENGOLAHAN:',
-      error
-    );
+    console.error('ERROR UPDATE PENGUMPULAN PENGOLAHAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -2622,9 +3577,11 @@ exports.updatePengumpulanPengolahan = async (req, res) => {
   }
 };
 
+
 exports.deletePengumpulanPengolahan = async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const instansiId = await getUserInstansiId(req);
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({
@@ -2632,29 +3589,51 @@ exports.deletePengumpulanPengolahan = async (req, res) => {
       });
     }
 
+    if (
+      instansiId !== null &&
+      (!Number.isInteger(Number(instansiId)) || Number(instansiId) <= 0)
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid'
+      });
+    }
+
     const [data] = await db.query(
       `
-      SELECT id
-      FROM mpn_pengumpulan_pengolahan
-      WHERE id = ?
+      SELECT pp.id
+      FROM mpn_pengumpulan_pengolahan pp
+      JOIN mpn_pengetahuan p
+        ON p.id = pp.pengetahuan_id
+      WHERE pp.id = ?
+        AND (? IS NULL OR p.pemilik_instansi_id = ?)
       LIMIT 1
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
 
     if (data.length === 0) {
       return res.status(404).json({
-        message: 'Data pengumpulan dan pengolahan tidak ditemukan'
+        message: 'Data tidak ditemukan atau tidak dapat diakses'
       });
     }
 
-    await db.query(
+    const [result] = await db.query(
       `
-      DELETE FROM mpn_pengumpulan_pengolahan
-      WHERE id = ?
+      DELETE pp
+      FROM mpn_pengumpulan_pengolahan pp
+      JOIN mpn_pengetahuan p
+        ON p.id = pp.pengetahuan_id
+      WHERE pp.id = ?
+        AND (? IS NULL OR p.pemilik_instansi_id = ?)
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Data tidak ditemukan atau tidak dapat diakses'
+      });
+    }
 
     return res.status(200).json({
       message: 'Data pengumpulan dan pengolahan berhasil dihapus'
@@ -2665,6 +3644,15 @@ exports.deletePengumpulanPengolahan = async (req, res) => {
       'ERROR DELETE PENGUMPULAN PENGOLAHAN:',
       error
     );
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (
       error.code === 'ER_ROW_IS_REFERENCED_2' ||
@@ -3719,7 +4707,10 @@ exports.getFileDokumentasi = async (req, res) => {
 
 exports.getAllPemanfaatan = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const instansiId = await getUserInstansiId(req);
+
+    const [rows] = await db.query(
+      `
       SELECT
         pm.id,
         pm.pengetahuan_id,
@@ -3734,7 +4725,10 @@ exports.getAllPemanfaatan = async (req, res) => {
         pm.jenis_pengguna,
 
         pm.unit_pengguna_id,
-        uk.nama_unit AS unit_pengguna,
+        COALESCE(
+          pm.unit_pengguna,
+          uk.nama_unit
+        ) AS unit_pengguna,
 
         pm.tujuan_pemanfaatan,
         pm.rating_pengetahuan,
@@ -3756,8 +4750,12 @@ exports.getAllPemanfaatan = async (req, res) => {
       JOIN users u
         ON u.id = pm.created_by
 
-      ORDER BY pm.created_at DESC
-    `);
+      WHERE (? IS NULL OR p.pemilik_instansi_id = ?)
+
+      ORDER BY pm.created_at DESC, pm.id DESC
+      `,
+      [instansiId, instansiId]
+    );
 
     return res.status(200).json({
       data: rows
@@ -3768,6 +4766,15 @@ exports.getAllPemanfaatan = async (req, res) => {
       'ERROR GET PEMANFAATAN PENGETAHUAN:',
       error
     );
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -3781,76 +4788,89 @@ exports.createPemanfaatan = async (req, res) => {
       pengetahuan_id,
       tanggal_pemanfaatan,
       jenis_pengguna,
-      unit_pengguna_id = null,
+      unit_pengguna = null,
       tujuan_pemanfaatan,
       rating_pengetahuan = null
     } = req.body;
 
-    const created_by = req.user.id;
-
-    // =========================
-    // VALIDASI PENGETAHUAN
-    // =========================
-
+    const created_by = Number(req.user?.id);
+    const instansiId = await getUserInstansiId(req);
     const pengetahuanId = Number(pengetahuan_id);
 
-    if (
-      !Number.isInteger(pengetahuanId) ||
-      pengetahuanId <= 0
-    ) {
-      return res.status(400).json({
-        message: 'ID pengetahuan wajib diisi dan harus valid'
+    if (!Number.isInteger(created_by) || created_by <= 0) {
+      return res.status(401).json({
+        message: 'Pengguna belum terautentikasi'
       });
     }
 
-    // =========================
-    // VALIDASI TANGGAL
-    // =========================
+    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
+      return res.status(400).json({
+        message: 'Pengetahuan wajib dipilih'
+      });
+    }
 
     if (
       typeof tanggal_pemanfaatan !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pemanfaatan)
     ) {
       return res.status(400).json({
-        message: 'Tanggal pemanfaatan wajib menggunakan format YYYY-MM-DD'
+        message: 'Tanggal pemanfaatan harus menggunakan format YYYY-MM-DD'
       });
     }
 
-    // =========================
-    // VALIDASI JENIS PENGGUNA
-    // =========================
+    const tanggal = new Date(`${tanggal_pemanfaatan}T00:00:00Z`);
 
-    const jenisPenggunaValid = [
-      'Publik',
-      'Internal'
-    ];
+    if (
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_pemanfaatan
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal pemanfaatan tidak valid'
+      });
+    }
 
-    if (!jenisPenggunaValid.includes(jenis_pengguna)) {
+    if (!['Publik', 'Internal'].includes(jenis_pengguna)) {
       return res.status(400).json({
         message: 'Jenis pengguna harus Publik atau Internal'
       });
     }
 
-    // =========================
-    // VALIDASI TUJUAN
-    // =========================
+    let unitPengguna = null;
+
+    if (jenis_pengguna === 'Internal') {
+      if (typeof unit_pengguna !== 'string') {
+        return res.status(400).json({
+          message: 'Unit Pengguna wajib diisi untuk pengguna internal'
+        });
+      }
+
+      unitPengguna = unit_pengguna.trim();
+
+      if (!unitPengguna) {
+        return res.status(400).json({
+          message: 'Unit Pengguna wajib diisi untuk pengguna internal'
+        });
+      }
+
+      if (unitPengguna.length > 255) {
+        return res.status(400).json({
+          message: 'Unit Pengguna maksimal 255 karakter'
+        });
+      }
+    }
 
     if (
       typeof tujuan_pemanfaatan !== 'string' ||
-      tujuan_pemanfaatan.trim() === ''
+      !tujuan_pemanfaatan.trim()
     ) {
       return res.status(400).json({
         message: 'Tujuan pemanfaatan wajib diisi'
       });
     }
 
-    // =========================
-    // CEK PENGETAHUAN
-    // =========================
-
     const [pengetahuan] = await db.query(
       `
-      SELECT id
+      SELECT id, pemilik_instansi_id
       FROM mpn_pengetahuan
       WHERE id = ?
       LIMIT 1
@@ -3864,49 +4884,14 @@ exports.createPemanfaatan = async (req, res) => {
       });
     }
 
-    // =========================
-    // VALIDASI UNIT PENGGUNA
-    // unit boleh NULL
-    // =========================
-
-    let unitPenggunaId = null;
-
     if (
-      unit_pengguna_id !== null &&
-      unit_pengguna_id !== ''
+      instansiId !== null &&
+      Number(pengetahuan[0].pemilik_instansi_id) !== Number(instansiId)
     ) {
-      unitPenggunaId = Number(unit_pengguna_id);
-
-      if (
-        !Number.isInteger(unitPenggunaId) ||
-        unitPenggunaId <= 0
-      ) {
-        return res.status(400).json({
-          message: 'ID unit pengguna tidak valid'
-        });
-      }
-
-      const [unit] = await db.query(
-        `
-        SELECT id
-        FROM unit_kerja
-        WHERE id = ?
-        LIMIT 1
-        `,
-        [unitPenggunaId]
-      );
-
-      if (unit.length === 0) {
-        return res.status(400).json({
-          message: 'Unit pengguna tidak ditemukan'
-        });
-      }
+      return res.status(403).json({
+        message: 'Pengetahuan bukan milik instansi akun ini'
+      });
     }
-
-    // =========================
-    // VALIDASI RATING
-    // DB: NULL atau 1-5
-    // =========================
 
     let ratingPengetahuan = null;
 
@@ -3914,8 +4899,7 @@ exports.createPemanfaatan = async (req, res) => {
       rating_pengetahuan !== null &&
       rating_pengetahuan !== ''
     ) {
-      ratingPengetahuan =
-        Number(rating_pengetahuan);
+      ratingPengetahuan = Number(rating_pengetahuan);
 
       if (
         !Number.isInteger(ratingPengetahuan) ||
@@ -3928,10 +4912,6 @@ exports.createPemanfaatan = async (req, res) => {
       }
     }
 
-    // =========================
-    // INSERT
-    // =========================
-
     const [result] = await db.query(
       `
       INSERT INTO mpn_pemanfaatan
@@ -3940,17 +4920,19 @@ exports.createPemanfaatan = async (req, res) => {
         tanggal_pemanfaatan,
         jenis_pengguna,
         unit_pengguna_id,
+        unit_pengguna,
         tujuan_pemanfaatan,
         rating_pengetahuan,
         created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         pengetahuanId,
         tanggal_pemanfaatan,
         jenis_pengguna,
-        unitPenggunaId,
+        null,
+        unitPengguna,
         tujuan_pemanfaatan.trim(),
         ratingPengetahuan,
         created_by
@@ -3964,11 +4946,10 @@ exports.createPemanfaatan = async (req, res) => {
         pengetahuan_id: pengetahuanId,
         tanggal_pemanfaatan,
         jenis_pengguna,
-        unit_pengguna_id: unitPenggunaId,
-        tujuan_pemanfaatan:
-          tujuan_pemanfaatan.trim(),
-        rating_pengetahuan:
-          ratingPengetahuan,
+        unit_pengguna_id: null,
+        unit_pengguna: unitPengguna,
+        tujuan_pemanfaatan: tujuan_pemanfaatan.trim(),
+        rating_pengetahuan: ratingPengetahuan,
         created_by
       }
     });
@@ -3979,11 +4960,21 @@ exports.createPemanfaatan = async (req, res) => {
       error
     );
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
     });
   }
 };
+
 
 exports.getDetailPemanfaatan = async (req, res) => {
   try {
@@ -4069,7 +5060,7 @@ exports.updatePemanfaatan = async (req, res) => {
       pengetahuan_id,
       tanggal_pemanfaatan,
       jenis_pengguna,
-      unit_pengguna_id = null,
+      unit_pengguna = null,
       tujuan_pemanfaatan,
       rating_pengetahuan = null
     } = req.body;
@@ -4080,12 +5071,17 @@ exports.updatePemanfaatan = async (req, res) => {
       });
     }
 
-    // Cek data
+    const instansiId = await getUserInstansiId(req);
+
     const [existing] = await db.query(
       `
-      SELECT id
-      FROM mpn_pemanfaatan
-      WHERE id = ?
+      SELECT
+        pm.id,
+        p.pemilik_instansi_id
+      FROM mpn_pemanfaatan pm
+      JOIN mpn_pengetahuan p
+        ON p.id = pm.pengetahuan_id
+      WHERE pm.id = ?
       LIMIT 1
       `,
       [id]
@@ -4097,51 +5093,85 @@ exports.updatePemanfaatan = async (req, res) => {
       });
     }
 
-    // Pengetahuan
-    const pengetahuanId = Number(pengetahuan_id);
-
     if (
-      !Number.isInteger(pengetahuanId) ||
-      pengetahuanId <= 0
+      instansiId !== null &&
+      Number(existing[0].pemilik_instansi_id) !== Number(instansiId)
     ) {
-      return res.status(400).json({
-        message: 'ID pengetahuan wajib diisi dan harus valid'
+      return res.status(403).json({
+        message: 'Anda tidak memiliki akses untuk mengubah data instansi lain'
       });
     }
 
-    // Tanggal
+    const pengetahuanId = Number(pengetahuan_id);
+
+    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
+      return res.status(400).json({
+        message: 'Pengetahuan wajib dipilih'
+      });
+    }
+
     if (
       typeof tanggal_pemanfaatan !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_pemanfaatan)
     ) {
       return res.status(400).json({
-        message: 'Tanggal pemanfaatan wajib menggunakan format YYYY-MM-DD'
+        message: 'Tanggal pemanfaatan harus menggunakan format YYYY-MM-DD'
       });
     }
 
-    // Jenis pengguna
+    const tanggal = new Date(`${tanggal_pemanfaatan}T00:00:00Z`);
+
     if (
-      !['Publik', 'Internal'].includes(jenis_pengguna)
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_pemanfaatan
     ) {
+      return res.status(400).json({
+        message: 'Tanggal pemanfaatan tidak valid'
+      });
+    }
+
+    if (!['Publik', 'Internal'].includes(jenis_pengguna)) {
       return res.status(400).json({
         message: 'Jenis pengguna harus Publik atau Internal'
       });
     }
 
-    // Tujuan
+    let unitPengguna = null;
+
+    if (jenis_pengguna === 'Internal') {
+      if (typeof unit_pengguna !== 'string') {
+        return res.status(400).json({
+          message: 'Unit Pengguna wajib diisi untuk pengguna internal'
+        });
+      }
+
+      unitPengguna = unit_pengguna.trim();
+
+      if (!unitPengguna) {
+        return res.status(400).json({
+          message: 'Unit Pengguna wajib diisi untuk pengguna internal'
+        });
+      }
+
+      if (unitPengguna.length > 255) {
+        return res.status(400).json({
+          message: 'Unit Pengguna maksimal 255 karakter'
+        });
+      }
+    }
+
     if (
       typeof tujuan_pemanfaatan !== 'string' ||
-      tujuan_pemanfaatan.trim() === ''
+      !tujuan_pemanfaatan.trim()
     ) {
       return res.status(400).json({
         message: 'Tujuan pemanfaatan wajib diisi'
       });
     }
 
-    // Cek pengetahuan
     const [pengetahuan] = await db.query(
       `
-      SELECT id
+      SELECT id, pemilik_instansi_id
       FROM mpn_pengetahuan
       WHERE id = ?
       LIMIT 1
@@ -4155,50 +5185,31 @@ exports.updatePemanfaatan = async (req, res) => {
       });
     }
 
-    // Unit pengguna boleh NULL
-    let unitPenggunaId = null;
-
     if (
-      unit_pengguna_id !== null &&
-      unit_pengguna_id !== ''
+      instansiId !== null &&
+      Number(pengetahuan[0].pemilik_instansi_id) !== Number(instansiId)
     ) {
-      unitPenggunaId = Number(unit_pengguna_id);
-
-      if (
-        !Number.isInteger(unitPenggunaId) ||
-        unitPenggunaId <= 0
-      ) {
-        return res.status(400).json({
-          message: 'ID unit pengguna tidak valid'
-        });
-      }
-
-      const [unit] = await db.query(
-        `
-        SELECT id
-        FROM unit_kerja
-        WHERE id = ?
-        LIMIT 1
-        `,
-        [unitPenggunaId]
-      );
-
-      if (unit.length === 0) {
-        return res.status(400).json({
-          message: 'Unit pengguna tidak ditemukan'
-        });
-      }
+      return res.status(403).json({
+        message: 'Pengetahuan bukan milik instansi akun ini'
+      });
     }
 
-    // Rating NULL atau 1-5
+    if (
+      Number(pengetahuan[0].pemilik_instansi_id) !==
+      Number(existing[0].pemilik_instansi_id)
+    ) {
+      return res.status(403).json({
+        message: 'Pengetahuan harus berasal dari instansi yang sama'
+      });
+    }
+
     let ratingPengetahuan = null;
 
     if (
       rating_pengetahuan !== null &&
       rating_pengetahuan !== ''
     ) {
-      ratingPengetahuan =
-        Number(rating_pengetahuan);
+      ratingPengetahuan = Number(rating_pengetahuan);
 
       if (
         !Number.isInteger(ratingPengetahuan) ||
@@ -4211,28 +5222,41 @@ exports.updatePemanfaatan = async (req, res) => {
       }
     }
 
-    await db.query(
+    const [result] = await db.query(
       `
       UPDATE mpn_pemanfaatan
       SET
         pengetahuan_id = ?,
         tanggal_pemanfaatan = ?,
         jenis_pengguna = ?,
-        unit_pengguna_id = ?,
+        unit_pengguna_id = NULL,
+        unit_pengguna = ?,
         tujuan_pemanfaatan = ?,
         rating_pengetahuan = ?
       WHERE id = ?
+        AND pengetahuan_id IN (
+          SELECT id
+          FROM mpn_pengetahuan
+          WHERE pemilik_instansi_id = ?
+        )
       `,
       [
         pengetahuanId,
         tanggal_pemanfaatan,
         jenis_pengguna,
-        unitPenggunaId,
+        unitPengguna,
         tujuan_pemanfaatan.trim(),
         ratingPengetahuan,
-        id
+        id,
+        Number(existing[0].pemilik_instansi_id)
       ]
     );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Data pemanfaatan tidak ditemukan atau tidak dapat diakses'
+      });
+    }
 
     return res.status(200).json({
       message: 'Data pemanfaatan pengetahuan berhasil diperbarui',
@@ -4241,19 +5265,24 @@ exports.updatePemanfaatan = async (req, res) => {
         pengetahuan_id: pengetahuanId,
         tanggal_pemanfaatan,
         jenis_pengguna,
-        unit_pengguna_id: unitPenggunaId,
-        tujuan_pemanfaatan:
-          tujuan_pemanfaatan.trim(),
-        rating_pengetahuan:
-          ratingPengetahuan
+        unit_pengguna_id: null,
+        unit_pengguna: unitPengguna,
+        tujuan_pemanfaatan: tujuan_pemanfaatan.trim(),
+        rating_pengetahuan: ratingPengetahuan
       }
     });
 
   } catch (error) {
-    console.error(
-      'ERROR UPDATE PEMANFAATAN:',
-      error
-    );
+    console.error('ERROR UPDATE PEMANFAATAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -4322,7 +5351,10 @@ exports.deletePemanfaatan = async (req, res) => {
 
 exports.getAllAlihPengetahuan = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const instansiId = await getUserInstansiId(req);
+
+    const [rows] = await db.query(
+      `
       SELECT
         ap.id,
         ap.pengetahuan_id,
@@ -4351,10 +5383,13 @@ exports.getAllAlihPengetahuan = async (req, res) => {
       JOIN users u
         ON u.id = ap.created_by
 
-      ORDER BY ap.created_at DESC
-    `);
+      WHERE (? IS NULL OR p.pemilik_instansi_id = ?)
 
-    // Ambil metode untuk masing-masing kegiatan alih
+      ORDER BY ap.created_at DESC, ap.id DESC
+      `,
+      [instansiId, instansiId]
+    );
+
     for (const row of rows) {
       const [metode] = await db.query(
         `
@@ -4383,6 +5418,15 @@ exports.getAllAlihPengetahuan = async (req, res) => {
       error
     );
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
     });
@@ -4401,43 +5445,45 @@ exports.createAlihPengetahuan = async (req, res) => {
       metode_alih = []
     } = req.body;
 
-    const created_by = req.user.id;
-
-    // =========================
-    // VALIDASI PENGETAHUAN
-    // =========================
-
     const pengetahuanId = Number(pengetahuan_id);
+    const createdBy = Number(req.user?.id);
+    const instansiId = await getUserInstansiId(req);
 
-    if (
-      !Number.isInteger(pengetahuanId) ||
-      pengetahuanId <= 0
-    ) {
-      return res.status(400).json({
-        message: 'ID pengetahuan wajib diisi dan harus valid'
+    if (!Number.isInteger(createdBy) || createdBy <= 0) {
+      return res.status(401).json({
+        message: 'Pengguna belum terautentikasi'
       });
     }
 
-    // =========================
-    // VALIDASI TANGGAL
-    // =========================
+    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
+      return res.status(400).json({
+        message: 'Pengetahuan wajib dipilih'
+      });
+    }
 
     if (
       typeof tanggal_kegiatan !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_kegiatan)
     ) {
       return res.status(400).json({
-        message: 'Tanggal kegiatan wajib menggunakan format YYYY-MM-DD'
+        message: 'Tanggal kegiatan harus berformat YYYY-MM-DD'
       });
     }
 
-    // =========================
-    // VALIDASI PENERIMA
-    // =========================
+    const tanggal = new Date(`${tanggal_kegiatan}T00:00:00Z`);
+
+    if (
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_kegiatan
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal kegiatan tidak valid'
+      });
+    }
 
     if (
       typeof penerima_pengetahuan !== 'string' ||
-      penerima_pengetahuan.trim() === ''
+      !penerima_pengetahuan.trim()
     ) {
       return res.status(400).json({
         message: 'Penerima pengetahuan wajib diisi'
@@ -4450,33 +5496,12 @@ exports.createAlihPengetahuan = async (req, res) => {
       });
     }
 
-    // =========================
-    // CEK PENGETAHUAN
-    // =========================
-
-    const [pengetahuan] = await db.query(
-      `
-      SELECT id
-      FROM mpn_pengetahuan
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [pengetahuanId]
-    );
-
-    if (pengetahuan.length === 0) {
+    if (
+      lesson_learned_evaluasi !== null &&
+      typeof lesson_learned_evaluasi !== 'string'
+    ) {
       return res.status(400).json({
-        message: 'Data pengetahuan tidak ditemukan'
-      });
-    }
-
-    // =========================
-    // VALIDASI METODE ALIH
-    // =========================
-
-    if (!Array.isArray(metode_alih)) {
-      return res.status(400).json({
-        message: 'Metode alih harus berupa array'
+        message: 'Lesson Learned / Evaluasi harus berupa teks'
       });
     }
 
@@ -4489,25 +5514,59 @@ exports.createAlihPengetahuan = async (req, res) => {
       'Lainnya'
     ];
 
-    for (const item of metode_alih) {
-      if (
-        !item ||
-        typeof item !== 'object' ||
-        !metodeValid.includes(item.metode)
-      ) {
-        return res.status(400).json({
-          message: 'Metode alih tidak valid'
-        });
-      }
+    if (
+      !Array.isArray(metode_alih) ||
+      metode_alih.length === 0 ||
+      metode_alih.some(
+        (item) =>
+          !item ||
+          typeof item !== 'object' ||
+          !metodeValid.includes(item.metode) ||
+          (
+            item.keterangan != null &&
+            typeof item.keterangan !== 'string'
+          ) ||
+          (
+            item.metode === 'Lainnya' &&
+            !String(item.keterangan || '').trim()
+          )
+      )
+    ) {
+      return res.status(400).json({
+        message: 'Pilih minimal satu metode transfer yang valid dan isi keterangan Lainnya bila dipilih'
+      });
     }
 
-    // =========================
-    // TRANSACTION
-    // =========================
+    if (
+      new Set(metode_alih.map((item) => item.metode)).size !==
+      metode_alih.length
+    ) {
+      return res.status(400).json({
+        message: 'Metode transfer tidak boleh duplikat'
+      });
+    }
 
     connection = await db.getConnection();
-
     await connection.beginTransaction();
+
+    const [pengetahuan] = await connection.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE id = ?
+        AND (? IS NULL OR pemilik_instansi_id = ?)
+      LIMIT 1
+      `,
+      [pengetahuanId, instansiId, instansiId]
+    );
+
+    if (pengetahuan.length === 0) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        message: 'Pengetahuan tidak ditemukan atau bukan milik instansi Anda'
+      });
+    }
 
     const [result] = await connection.query(
       `
@@ -4526,13 +5585,10 @@ exports.createAlihPengetahuan = async (req, res) => {
         tanggal_kegiatan,
         penerima_pengetahuan.trim(),
         lesson_learned_evaluasi || null,
-        created_by
+        createdBy
       ]
     );
 
-    const alihPengetahuanId = result.insertId;
-
-    // Simpan masing-masing metode
     for (const item of metode_alih) {
       await connection.query(
         `
@@ -4545,7 +5601,7 @@ exports.createAlihPengetahuan = async (req, res) => {
         VALUES (?, ?, ?)
         `,
         [
-          alihPengetahuanId,
+          result.insertId,
           item.metode,
           item.keterangan || null
         ]
@@ -4557,15 +5613,13 @@ exports.createAlihPengetahuan = async (req, res) => {
     return res.status(201).json({
       message: 'Data alih pengetahuan berhasil disimpan',
       data: {
-        id: alihPengetahuanId,
+        id: result.insertId,
         pengetahuan_id: pengetahuanId,
         tanggal_kegiatan,
-        penerima_pengetahuan:
-          penerima_pengetahuan.trim(),
-        lesson_learned_evaluasi:
-          lesson_learned_evaluasi || null,
+        penerima_pengetahuan: penerima_pengetahuan.trim(),
+        lesson_learned_evaluasi: lesson_learned_evaluasi || null,
         metode_alih,
-        created_by
+        created_by: createdBy
       }
     });
 
@@ -4574,10 +5628,16 @@ exports.createAlihPengetahuan = async (req, res) => {
       await connection.rollback();
     }
 
-    console.error(
-      'ERROR CREATE ALIH PENGETAHUAN:',
-      error
-    );
+    console.error('ERROR CREATE ALIH PENGETAHUAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -4599,6 +5659,8 @@ exports.getDetailAlihPengetahuan = async (req, res) => {
         message: 'ID alih pengetahuan tidak valid'
       });
     }
+
+    const instansiId = await getUserInstansiId(req);
 
     const [rows] = await db.query(
       `
@@ -4631,14 +5693,16 @@ exports.getDetailAlihPengetahuan = async (req, res) => {
         ON u.id = ap.created_by
 
       WHERE ap.id = ?
+        AND (? IS NULL OR p.pemilik_instansi_id = ?)
+
       LIMIT 1
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
 
     if (rows.length === 0) {
       return res.status(404).json({
-        message: 'Data alih pengetahuan tidak ditemukan'
+        message: 'Data alih pengetahuan tidak ditemukan atau tidak dapat diakses'
       });
     }
 
@@ -4668,6 +5732,15 @@ exports.getDetailAlihPengetahuan = async (req, res) => {
       error
     );
 
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
+
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
     });
@@ -4688,67 +5761,43 @@ exports.updateAlihPengetahuan = async (req, res) => {
       metode_alih = []
     } = req.body;
 
+    const pengetahuanId = Number(pengetahuan_id);
+
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({
         message: 'ID alih pengetahuan tidak valid'
       });
     }
 
-    // =========================
-    // CEK DATA ALIH
-    // =========================
-
-    const [existing] = await db.query(
-      `
-      SELECT id
-      FROM mpn_alih_pengetahuan
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
-
-    if (existing.length === 0) {
-      return res.status(404).json({
-        message: 'Data alih pengetahuan tidak ditemukan'
-      });
-    }
-
-    // =========================
-    // VALIDASI PENGETAHUAN
-    // =========================
-
-    const pengetahuanId = Number(pengetahuan_id);
-
-    if (
-      !Number.isInteger(pengetahuanId) ||
-      pengetahuanId <= 0
-    ) {
+    if (!Number.isInteger(pengetahuanId) || pengetahuanId <= 0) {
       return res.status(400).json({
-        message: 'ID pengetahuan wajib diisi dan harus valid'
+        message: 'Pengetahuan wajib dipilih'
       });
     }
-
-    // =========================
-    // VALIDASI TANGGAL
-    // =========================
 
     if (
       typeof tanggal_kegiatan !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_kegiatan)
     ) {
       return res.status(400).json({
-        message: 'Tanggal kegiatan wajib menggunakan format YYYY-MM-DD'
+        message: 'Tanggal kegiatan harus berformat YYYY-MM-DD'
       });
     }
 
-    // =========================
-    // VALIDASI PENERIMA
-    // =========================
+    const tanggal = new Date(`${tanggal_kegiatan}T00:00:00Z`);
+
+    if (
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_kegiatan
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal kegiatan tidak valid'
+      });
+    }
 
     if (
       typeof penerima_pengetahuan !== 'string' ||
-      penerima_pengetahuan.trim() === ''
+      !penerima_pengetahuan.trim()
     ) {
       return res.status(400).json({
         message: 'Penerima pengetahuan wajib diisi'
@@ -4761,33 +5810,12 @@ exports.updateAlihPengetahuan = async (req, res) => {
       });
     }
 
-    // =========================
-    // CEK PENGETAHUAN
-    // =========================
-
-    const [pengetahuan] = await db.query(
-      `
-      SELECT id
-      FROM mpn_pengetahuan
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [pengetahuanId]
-    );
-
-    if (pengetahuan.length === 0) {
+    if (
+      lesson_learned_evaluasi !== null &&
+      typeof lesson_learned_evaluasi !== 'string'
+    ) {
       return res.status(400).json({
-        message: 'Data pengetahuan tidak ditemukan'
-      });
-    }
-
-    // =========================
-    // VALIDASI METODE
-    // =========================
-
-    if (!Array.isArray(metode_alih)) {
-      return res.status(400).json({
-        message: 'Metode alih harus berupa array'
+        message: 'Lesson Learned / Evaluasi harus berupa teks'
       });
     }
 
@@ -4800,37 +5828,95 @@ exports.updateAlihPengetahuan = async (req, res) => {
       'Lainnya'
     ];
 
-    for (const item of metode_alih) {
-      if (
-        !item ||
-        typeof item !== 'object' ||
-        !metodeValid.includes(item.metode)
-      ) {
-        return res.status(400).json({
-          message: 'Metode alih tidak valid'
-        });
-      }
-
-      if (
-        item.keterangan !== undefined &&
-        item.keterangan !== null &&
-        typeof item.keterangan !== 'string'
-      ) {
-        return res.status(400).json({
-          message: 'Keterangan metode harus berupa teks'
-        });
-      }
+    if (
+      !Array.isArray(metode_alih) ||
+      metode_alih.length === 0 ||
+      metode_alih.some(
+        (item) =>
+          !item ||
+          typeof item !== 'object' ||
+          !metodeValid.includes(item.metode) ||
+          (
+            item.keterangan != null &&
+            typeof item.keterangan !== 'string'
+          ) ||
+          (
+            item.metode === 'Lainnya' &&
+            !String(item.keterangan || '').trim()
+          )
+      )
+    ) {
+      return res.status(400).json({
+        message: 'Pilih minimal satu metode transfer yang valid dan isi keterangan Lainnya bila dipilih'
+      });
     }
 
-    // =========================
-    // TRANSACTION
-    // =========================
+    if (
+      new Set(metode_alih.map((item) => item.metode)).size !==
+      metode_alih.length
+    ) {
+      return res.status(400).json({
+        message: 'Metode transfer tidak boleh duplikat'
+      });
+    }
+
+    const instansiId = await getUserInstansiId(req);
 
     connection = await db.getConnection();
-
     await connection.beginTransaction();
 
-    await connection.query(
+    const [existing] = await connection.query(
+      `
+      SELECT
+        ap.id,
+        p.pemilik_instansi_id
+
+      FROM mpn_alih_pengetahuan ap
+
+      JOIN mpn_pengetahuan p
+        ON p.id = ap.pengetahuan_id
+
+      WHERE ap.id = ?
+        AND (? IS NULL OR p.pemilik_instansi_id = ?)
+
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [id, instansiId, instansiId]
+    );
+
+    if (existing.length === 0) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        message: 'Data alih pengetahuan tidak ditemukan atau tidak dapat diakses'
+      });
+    }
+
+    const ownerId = Number(
+      existing[0].pemilik_instansi_id
+    );
+
+    const [pengetahuan] = await connection.query(
+      `
+      SELECT id
+      FROM mpn_pengetahuan
+      WHERE id = ?
+        AND pemilik_instansi_id = ?
+      LIMIT 1
+      `,
+      [pengetahuanId, ownerId]
+    );
+
+    if (pengetahuan.length === 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        message: 'Pengetahuan harus berasal dari instansi yang sama'
+      });
+    }
+
+    const [result] = await connection.query(
       `
       UPDATE mpn_alih_pengetahuan
       SET
@@ -4839,17 +5925,30 @@ exports.updateAlihPengetahuan = async (req, res) => {
         penerima_pengetahuan = ?,
         lesson_learned_evaluasi = ?
       WHERE id = ?
+        AND pengetahuan_id IN (
+          SELECT id
+          FROM mpn_pengetahuan
+          WHERE pemilik_instansi_id = ?
+        )
       `,
       [
         pengetahuanId,
         tanggal_kegiatan,
         penerima_pengetahuan.trim(),
         lesson_learned_evaluasi || null,
-        id
+        id,
+        ownerId
       ]
     );
 
-    // Hapus metode lama
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        message: 'Data alih pengetahuan tidak dapat diperbarui'
+      });
+    }
+
     await connection.query(
       `
       DELETE FROM mpn_metode_alih
@@ -4858,7 +5957,6 @@ exports.updateAlihPengetahuan = async (req, res) => {
       [id]
     );
 
-    // Masukkan metode terbaru
     for (const item of metode_alih) {
       await connection.query(
         `
@@ -4886,10 +5984,8 @@ exports.updateAlihPengetahuan = async (req, res) => {
         id,
         pengetahuan_id: pengetahuanId,
         tanggal_kegiatan,
-        penerima_pengetahuan:
-          penerima_pengetahuan.trim(),
-        lesson_learned_evaluasi:
-          lesson_learned_evaluasi || null,
+        penerima_pengetahuan: penerima_pengetahuan.trim(),
+        lesson_learned_evaluasi: lesson_learned_evaluasi || null,
         metode_alih
       }
     });
@@ -4899,10 +5995,16 @@ exports.updateAlihPengetahuan = async (req, res) => {
       await connection.rollback();
     }
 
-    console.error(
-      'ERROR UPDATE ALIH PENGETAHUAN:',
-      error
-    );
+    console.error('ERROR UPDATE ALIH PENGETAHUAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -4927,27 +6029,37 @@ exports.deleteAlihPengetahuan = async (req, res) => {
       });
     }
 
-    const [data] = await db.query(
+    const instansiId = await getUserInstansiId(req);
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const [data] = await connection.query(
       `
-      SELECT id
-      FROM mpn_alih_pengetahuan
-      WHERE id = ?
+      SELECT ap.id
+
+      FROM mpn_alih_pengetahuan ap
+
+      JOIN mpn_pengetahuan p
+        ON p.id = ap.pengetahuan_id
+
+      WHERE ap.id = ?
+        AND (? IS NULL OR p.pemilik_instansi_id = ?)
+
       LIMIT 1
+      FOR UPDATE
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
 
     if (data.length === 0) {
+      await connection.rollback();
+
       return res.status(404).json({
-        message: 'Data alih pengetahuan tidak ditemukan'
+        message: 'Data alih pengetahuan tidak ditemukan atau tidak dapat diakses'
       });
     }
 
-    connection = await db.getConnection();
-
-    await connection.beginTransaction();
-
-    // Hapus child terlebih dahulu
     await connection.query(
       `
       DELETE FROM mpn_metode_alih
@@ -4956,14 +6068,28 @@ exports.deleteAlihPengetahuan = async (req, res) => {
       [id]
     );
 
-    // Hapus parent
-    await connection.query(
+    const [result] = await connection.query(
       `
-      DELETE FROM mpn_alih_pengetahuan
-      WHERE id = ?
+      DELETE ap
+
+      FROM mpn_alih_pengetahuan ap
+
+      JOIN mpn_pengetahuan p
+        ON p.id = ap.pengetahuan_id
+
+      WHERE ap.id = ?
+        AND (? IS NULL OR p.pemilik_instansi_id = ?)
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
+
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        message: 'Data alih pengetahuan tidak dapat dihapus'
+      });
+    }
 
     await connection.commit();
 
@@ -4976,10 +6102,16 @@ exports.deleteAlihPengetahuan = async (req, res) => {
       await connection.rollback();
     }
 
-    console.error(
-      'ERROR DELETE ALIH PENGETAHUAN:',
-      error
-    );
+    console.error('ERROR DELETE ALIH PENGETAHUAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (
       error.code === 'ER_ROW_IS_REFERENCED_2' ||
@@ -5003,54 +6135,55 @@ exports.deleteAlihPengetahuan = async (req, res) => {
 
 exports.getAllEvaluasi = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const instansiId = await getUserInstansiId(req);
+
+    const [rows] = await db.query(
+      `
       SELECT
         e.id,
         e.indikator_perencanaan_id,
-
         ip.perencanaan_id,
         ip.kode_indikator,
         ip.nilai_saat_ini,
         ip.nilai_target,
-
-        DATE_FORMAT(
-          e.tanggal_evaluasi,
-          '%Y-%m-%d'
-        ) AS tanggal_evaluasi,
-
+        DATE_FORMAT(e.tanggal_evaluasi, '%Y-%m-%d') AS tanggal_evaluasi,
         e.nilai_realisasi,
         e.analisis,
         e.tindak_lanjut,
         e.pelaksana_terkait,
-
         e.created_by,
         u.nama AS pembuat,
-
         e.created_at,
         e.updated_at
-
       FROM mpn_evaluasi e
-
       JOIN mpn_indikator_perencanaan ip
         ON ip.id = e.indikator_perencanaan_id
-
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
       JOIN users u
         ON u.id = e.created_by
-
+      WHERE (? IS NULL OR p.instansi_id = ?)
       ORDER BY
         e.tanggal_evaluasi DESC,
         e.created_at DESC
-    `);
+      `,
+      [instansiId, instansiId]
+    );
 
     return res.status(200).json({
       data: rows
     });
-
   } catch (error) {
-    console.error(
-      'ERROR GET EVALUASI PENGETAHUAN:',
-      error
-    );
+    console.error('ERROR GET EVALUASI PENGETAHUAN:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -5064,54 +6197,58 @@ exports.createEvaluasi = async (req, res) => {
       indikator_perencanaan_id,
       tanggal_evaluasi,
       nilai_realisasi,
-      analisis = null,
-      tindak_lanjut = null,
+      analisis,
+      tindak_lanjut,
       pelaksana_terkait
     } = req.body;
 
-    const created_by = req.user.id;
+    const createdBy = Number(req.user?.id);
+    const indikatorId = Number(indikator_perencanaan_id);
+    const instansiId = await getUserInstansiId(req);
 
-    // =========================
-    // VALIDASI INDIKATOR
-    // =========================
-
-    const indikatorId = Number(
-      indikator_perencanaan_id
-    );
-
-    if (
-      !Number.isInteger(indikatorId) ||
-      indikatorId <= 0
-    ) {
-      return res.status(400).json({
-        message:
-          'ID indikator perencanaan wajib diisi dan harus valid'
+    if (!Number.isInteger(createdBy) || createdBy <= 0) {
+      return res.status(401).json({
+        message: 'Pengguna belum terautentikasi'
       });
     }
 
-    // =========================
-    // VALIDASI TANGGAL
-    // =========================
+    if (!Number.isInteger(indikatorId) || indikatorId <= 0) {
+      return res.status(400).json({
+        message: 'Indikator Manajemen Pengetahuan wajib dipilih'
+      });
+    }
 
     if (
       typeof tanggal_evaluasi !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(
-        tanggal_evaluasi
-      )
+      !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_evaluasi)
     ) {
       return res.status(400).json({
-        message:
-          'Tanggal evaluasi wajib menggunakan format YYYY-MM-DD'
+        message: 'Tanggal Evaluasi wajib diisi dengan format YYYY-MM-DD'
       });
     }
 
-    // =========================
-    // VALIDASI NILAI REALISASI
-    // DB CHECK: 0 - 100
-    // =========================
+    const tanggal = new Date(`${tanggal_evaluasi}T00:00:00Z`);
 
-    const nilaiRealisasi =
-      Number(nilai_realisasi);
+    if (
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_evaluasi
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal Evaluasi tidak valid'
+      });
+    }
+
+    if (
+      nilai_realisasi === undefined ||
+      nilai_realisasi === null ||
+      String(nilai_realisasi).trim() === ''
+    ) {
+      return res.status(400).json({
+        message: 'Realisasi wajib diisi'
+      });
+    }
+
+    const nilaiRealisasi = Number(nilai_realisasi);
 
     if (
       !Number.isFinite(nilaiRealisasi) ||
@@ -5119,63 +6256,63 @@ exports.createEvaluasi = async (req, res) => {
       nilaiRealisasi > 100
     ) {
       return res.status(400).json({
-        message:
-          'Nilai realisasi harus berada antara 0 sampai 100'
+        message: 'Nilai Realisasi harus berada antara 0 sampai 100'
       });
     }
 
-    // =========================
-    // VALIDASI PELAKSANA
-    // =========================
+    if (typeof analisis !== 'string' || !analisis.trim()) {
+      return res.status(400).json({
+        message: 'Analisis wajib diisi'
+      });
+    }
+
+    if (
+      typeof tindak_lanjut !== 'string' ||
+      !tindak_lanjut.trim()
+    ) {
+      return res.status(400).json({
+        message: 'Tindak Lanjut wajib diisi'
+      });
+    }
 
     if (
       typeof pelaksana_terkait !== 'string' ||
-      pelaksana_terkait.trim() === ''
+      !pelaksana_terkait.trim()
     ) {
       return res.status(400).json({
-        message:
-          'Pelaksana terkait wajib diisi'
+        message: 'Pelaksana Terkait wajib diisi'
       });
     }
 
-    if (
-      pelaksana_terkait.trim().length > 255
-    ) {
+    if (pelaksana_terkait.trim().length > 255) {
       return res.status(400).json({
-        message:
-          'Pelaksana terkait maksimal 255 karakter'
+        message: 'Pelaksana Terkait maksimal 255 karakter'
       });
     }
-
-    // =========================
-    // CEK INDIKATOR
-    // =========================
 
     const [indikator] = await db.query(
       `
       SELECT
-        id,
-        perencanaan_id,
-        kode_indikator,
-        nilai_target
-      FROM mpn_indikator_perencanaan
-      WHERE id = ?
+        ip.id,
+        ip.perencanaan_id,
+        ip.kode_indikator,
+        ip.nilai_target,
+        p.instansi_id
+      FROM mpn_indikator_perencanaan ip
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE ip.id = ?
+        AND (? IS NULL OR p.instansi_id = ?)
       LIMIT 1
       `,
-      [indikatorId]
+      [indikatorId, instansiId, instansiId]
     );
 
     if (indikator.length === 0) {
-      return res.status(400).json({
-        message:
-          'Indikator perencanaan tidak ditemukan'
+      return res.status(404).json({
+        message: 'Indikator tidak ditemukan atau bukan milik instansi Anda'
       });
     }
-
-    // =========================
-    // CEK DUPLICATE
-    // indikator + tanggal harus unik
-    // =========================
 
     const [existing] = await db.query(
       `
@@ -5185,22 +6322,14 @@ exports.createEvaluasi = async (req, res) => {
         AND tanggal_evaluasi = ?
       LIMIT 1
       `,
-      [
-        indikatorId,
-        tanggal_evaluasi
-      ]
+      [indikatorId, tanggal_evaluasi]
     );
 
     if (existing.length > 0) {
       return res.status(409).json({
-        message:
-          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+        message: 'Evaluasi indikator pada tanggal tersebut sudah tersedia'
       });
     }
-
-    // =========================
-    // INSERT
-    // =========================
 
     const [result] = await db.query(
       `
@@ -5214,56 +6343,72 @@ exports.createEvaluasi = async (req, res) => {
         pelaksana_terkait,
         created_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      SELECT
+        ip.id,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
+      FROM mpn_indikator_perencanaan ip
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE ip.id = ?
+        AND (? IS NULL OR p.instansi_id = ?)
       `,
       [
-        indikatorId,
         tanggal_evaluasi,
         nilaiRealisasi,
-        analisis || null,
-        tindak_lanjut || null,
+        analisis.trim(),
+        tindak_lanjut.trim(),
         pelaksana_terkait.trim(),
-        created_by
+        createdBy,
+        indikatorId,
+        instansiId,
+        instansiId
       ]
     );
 
-    return res.status(201).json({
-      message:
-        'Data evaluasi berhasil disimpan',
+    if (result.affectedRows === 0) {
+      return res.status(403).json({
+        message: 'Anda tidak memiliki akses ke indikator tersebut'
+      });
+    }
 
+    return res.status(201).json({
+      message: 'Data evaluasi berhasil disimpan',
       data: {
         id: result.insertId,
-        indikator_perencanaan_id:
-          indikatorId,
+        indikator_perencanaan_id: indikatorId,
         tanggal_evaluasi,
-        nilai_realisasi:
-          nilaiRealisasi,
-        analisis:
-          analisis || null,
-        tindak_lanjut:
-          tindak_lanjut || null,
-        pelaksana_terkait:
-          pelaksana_terkait.trim(),
-        created_by
+        nilai_realisasi: nilaiRealisasi,
+        analisis: analisis.trim(),
+        tindak_lanjut: tindak_lanjut.trim(),
+        pelaksana_terkait: pelaksana_terkait.trim(),
+        created_by: createdBy
       }
     });
-
   } catch (error) {
-    console.error(
-      'ERROR CREATE EVALUASI:',
-      error
-    );
+    console.error('ERROR CREATE EVALUASI:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message:
-          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+        message: 'Evaluasi indikator pada tanggal tersebut sudah tersedia'
       });
     }
 
     return res.status(500).json({
-      message:
-        'Terjadi kesalahan pada server'
+      message: 'Terjadi kesalahan pada server'
     });
   }
 };
@@ -5278,62 +6423,60 @@ exports.getDetailEvaluasi = async (req, res) => {
       });
     }
 
+    const instansiId = await getUserInstansiId(req);
+
     const [rows] = await db.query(
       `
       SELECT
         e.id,
         e.indikator_perencanaan_id,
-
         ip.perencanaan_id,
         ip.kode_indikator,
         ip.nilai_saat_ini,
         ip.nilai_target,
-
-        DATE_FORMAT(
-          e.tanggal_evaluasi,
-          '%Y-%m-%d'
-        ) AS tanggal_evaluasi,
-
+        DATE_FORMAT(e.tanggal_evaluasi, '%Y-%m-%d') AS tanggal_evaluasi,
         e.nilai_realisasi,
         e.analisis,
         e.tindak_lanjut,
         e.pelaksana_terkait,
-
         e.created_by,
         u.nama AS pembuat,
-
         e.created_at,
         e.updated_at
-
       FROM mpn_evaluasi e
-
       JOIN mpn_indikator_perencanaan ip
         ON ip.id = e.indikator_perencanaan_id
-
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
       JOIN users u
         ON u.id = e.created_by
-
       WHERE e.id = ?
+        AND (? IS NULL OR p.instansi_id = ?)
       LIMIT 1
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
 
     if (rows.length === 0) {
       return res.status(404).json({
-        message: 'Data evaluasi tidak ditemukan'
+        message: 'Data evaluasi tidak ditemukan atau tidak dapat diakses'
       });
     }
 
     return res.status(200).json({
       data: rows[0]
     });
-
   } catch (error) {
-    console.error(
-      'ERROR GET DETAIL EVALUASI:',
-      error
-    );
+    console.error('ERROR GET DETAIL EVALUASI:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     return res.status(500).json({
       message: 'Terjadi kesalahan pada server'
@@ -5349,14 +6492,12 @@ exports.updateEvaluasi = async (req, res) => {
       indikator_perencanaan_id,
       tanggal_evaluasi,
       nilai_realisasi,
-      analisis = null,
-      tindak_lanjut = null,
+      analisis,
+      tindak_lanjut,
       pelaksana_terkait
     } = req.body;
 
-    // =========================
-    // VALIDASI ID
-    // =========================
+    const indikatorId = Number(indikator_perencanaan_id);
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({
@@ -5364,65 +6505,43 @@ exports.updateEvaluasi = async (req, res) => {
       });
     }
 
-    // =========================
-    // CEK DATA EVALUASI
-    // =========================
-
-    const [existingEvaluasi] = await db.query(
-      `
-      SELECT id
-      FROM mpn_evaluasi
-      WHERE id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
-
-    if (existingEvaluasi.length === 0) {
-      return res.status(404).json({
-        message: 'Data evaluasi tidak ditemukan'
-      });
-    }
-
-    // =========================
-    // VALIDASI INDIKATOR
-    // =========================
-
-    const indikatorId = Number(
-      indikator_perencanaan_id
-    );
-
-    if (
-      !Number.isInteger(indikatorId) ||
-      indikatorId <= 0
-    ) {
+    if (!Number.isInteger(indikatorId) || indikatorId <= 0) {
       return res.status(400).json({
-        message:
-          'ID indikator perencanaan wajib diisi dan harus valid'
+        message: 'Indikator Manajemen Pengetahuan wajib dipilih'
       });
     }
-
-    // =========================
-    // VALIDASI TANGGAL
-    // =========================
 
     if (
       typeof tanggal_evaluasi !== 'string' ||
       !/^\d{4}-\d{2}-\d{2}$/.test(tanggal_evaluasi)
     ) {
       return res.status(400).json({
-        message:
-          'Tanggal evaluasi wajib menggunakan format YYYY-MM-DD'
+        message: 'Tanggal Evaluasi wajib menggunakan format YYYY-MM-DD'
       });
     }
 
-    // =========================
-    // VALIDASI NILAI REALISASI
-    // DB: 0 - 100
-    // =========================
+    const tanggal = new Date(`${tanggal_evaluasi}T00:00:00Z`);
 
-    const nilaiRealisasi =
-      Number(nilai_realisasi);
+    if (
+      Number.isNaN(tanggal.getTime()) ||
+      tanggal.toISOString().slice(0, 10) !== tanggal_evaluasi
+    ) {
+      return res.status(400).json({
+        message: 'Tanggal Evaluasi tidak valid'
+      });
+    }
+
+    if (
+      nilai_realisasi === undefined ||
+      nilai_realisasi === null ||
+      String(nilai_realisasi).trim() === ''
+    ) {
+      return res.status(400).json({
+        message: 'Realisasi wajib diisi'
+      });
+    }
+
+    const nilaiRealisasi = Number(nilai_realisasi);
 
     if (
       !Number.isFinite(nilaiRealisasi) ||
@@ -5430,60 +6549,85 @@ exports.updateEvaluasi = async (req, res) => {
       nilaiRealisasi > 100
     ) {
       return res.status(400).json({
-        message:
-          'Nilai realisasi harus berada antara 0 sampai 100'
+        message: 'Nilai Realisasi harus berada antara 0 sampai 100'
       });
     }
 
-    // =========================
-    // VALIDASI PELAKSANA
-    // =========================
+    if (typeof analisis !== 'string' || !analisis.trim()) {
+      return res.status(400).json({
+        message: 'Analisis wajib diisi'
+      });
+    }
+
+    if (
+      typeof tindak_lanjut !== 'string' ||
+      !tindak_lanjut.trim()
+    ) {
+      return res.status(400).json({
+        message: 'Tindak Lanjut wajib diisi'
+      });
+    }
 
     if (
       typeof pelaksana_terkait !== 'string' ||
-      pelaksana_terkait.trim() === ''
+      !pelaksana_terkait.trim()
     ) {
       return res.status(400).json({
-        message:
-          'Pelaksana terkait wajib diisi'
+        message: 'Pelaksana Terkait wajib diisi'
       });
     }
 
-    if (
-      pelaksana_terkait.trim().length > 255
-    ) {
+    if (pelaksana_terkait.trim().length > 255) {
       return res.status(400).json({
-        message:
-          'Pelaksana terkait maksimal 255 karakter'
+        message: 'Pelaksana Terkait maksimal 255 karakter'
       });
     }
 
-    // =========================
-    // CEK INDIKATOR
-    // =========================
+    const instansiId = await getUserInstansiId(req);
+
+    const [existing] = await db.query(
+      `
+      SELECT
+        e.id,
+        p.instansi_id
+      FROM mpn_evaluasi e
+      JOIN mpn_indikator_perencanaan ip
+        ON ip.id = e.indikator_perencanaan_id
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE e.id = ?
+        AND (? IS NULL OR p.instansi_id = ?)
+      LIMIT 1
+      `,
+      [id, instansiId, instansiId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        message: 'Data evaluasi tidak ditemukan atau bukan milik instansi Anda'
+      });
+    }
+
+    const pemilikInstansiId = Number(existing[0].instansi_id);
 
     const [indikator] = await db.query(
       `
-      SELECT id
-      FROM mpn_indikator_perencanaan
-      WHERE id = ?
+      SELECT ip.id
+      FROM mpn_indikator_perencanaan ip
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE ip.id = ?
+        AND p.instansi_id = ?
       LIMIT 1
       `,
-      [indikatorId]
+      [indikatorId, pemilikInstansiId]
     );
 
     if (indikator.length === 0) {
       return res.status(400).json({
-        message:
-          'Indikator perencanaan tidak ditemukan'
+        message: 'Indikator harus berasal dari instansi yang sama'
       });
     }
-
-    // =========================
-    // CEK DUPLICATE
-    // indikator + tanggal
-    // kecuali record yang sedang diedit
-    // =========================
 
     const [duplicate] = await db.query(
       `
@@ -5494,78 +6638,86 @@ exports.updateEvaluasi = async (req, res) => {
         AND id <> ?
       LIMIT 1
       `,
-      [
-        indikatorId,
-        tanggal_evaluasi,
-        id
-      ]
+      [indikatorId, tanggal_evaluasi, id]
     );
 
     if (duplicate.length > 0) {
       return res.status(409).json({
-        message:
-          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+        message: 'Evaluasi indikator pada tanggal tersebut sudah tersedia'
       });
     }
 
-    // =========================
-    // UPDATE
-    // created_by TIDAK diubah
-    // =========================
-
-    await db.query(
+    const [result] = await db.query(
       `
-      UPDATE mpn_evaluasi
+      UPDATE mpn_evaluasi e
+      JOIN mpn_indikator_perencanaan ip_lama
+        ON ip_lama.id = e.indikator_perencanaan_id
+      JOIN mpn_perencanaan p_lama
+        ON p_lama.id = ip_lama.perencanaan_id
+      JOIN mpn_indikator_perencanaan ip_baru
+        ON ip_baru.id = ?
+      JOIN mpn_perencanaan p_baru
+        ON p_baru.id = ip_baru.perencanaan_id
       SET
-        indikator_perencanaan_id = ?,
-        tanggal_evaluasi = ?,
-        nilai_realisasi = ?,
-        analisis = ?,
-        tindak_lanjut = ?,
-        pelaksana_terkait = ?
-      WHERE id = ?
+        e.indikator_perencanaan_id = ?,
+        e.tanggal_evaluasi = ?,
+        e.nilai_realisasi = ?,
+        e.analisis = ?,
+        e.tindak_lanjut = ?,
+        e.pelaksana_terkait = ?
+      WHERE e.id = ?
+        AND p_lama.instansi_id = ?
+        AND p_baru.instansi_id = p_lama.instansi_id
+        AND (? IS NULL OR p_lama.instansi_id = ?)
       `,
       [
         indikatorId,
+        indikatorId,
         tanggal_evaluasi,
         nilaiRealisasi,
-        analisis || null,
-        tindak_lanjut || null,
+        analisis.trim(),
+        tindak_lanjut.trim(),
         pelaksana_terkait.trim(),
-        id
+        id,
+        pemilikInstansiId,
+        instansiId,
+        instansiId
       ]
     );
 
-    return res.status(200).json({
-      message:
-        'Data evaluasi berhasil diperbarui',
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Data evaluasi tidak ditemukan atau tidak dapat diperbarui'
+      });
+    }
 
+    return res.status(200).json({
+      message: 'Data evaluasi berhasil diperbarui',
       data: {
         id,
-        indikator_perencanaan_id:
-          indikatorId,
+        indikator_perencanaan_id: indikatorId,
         tanggal_evaluasi,
-        nilai_realisasi:
-          nilaiRealisasi,
-        analisis:
-          analisis || null,
-        tindak_lanjut:
-          tindak_lanjut || null,
-        pelaksana_terkait:
-          pelaksana_terkait.trim()
+        nilai_realisasi: nilaiRealisasi,
+        analisis: analisis.trim(),
+        tindak_lanjut: tindak_lanjut.trim(),
+        pelaksana_terkait: pelaksana_terkait.trim()
       }
     });
-
   } catch (error) {
-    console.error(
-      'ERROR UPDATE EVALUASI:',
-      error
-    );
+    console.error('ERROR UPDATE EVALUASI:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({
-        message:
-          'Evaluasi indikator pada tanggal tersebut sudah tersedia'
+        message: 'Evaluasi indikator pada tanggal tersebut sudah tersedia'
       });
     }
 
@@ -5585,47 +6737,49 @@ exports.deleteEvaluasi = async (req, res) => {
       });
     }
 
-    const [data] = await db.query(
+    const instansiId = await getUserInstansiId(req);
+
+    const [result] = await db.query(
       `
-      SELECT id
-      FROM mpn_evaluasi
-      WHERE id = ?
-      LIMIT 1
+      DELETE e
+      FROM mpn_evaluasi e
+      JOIN mpn_indikator_perencanaan ip
+        ON ip.id = e.indikator_perencanaan_id
+      JOIN mpn_perencanaan p
+        ON p.id = ip.perencanaan_id
+      WHERE e.id = ?
+        AND (? IS NULL OR p.instansi_id = ?)
       `,
-      [id]
+      [id, instansiId, instansiId]
     );
 
-    if (data.length === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({
-        message: 'Data evaluasi tidak ditemukan'
+        message: 'Data evaluasi tidak ditemukan atau tidak dapat diakses'
       });
     }
-
-    await db.query(
-      `
-      DELETE FROM mpn_evaluasi
-      WHERE id = ?
-      `,
-      [id]
-    );
 
     return res.status(200).json({
       message: 'Data evaluasi berhasil dihapus'
     });
-
   } catch (error) {
-    console.error(
-      'ERROR DELETE EVALUASI:',
-      error
-    );
+    console.error('ERROR DELETE EVALUASI:', error);
+
+    if (
+      error.message === 'INSTANSI_AKUN_KOSONG' ||
+      error.message === 'INSTANSI_AKUN_TIDAK_DITEMUKAN'
+    ) {
+      return res.status(403).json({
+        message: 'Instansi akun tidak valid atau belum terdaftar'
+      });
+    }
 
     if (
       error.code === 'ER_ROW_IS_REFERENCED_2' ||
       error.code === 'ER_ROW_IS_REFERENCED'
     ) {
       return res.status(409).json({
-        message:
-          'Data evaluasi tidak dapat dihapus karena masih digunakan'
+        message: 'Data evaluasi tidak dapat dihapus karena masih digunakan'
       });
     }
 

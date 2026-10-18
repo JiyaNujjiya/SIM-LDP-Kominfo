@@ -20,7 +20,6 @@ import PetaRisikoPage from "./pages/PetaRisikoPage";
 import MonitoringSemester1Page from "./pages/MonitoringSemester1Page";
 import MonitoringSemester2Page from "./pages/MonitoringSemester2Page";
 import MonitoringTahunanPage from "./pages/MonitoringTahunanPage";
-import RiskOverviewPage from "./pages/RiskOverviewPage";
 
 import PerencanaanPerubahanPage from "./pages/PerencanaanPerubahanPage";
 import AnalisisPerubahanPage from "./pages/AnalisisPerubahanPage";
@@ -44,6 +43,7 @@ import PenangananRelasiPenggunaPage from "./pages/PenangananRelasiPenggunaPage";
 import EvaluasiRelasiPenggunaPage from "./pages/EvaluasiRelasiPenggunaPage";
 
 import KelolaAkunPage from "./pages/KelolaAkunPage";
+import LaporanEksporPage from "./pages/LaporanEksporPage";
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
@@ -126,17 +126,16 @@ export default function App() {
               }
             />
 
-            {/* ================= RISIKO ================= */}
-
             <Route
-              path="/risiko/overview"
+              path="/laporan-ekspor"
               element={
-                <RequirePermission permission="risk.view">
-                  <RiskOverviewPage />
+                <RequirePermission permission="dashboard.view">
+                  <LaporanEksporPage />
                 </RequirePermission>
               }
             />
 
+            {/* ================= RISIKO ================= */}
             <Route
               path="/risiko/konteks"
               element={

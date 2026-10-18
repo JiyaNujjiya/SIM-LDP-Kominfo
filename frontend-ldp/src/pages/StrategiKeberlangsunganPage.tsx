@@ -114,6 +114,14 @@ const processSteps = [
 const StrategiKeberlangsunganPage = () => {
   const navigate = useNavigate();
 
+  const savedUser = sessionStorage.getItem('user');
+  const user = savedUser ? JSON.parse(savedUser) : null;
+  const permissions: string[] = user?.permissions || [];
+
+  const canCreate = permissions.includes('continuity.create');
+  const canUpdate = permissions.includes('continuity.update');
+  const canDelete = permissions.includes('continuity.delete');
+
   const [bia, setBia] = useState<BiaItem[]>([]);
   const [insiden, setInsiden] = useState<InsidenItem[]>([]);
   const [strategi, setStrategi] = useState<StrategiItem[]>([]);
@@ -140,6 +148,8 @@ const StrategiKeberlangsunganPage = () => {
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [strategiFormError, setStrategiFormError] = useState('');
+  const [langkahFormError, setLangkahFormError] = useState(''); 
 
   const inputClass = 'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500 focus:ring-1 focus:ring-slate-500';
   const labelClass = 'text-sm font-medium text-slate-700';
@@ -316,6 +326,7 @@ const StrategiKeberlangsunganPage = () => {
   }, [strategi, strategiForm.insiden_id, editingStrategiId]);
 
   const handleTambahStrategi = () => {
+    setStrategiFormError('');
     setEditingStrategiId(null);
     setStrategiForm(emptyStrategiForm);
     setMessage('');
@@ -324,6 +335,7 @@ const StrategiKeberlangsunganPage = () => {
   };
 
   const handleEditStrategi = (item: StrategiItem) => {
+    setStrategiFormError('');
     setEditingStrategiId(item.id);
     setStrategiForm({
       insiden_id: String(item.insiden_id),
@@ -348,16 +360,33 @@ const StrategiKeberlangsunganPage = () => {
     setShowStrategiForm(false);
   };
 
+  
   const handleSubmitStrategi = async (event: FormEvent) => {
     event.preventDefault();
+    setStrategiFormError('');
 
-    if (!editingStrategiId && !strategiForm.insiden_id) {
-      setError('Insiden / gangguan wajib dipilih.');
+    if (!strategiForm.insiden_id) {
+      setStrategiFormError('Insiden / Gangguan Potensial wajib dipilih.');
       return;
     }
 
-    if (!strategiForm.nomor_skenario || !strategiForm.kategori || !strategiForm.metode_pemulihan.trim()) {
-      setError('Skenario, kategori, dan metode pemulihan wajib diisi.');
+    if (!strategiForm.nomor_skenario) {
+      setStrategiFormError('Nomor Skenario wajib dipilih.');
+      return;
+    }
+
+    if (!strategiForm.kategori) {
+      setStrategiFormError('Kategori wajib dipilih.');
+      return;
+    }
+
+    if (!strategiForm.metode_pemulihan.trim()) {
+      setStrategiFormError('Metode Pemulihan wajib diisi.');
+      return;
+    }
+
+    if (!strategiForm.deskripsi_strategi.trim()) {
+      setStrategiFormError('Deskripsi Strategi wajib diisi.');
       return;
     }
 
@@ -370,24 +399,28 @@ const StrategiKeberlangsunganPage = () => {
         nomor_skenario: Number(strategiForm.nomor_skenario),
         kategori: strategiForm.kategori,
         metode_pemulihan: strategiForm.metode_pemulihan.trim(),
-        deskripsi_strategi: strategiForm.deskripsi_strategi.trim() || null,
+        deskripsi_strategi: strategiForm.deskripsi_strategi.trim()
       };
 
       const result = await request(
-        editingStrategiId
+        editingStrategiId !== null
           ? `http://localhost:5000/api/bcp/strategi/${editingStrategiId}`
           : `http://localhost:5000/api/bcp/insiden/${strategiForm.insiden_id}/strategi`,
         {
-          method: editingStrategiId ? 'PUT' : 'POST',
-          body: JSON.stringify(payload),
+          method: editingStrategiId !== null ? 'PUT' : 'POST',
+          body: JSON.stringify(payload)
         }
       );
 
-      setMessage(result.message || 'Strategi pemulihan berhasil disimpan.');
       resetStrategiForm();
       await refreshAll();
+      setMessage(result.message || 'Strategi pemulihan berhasil disimpan.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan strategi pemulihan.');
+      setStrategiFormError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal menyimpan strategi pemulihan.'
+      );
     } finally {
       setSavingStrategi(false);
     }
@@ -408,6 +441,7 @@ const StrategiKeberlangsunganPage = () => {
   };
 
   const handleTambahLangkah = () => {
+    setLangkahFormError('');
     setEditingLangkahId(null);
     setLangkahForm(emptyLangkahForm);
     setMessage('');
@@ -416,6 +450,7 @@ const StrategiKeberlangsunganPage = () => {
   };
 
   const handleEditLangkah = (item: LangkahItem) => {
+    setLangkahFormError('');
     setEditingLangkahId(item.id);
     setLangkahForm({
       strategi_id: String(item.strategi_id),
@@ -434,16 +469,35 @@ const StrategiKeberlangsunganPage = () => {
     setShowLangkahForm(false);
   };
 
+  
   const handleSubmitLangkah = async (event: FormEvent) => {
     event.preventDefault();
+    setLangkahFormError('');
 
-    if (!editingLangkahId && !langkahForm.strategi_id) {
-      setError('Strategi / skenario wajib dipilih.');
+    if (!langkahForm.strategi_id) {
+      setLangkahFormError('Strategi / Skenario wajib dipilih.');
       return;
     }
 
-    if (!langkahForm.urutan || Number(langkahForm.urutan) <= 0 || !langkahForm.nama_langkah.trim()) {
-      setError('Urutan dan nama langkah wajib diisi.');
+    if (!langkahForm.urutan.trim()) {
+      setLangkahFormError('Urutan wajib diisi.');
+      return;
+    }
+
+    const urutan = Number(langkahForm.urutan);
+
+    if (!Number.isInteger(urutan) || urutan <= 0) {
+      setLangkahFormError('Urutan harus berupa bilangan bulat lebih dari 0.');
+      return;
+    }
+
+    if (!langkahForm.nama_langkah.trim()) {
+      setLangkahFormError('Nama Langkah wajib diisi.');
+      return;
+    }
+
+    if (!langkahForm.deskripsi.trim()) {
+      setLangkahFormError('Deskripsi wajib diisi.');
       return;
     }
 
@@ -453,26 +507,30 @@ const StrategiKeberlangsunganPage = () => {
       setError('');
 
       const payload = {
-        urutan: Number(langkahForm.urutan),
+        urutan,
         nama_langkah: langkahForm.nama_langkah.trim(),
-        deskripsi: langkahForm.deskripsi.trim() || null,
+        deskripsi: langkahForm.deskripsi.trim()
       };
 
       const result = await request(
-        editingLangkahId
+        editingLangkahId !== null
           ? `http://localhost:5000/api/bcp/langkah-pemulihan/${editingLangkahId}`
           : `http://localhost:5000/api/bcp/strategi/${langkahForm.strategi_id}/langkah`,
         {
-          method: editingLangkahId ? 'PUT' : 'POST',
-          body: JSON.stringify(payload),
+          method: editingLangkahId !== null ? 'PUT' : 'POST',
+          body: JSON.stringify(payload)
         }
       );
 
-      setMessage(result.message || 'Langkah pemulihan berhasil disimpan.');
       resetLangkahForm();
       await refreshAll();
+      setMessage(result.message || 'Langkah pemulihan berhasil disimpan.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan langkah pemulihan.');
+      setLangkahFormError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal menyimpan langkah pemulihan.'
+      );
     } finally {
       setSavingLangkah(false);
     }
@@ -564,9 +622,11 @@ const StrategiKeberlangsunganPage = () => {
                 </p>
               </div>
 
-              <button type="button" onClick={handleTambahStrategi} disabled={insiden.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+              {canCreate && (
+                <button type="button" onClick={handleTambahStrategi} disabled={insiden.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
                 Tambah Strategi
               </button>
+              )}
             </div>
 
             <div className="border-b border-slate-200 p-5">
@@ -574,17 +634,17 @@ const StrategiKeberlangsunganPage = () => {
             </div>
 
             <div className="overflow-x-auto p-5">
-              <table className="min-w-[1300px] w-full">
+              <table className="w-full min-w-[1250px] table-fixed border-collapse text-left text-sm">
                 <thead className="bg-slate-50">
                   <tr className="border-b border-slate-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">No</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Layanan</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Insiden</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Jenis Kejadian</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Skenario</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Kategori</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Metode Pemulihan</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">Aksi</th>
+                    <th className="w-[60px] px-3 py-4 text-left font-semibold text-slate-600">No</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Layanan</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Insiden</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Jenis Kejadian</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Skenario</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Kategori</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Metode Pemulihan</th>
+                    <th className="w-[220px] px-3 py-4 text-center font-semibold text-slate-600">Aksi</th>
                   </tr>
                 </thead>
 
@@ -609,7 +669,7 @@ const StrategiKeberlangsunganPage = () => {
                           <div className="font-medium">{item.kode_prioritas}</div>
                           <div className="mt-1 text-xs text-slate-500">{item.nama_layanan}</div>
                         </td>
-                        <td className="max-w-[260px] px-4 py-3 text-sm text-slate-700">{item.nama_insiden}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{item.nama_insiden}</td>
                         <td className="px-4 py-3 text-sm text-slate-600">{item.jenis_kejadian || '-'}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-slate-700">Skenario {item.nomor_skenario}</td>
                         <td className="px-4 py-3 text-sm text-slate-700">
@@ -619,18 +679,22 @@ const StrategiKeberlangsunganPage = () => {
                         </td>
                         <td className="max-w-[260px] px-4 py-3 text-sm text-slate-600">{item.metode_pemulihan}</td>
                         <td className="px-4 py-3">
-                          <div className="flex justify-center gap-2">
+                          <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
                             <button type="button" onClick={() => handleDetailStrategi(item)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
                               Detail
                             </button>
 
-                            <button type="button" onClick={() => handleEditStrategi(item)} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                            {canUpdate && (
+                              <button type="button" onClick={() => handleEditStrategi(item)} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100">
                               Edit
                             </button>
+                            )}
 
-                            <button type="button" onClick={() => handleDeleteStrategi(item)} className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
+                            {canDelete && (
+                              <button type="button" onClick={() => handleDeleteStrategi(item)} className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
                               Hapus
                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -653,9 +717,11 @@ const StrategiKeberlangsunganPage = () => {
                 </p>
               </div>
 
-              <button type="button" onClick={handleTambahLangkah} disabled={strategi.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+              {canCreate && (
+                <button type="button" onClick={handleTambahLangkah} disabled={strategi.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
                 Tambah Langkah
               </button>
+              )}
             </div>
 
             <div className="border-b border-slate-200 p-5">
@@ -663,16 +729,16 @@ const StrategiKeberlangsunganPage = () => {
             </div>
 
             <div className="overflow-x-auto p-5">
-              <table className="min-w-[1200px] w-full">
+              <table className="w-full min-w-[1250px] table-fixed border-collapse text-left text-sm">
                 <thead className="bg-slate-50">
                   <tr className="border-b border-slate-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Urutan</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Layanan</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Insiden</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Skenario</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Nama Langkah</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Deskripsi</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">Aksi</th>
+                    <th className="w-[100px] px-3 py-4 text-left font-semibold text-slate-600">Urutan</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Layanan</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Insiden</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Skenario</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Nama Langkah</th>
+                    <th className="px-3 py-4 text-left font-semibold text-slate-600">Deskripsi</th>
+                    <th className="w-[220px] px-3 py-4 text-center font-semibold text-slate-600">Aksi</th>
                   </tr>
                 </thead>
 
@@ -704,14 +770,18 @@ const StrategiKeberlangsunganPage = () => {
                         <td className="max-w-[260px] px-4 py-3 text-sm font-medium text-slate-700">{item.nama_langkah}</td>
                         <td className="max-w-[300px] px-4 py-3 text-sm text-slate-600">{item.deskripsi || '-'}</td>
                         <td className="px-4 py-3">
-                          <div className="flex justify-center gap-2">
-                            <button type="button" onClick={() => handleEditLangkah(item)} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                          <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
+                            {canUpdate && (
+                              <button type="button" onClick={() => handleEditLangkah(item)} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100">
                               Edit
                             </button>
+                            )}
 
-                            <button type="button" onClick={() => handleDeleteLangkah(item)} className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
+                            {canDelete && (
+                              <button type="button" onClick={() => handleDeleteLangkah(item)} className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100">
                               Hapus
                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -742,11 +812,17 @@ const StrategiKeberlangsunganPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitStrategi} className="p-6">
+            
+            <form onSubmit={handleSubmitStrategi} noValidate className="p-6">
+              {strategiFormError && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {strategiFormError}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
-                    Insiden / Gangguan Potensial
+                    Insiden / Gangguan Potensial *
                   </label>
 
                   <select
@@ -784,7 +860,7 @@ const StrategiKeberlangsunganPage = () => {
 
                 <div>
                   <label className={labelClass}>
-                    Nomor Skenario
+                    Nomor Skenario *
                   </label>
 
                   <select
@@ -812,7 +888,7 @@ const StrategiKeberlangsunganPage = () => {
 
                 <div>
                   <label className={labelClass}>
-                    Kategori
+                    Kategori *
                   </label>
 
                   <select
@@ -840,7 +916,7 @@ const StrategiKeberlangsunganPage = () => {
 
                 <div className="md:col-span-2">
                   <label className={labelClass}>
-                    Metode Pemulihan
+                    Metode Pemulihan *
                   </label>
 
                   <input
@@ -861,7 +937,7 @@ const StrategiKeberlangsunganPage = () => {
 
                 <div className="md:col-span-2">
                   <label className={labelClass}>
-                    Deskripsi Strategi
+                    Deskripsi Strategi *
                   </label>
 
                   <textarea
@@ -912,11 +988,17 @@ const StrategiKeberlangsunganPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitLangkah} className="p-6">
+            
+            <form onSubmit={handleSubmitLangkah} noValidate className="p-6">
+              {langkahFormError && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {langkahFormError}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
-                    Strategi / Skenario
+                    Strategi / Skenario *
                   </label>
 
                   <select
@@ -977,7 +1059,7 @@ const StrategiKeberlangsunganPage = () => {
 
                 <div>
                   <label className={labelClass}>
-                    Nama Langkah
+                    Nama Langkah *
                   </label>
 
                   <input

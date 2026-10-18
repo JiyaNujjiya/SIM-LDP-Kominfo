@@ -84,6 +84,13 @@ router.get(
   pengetahuanController.getRencanaDokumentasi
 );
 
+router.post(
+  '/perencanaan/:id/rencana-dokumentasi-gabungan',
+  authMiddleware,
+  requirePermission('knowledge.create'),
+  pengetahuanController.createRencanaDokumentasiGabungan
+);
+
 router.get(
   '/perencanaan/:id/indikator',
   authMiddleware,

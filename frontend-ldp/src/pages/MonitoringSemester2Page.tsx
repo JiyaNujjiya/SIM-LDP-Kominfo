@@ -69,6 +69,12 @@ const MonitoringSemester2Page: React.FC = () => {
 
   const navigate = useNavigate();
 
+  const savedUser = sessionStorage.getItem('user');
+  const user = savedUser ? JSON.parse(savedUser) : null;
+  const permissions: string[] = user?.permissions || [];
+
+  const canUpdate = permissions.includes('risk.update');
+
   const tahunSekarang = new Date().getFullYear();
 
   const fetchMonitoring = async () => {
@@ -383,8 +389,6 @@ const MonitoringSemester2Page: React.FC = () => {
   };
 
   const [search, setSearch] = React.useState('');
-  const [statusFilter, setStatusFilter] =
-    React.useState('Semua');
 
   const filteredData = data
     .filter((item) => {
@@ -402,14 +406,7 @@ const MonitoringSemester2Page: React.FC = () => {
           ?.toLowerCase()
           .includes(keyword);
 
-      const matchStatus =
-        statusFilter === 'Semua' ||
-        (statusFilter === 'Sudah Dimonitor' &&
-          item.monitoring_id !== null) ||
-        (statusFilter === 'Belum Dimonitor' &&
-          item.monitoring_id === null);
-
-      return matchSearch && matchStatus;
+      return matchSearch
     })
     .sort((a, b) =>
       (a.kode_risiko || '').localeCompare(
@@ -483,7 +480,7 @@ const MonitoringSemester2Page: React.FC = () => {
       )}
 
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="p-5">
+        <div className="border-b border-slate-200 p-5">
           <h2 className="text-lg font-semibold text-slate-800">
             Monitoring Risiko Semester II
           </h2>
@@ -492,34 +489,8 @@ const MonitoringSemester2Page: React.FC = () => {
           </p>
         </div>
 
-        <div className="p-5">
+        <div className="border-b border-slate-200 p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
-                Status Monitoring
-              </label>
-
-              <select
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value)
-                }
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-              >
-                <option value="Semua">
-                  Semua Status
-                </option>
-
-                <option value="Sudah Dimonitor">
-                  Sudah Dimonitor
-                </option>
-
-                <option value="Belum Dimonitor">
-                  Belum Dimonitor
-                </option>
-              </select>
-            </div>
-
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
                 Pencarian
@@ -536,68 +507,64 @@ const MonitoringSemester2Page: React.FC = () => {
               />
             </div>
           </div>
-
         </div>
 
-        <div className="overflow-x-auto">
-            <table className="w-full min-w-[1650px] border-collapse text-left">
-              <thead className="bg-slate-50">
-                <tr className="border-b border-slate-200">
-                  <th className="w-[120px] px-4 py-3 text-center">
+        <div className="p-5">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1500px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                  <th className="px-4 py-3 font-semibold">
                     Kode Risiko
                   </th>
 
-                  <th className="w-[280px] px-4 py-3">
+                  <th className="px-4 py-3 font-semibold">
                     Peristiwa Risiko
                   </th>
 
-                  <th className="w-[150px] px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center font-semibold">
                     Risiko Saat Ini
                   </th>
 
-                  <th className="w-[140px] px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center font-semibold">
                     Proyeksi Risiko
                   </th>
 
-                  <th className="w-[220px] px-4 py-3">
+                  <th className="px-4 py-3 font-semibold">
                     Perlakuan Risiko
                   </th>
 
-                  <th className="w-[260px] px-4 py-3">
+                  <th className="px-4 py-3 font-semibold">
                     Rencana Penanganan
                   </th>
 
-                  <th className="w-[180px] px-4 py-3">
+                  <th className="px-4 py-3 font-semibold">
                     Penanggung Jawab
                   </th>
 
-                  <th className="w-[150px] px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center font-semibold">
                     Waktu Pelaksanaan
                   </th>
 
-                  <th className="w-[240px] px-4 py-3">
+                  <th className="px-4 py-3 font-semibold">
                     Hasil Pelaksanaan
                   </th>
 
-                  <th className="w-[220px] px-4 py-3">
+                  <th className="px-4 py-3 font-semibold">
                     Data Dukung
                   </th>
 
-                  <th className="w-[140px] px-4 py-3 text-center">
-                    Status
-                  </th>
-
-                  <th className="w-[120px] px-4 py-3 text-center">
+                  <th className="px-4 py-3 text-center font-semibold">
                     Aksi
                   </th>
                 </tr>
               </thead>
 
-              <tbody className="text-sm text-slate-700">
+              <tbody>
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={12}
+                      colSpan={11}
                       className="px-4 py-10 text-center text-sm text-slate-500"
                     >
                       Memuat data monitoring...
@@ -606,8 +573,8 @@ const MonitoringSemester2Page: React.FC = () => {
                 ) : filteredData.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={12}
-                      className="px-4 py-10 text-center text-sm text-slate-400"
+                      colSpan={11}
+                      className="px-4 py-10 text-center text-sm text-slate-500"
                     >
                       Tidak ada data monitoring yang sesuai.
                     </td>
@@ -616,39 +583,39 @@ const MonitoringSemester2Page: React.FC = () => {
                   filteredData.map((item) => (
                     <tr
                       key={item.risiko_id}
-                      className="hover:bg-slate-50"
+                      className="border-b border-slate-100 hover:bg-slate-50"
                     >
-                      <td className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-900">
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
                         {item.kode_risiko}
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.peristiwa_risiko || '-'}
                       </td>
 
-                      <td className="px-4 py-3 text-center font-semibold text-slate-900">
+                      <td className="px-4 py-3 text-center font-semibold text-slate-800">
                         {item.risiko_saat_ini ??
                           item.besaran_risiko ??
                           '-'}
                       </td>
 
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center text-slate-700">
                         {item.proyeksi_risiko ?? '-'}
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.perlakuan_risiko || '-'}
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.rencana_penanganan || '-'}
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.nama_penanggung_jawab || '-'}
                       </td>
 
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center text-slate-700">
                         {item.waktu_pelaksanaan
                           ? new Date(
                               item.waktu_pelaksanaan
@@ -656,7 +623,7 @@ const MonitoringSemester2Page: React.FC = () => {
                           : '-'}
                       </td>
 
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-slate-700">
                         {item.hasil_pelaksanaan || '-'}
                       </td>
 
@@ -664,24 +631,22 @@ const MonitoringSemester2Page: React.FC = () => {
                         {item.dokumen &&
                         item.dokumen.length > 0 ? (
                           <div className="space-y-1">
-                            {item.dokumen.map(
-                              (dokumen) => (
-                                <button
-                                  key={dokumen.id}
-                                  type="button"
-                                  onClick={() =>
-                                    handleDownloadDokumen(
-                                      dokumen.id,
-                                      dokumen.nama_file
-                                    )
-                                  }
-                                  className="block max-w-[200px] truncate text-left text-xs font-medium text-blue-700 hover:underline"
-                                  title={dokumen.nama_file}
-                                >
-                                  {dokumen.nama_file}
-                                </button>
-                              )
-                            )}
+                            {item.dokumen.map((dokumen) => (
+                              <button
+                                key={dokumen.id}
+                                type="button"
+                                onClick={() =>
+                                  handleDownloadDokumen(
+                                    dokumen.id,
+                                    dokumen.nama_file
+                                  )
+                                }
+                                className="block max-w-[200px] truncate text-left text-xs font-medium text-blue-700 hover:underline"
+                                title={dokumen.nama_file}
+                              >
+                                {dokumen.nama_file}
+                              </button>
+                            ))}
                           </div>
                         ) : (
                           <span className="text-slate-400">
@@ -690,30 +655,18 @@ const MonitoringSemester2Page: React.FC = () => {
                         )}
                       </td>
 
-                      <td className="px-4 py-3 text-center">
-                        {item.monitoring_id ? (
-                          <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                            Sudah Dimonitor
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                            Belum Dimonitor
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleEdit(item)
-                          }
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                        >
-                          {item.monitoring_id
-                            ? 'Edit'
-                            : 'Lengkapi'}
-                        </button>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(item)}
+                            className="rounded-md border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                          >
+                            {item.monitoring_id
+                              ? 'Edit'
+                              : 'Lengkapi'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -721,6 +674,7 @@ const MonitoringSemester2Page: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
       </div>
 
       {editingItem && (

@@ -1,5 +1,19 @@
-    import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+
+const getUserRelationPermissions = (): string[] => {
+  const raw = sessionStorage.getItem('user');
+
+  if (!raw) return [];
+
+  try {
+    const currentUser = JSON.parse(raw);
+    return Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  } catch {
+    return [];
+  }
+};
 
 const API = 'http://localhost:5000/api/relasi-pengguna';
 
@@ -20,7 +34,8 @@ type TargetItem = {
   id: number;
   jenis: string;
   prioritas: string;
-  layanan_id: number;
+  layanan_id: number | null;
+  katalog_layanan_id?: number | null;
   kode_layanan: string;
   nama_layanan: string;
   versi_standar: number;
@@ -34,7 +49,8 @@ type KueriItem = {
   id: number;
   kode_kueri: string;
   waktu_masuk: string;
-  layanan_id: number;
+  layanan_id: number | null;
+  katalog_layanan_id?: number | null;
   kode_layanan: string;
   nama_layanan: string;
   target_kueri_id: number | null;
@@ -59,7 +75,8 @@ type TanggapanKueriItem = {
   kueri_id: number;
   kode_kueri: string;
   judul: string;
-  layanan_id: number;
+  layanan_id: number | null;
+  katalog_layanan_id?: number | null;
   kode_layanan: string;
   nama_layanan: string;
   status_kueri: string;
@@ -84,7 +101,8 @@ type InsidenItem = {
   pelapor_id: number | null;
   nama_pelapor: string | null;
   waktu_terdeteksi: string;
-  layanan_id: number;
+  layanan_id: number | null;
+  katalog_layanan_id?: number | null;
   kode_layanan: string;
   nama_layanan: string;
   target_insiden_id: number | null;
@@ -103,7 +121,8 @@ type PenangananInsidenItem = {
   id: number;
   insiden_id: number;
   kode_insiden: string;
-  layanan_id: number;
+  layanan_id: number | null;
+  katalog_layanan_id?: number | null;
   kode_layanan: string;
   nama_layanan: string;
   prioritas: string;
@@ -144,7 +163,8 @@ type MasalahInsidenItem = {
   prioritas_insiden: string;
   status_insiden: string;
   apakah_berulang: number;
-  layanan_id: number;
+  layanan_id: number | null;
+  katalog_layanan_id?: number | null;
   kode_layanan: string;
   nama_layanan: string;
   keterangan: string | null;
@@ -389,7 +409,7 @@ const PenangananRelasiPenggunaPage = () => {
         masalahResult,
         masalahInsidenResult,
       ] = await Promise.all([
-        request(`${API}/layanan-options`),
+        request(`${API}/katalog-layanan`),
         request(`${API}/user-options`),
         request(`${API}/target-kueri-insiden`),
         request(`${API}/kueri`),
@@ -400,7 +420,7 @@ const PenangananRelasiPenggunaPage = () => {
         request(`${API}/masalah-insiden`),
       ]);
 
-      setLayananOptions(rowsOf<LayananOption>(layananResult));
+      setLayananOptions(rowsOf<LayananOption>(layananResult).map(item => ({...item, kode_layanan: item.kode_layanan || `KAT-${item.id}`})));
       setUserOptions(rowsOf<UserOption>(userResult));
       setTargetOptions(rowsOf<TargetItem>(targetResult));
       setKueri(rowsOf<KueriItem>(kueriResult));
@@ -524,7 +544,7 @@ const PenangananRelasiPenggunaPage = () => {
       targetOptions.filter(
         (item) =>
           item.jenis === 'Kueri' &&
-          (!kueriForm.layanan_id || Number(item.layanan_id) === Number(kueriForm.layanan_id))
+          (!kueriForm.layanan_id || Number(item.katalog_layanan_id) === Number(kueriForm.layanan_id))
       ),
     [targetOptions, kueriForm.layanan_id]
   );
@@ -534,7 +554,7 @@ const PenangananRelasiPenggunaPage = () => {
       targetOptions.filter(
         (item) =>
           item.jenis === 'Insiden' &&
-          (!insidenForm.layanan_id || Number(item.layanan_id) === Number(insidenForm.layanan_id)) &&
+          (!insidenForm.layanan_id || Number(item.katalog_layanan_id) === Number(insidenForm.layanan_id)) &&
           (!insidenForm.prioritas || item.prioritas === insidenForm.prioritas)
       ),
     [targetOptions, insidenForm.layanan_id, insidenForm.prioritas]
@@ -545,7 +565,7 @@ const PenangananRelasiPenggunaPage = () => {
       kueri.filter(
         (item) =>
           !insidenForm.layanan_id ||
-          Number(item.layanan_id) === Number(insidenForm.layanan_id)
+          Number(item.katalog_layanan_id) === Number(insidenForm.layanan_id)
       ),
     [kueri, insidenForm.layanan_id]
   );
@@ -556,6 +576,7 @@ const PenangananRelasiPenggunaPage = () => {
       ...emptyKueriForm,
       kode_kueri: `KR-${Date.now()}`,
     });
+    setError('');
     setShowKueriForm(true);
   };
 
@@ -564,7 +585,7 @@ const PenangananRelasiPenggunaPage = () => {
     setKueriForm({
       kode_kueri: item.kode_kueri,
       waktu_masuk: item.waktu_masuk ? item.waktu_masuk.slice(0, 16) : '',
-      layanan_id: String(item.layanan_id),
+      layanan_id: String(item.katalog_layanan_id || ''),
       target_kueri_id: item.target_kueri_id ? String(item.target_kueri_id) : '',
       cakupan_layanan_terkait: item.cakupan_layanan_terkait || '',
       pengguna_id: item.pengguna_id ? String(item.pengguna_id) : '',
@@ -579,11 +600,23 @@ const PenangananRelasiPenggunaPage = () => {
       urgensi: item.urgensi || 'Rendah',
       status: item.status || 'Diterima',
     });
+    setError('');
     setShowKueriForm(true);
   };
 
   const submitKueri = async (event: FormEvent) => {
     event.preventDefault();
+
+    setError('');
+    if (!String(kueriForm.kode_kueri ?? '').trim()) { setError('Kode Kueri wajib diisi.'); return; }
+    if (!String(kueriForm.waktu_masuk ?? '').trim()) { setError('Waktu Masuk wajib diisi.'); return; }
+    if (!String(kueriForm.layanan_id ?? '').trim()) { setError('Katalog Layanan wajib diisi.'); return; }
+    if (!String(kueriForm.kanal_masuk ?? '').trim()) { setError('Kanal Masuk wajib diisi.'); return; }
+    if (!String(kueriForm.jenis ?? '').trim()) { setError('Jenis Kueri wajib diisi.'); return; }
+    if (!String(kueriForm.urgensi ?? '').trim()) { setError('Urgensi wajib diisi.'); return; }
+    if (!String(kueriForm.judul ?? '').trim()) { setError('Judul wajib diisi.'); return; }
+    if (!String(kueriForm.deskripsi ?? '').trim()) { setError('Deskripsi wajib diisi.'); return; }
+
 
     try {
       setSaving(true);
@@ -593,7 +626,7 @@ const PenangananRelasiPenggunaPage = () => {
       const payload = {
         kode_kueri: kueriForm.kode_kueri.trim(),
         waktu_masuk: kueriForm.waktu_masuk,
-        layanan_id: Number(kueriForm.layanan_id),
+        katalog_layanan_id: Number(kueriForm.layanan_id),
         target_kueri_id: kueriForm.target_kueri_id ? Number(kueriForm.target_kueri_id) : null,
         cakupan_layanan_terkait: kueriForm.cakupan_layanan_terkait.trim() || null,
         pengguna_id: kueriForm.pengguna_id ? Number(kueriForm.pengguna_id) : null,
@@ -653,6 +686,7 @@ const PenangananRelasiPenggunaPage = () => {
       kueri_id: String(selectedKueri.id),
     });
 
+    setError('');
     setShowTanggapanKueriForm(true);
   };
 
@@ -668,6 +702,13 @@ const PenangananRelasiPenggunaPage = () => {
 
   const submitTanggapanKueri = async (event: FormEvent) => {
     event.preventDefault();
+
+    setError('');
+    if (!String(tanggapanKueriForm.pic_id ?? '').trim()) { setError('PIC wajib diisi.'); return; }
+    if (!String(tanggapanKueriForm.jenis_tindakan ?? '').trim()) { setError('Jenis Tindakan wajib diisi.'); return; }
+    if (!String(tanggapanKueriForm.status_setelah ?? '').trim()) { setError('Status Setelah wajib diisi.'); return; }
+    if (!String(tanggapanKueriForm.respon ?? '').trim()) { setError('Respons wajib diisi.'); return; }
+
 
     try {
       setSaving(true);
@@ -703,6 +744,7 @@ const PenangananRelasiPenggunaPage = () => {
       kode_insiden: `INS-${Date.now()}`,
     });
 
+    setError('');
     setShowInsidenForm(true);
   };
 
@@ -715,7 +757,7 @@ const PenangananRelasiPenggunaPage = () => {
       kanal_masuk: item.kanal_masuk || '',
       pelapor_id: item.pelapor_id ? String(item.pelapor_id) : '',
       waktu_terdeteksi: item.waktu_terdeteksi ? item.waktu_terdeteksi.slice(0, 16) : '',
-      layanan_id: String(item.layanan_id),
+      layanan_id: String(item.katalog_layanan_id || ''),
       target_insiden_id: item.target_insiden_id ? String(item.target_insiden_id) : '',
       deskripsi_insiden: item.deskripsi_insiden || '',
       prioritas: item.prioritas || 'Rendah',
@@ -725,11 +767,21 @@ const PenangananRelasiPenggunaPage = () => {
       apakah_berulang: String(item.apakah_berulang || 0),
     });
 
+    setError('');
     setShowInsidenForm(true);
   };
 
   const submitInsiden = async (event: FormEvent) => {
     event.preventDefault();
+
+    setError('');
+    if (!String(insidenForm.kode_insiden ?? '').trim()) { setError('Kode Insiden wajib diisi.'); return; }
+    if (!String(insidenForm.waktu_terdeteksi ?? '').trim()) { setError('Waktu Terdeteksi wajib diisi.'); return; }
+    if (!String(insidenForm.layanan_id ?? '').trim()) { setError('Katalog Layanan wajib diisi.'); return; }
+    if (!String(insidenForm.kanal_masuk ?? '').trim()) { setError('Kanal Masuk wajib diisi.'); return; }
+    if (!String(insidenForm.prioritas ?? '').trim()) { setError('Prioritas wajib diisi.'); return; }
+    if (!String(insidenForm.deskripsi_insiden ?? '').trim()) { setError('Deskripsi Insiden wajib diisi.'); return; }
+
 
     try {
       setSaving(true);
@@ -742,7 +794,7 @@ const PenangananRelasiPenggunaPage = () => {
         kanal_masuk: insidenForm.kanal_masuk.trim(),
         pelapor_id: insidenForm.pelapor_id ? Number(insidenForm.pelapor_id) : null,
         waktu_terdeteksi: insidenForm.waktu_terdeteksi,
-        layanan_id: Number(insidenForm.layanan_id),
+        katalog_layanan_id: Number(insidenForm.layanan_id),
         target_insiden_id: insidenForm.target_insiden_id ? Number(insidenForm.target_insiden_id) : null,
         deskripsi_insiden: insidenForm.deskripsi_insiden.trim(),
         prioritas: insidenForm.prioritas,
@@ -805,11 +857,20 @@ const PenangananRelasiPenggunaPage = () => {
       insiden_id: String(selectedInsiden.id),
     });
 
+    setError('');
     setShowPenangananInsidenForm(true);
   };
 
   const submitPenangananInsiden = async (event: FormEvent) => {
     event.preventDefault();
+
+    setError('');
+    if (!String(penangananInsidenForm.pic_id ?? '').trim()) { setError('PIC wajib diisi.'); return; }
+    if (!String(penangananInsidenForm.jenis_penanganan ?? '').trim()) { setError('Jenis Penanganan wajib diisi.'); return; }
+    if (!String(penangananInsidenForm.status_setelah ?? '').trim()) { setError('Status Setelah wajib diisi.'); return; }
+    if (!String(penangananInsidenForm.tindakan ?? '').trim()) { setError('Tindakan wajib diisi.'); return; }
+    if (penangananInsidenForm.jenis_penanganan === 'Eskalasi' && !penangananInsidenForm.eskalasi_kepada.trim()) { setError('Eskalasi Kepada wajib diisi.'); return; }
+
 
     try {
       setSaving(true);
@@ -846,6 +907,7 @@ const PenangananRelasiPenggunaPage = () => {
       kode_masalah: `MSL-${Date.now()}`,
     });
 
+    setError('');
     setShowMasalahForm(true);
   };
 
@@ -866,11 +928,21 @@ const PenangananRelasiPenggunaPage = () => {
       perubahan_id: item.perubahan_id ? String(item.perubahan_id) : '',
     });
 
+    setError('');
     setShowMasalahForm(true);
   };
 
   const submitMasalah = async (event: FormEvent) => {
     event.preventDefault();
+
+    setError('');
+    if (!String(masalahForm.kode_masalah ?? '').trim()) { setError('Kode Masalah wajib diisi.'); return; }
+    if (!String(masalahForm.prioritas ?? '').trim()) { setError('Prioritas wajib diisi.'); return; }
+    if (!String(masalahForm.diagnosa_akar_masalah ?? '').trim()) { setError('Diagnosa Akar Masalah wajib diisi.'); return; }
+    if (!String(masalahForm.deskripsi_akar_masalah ?? '').trim()) { setError('Deskripsi Akar Masalah wajib diisi.'); return; }
+    if (!String(masalahForm.status ?? '').trim()) { setError('Status wajib diisi.'); return; }
+    if (masalahForm.memerlukan_perubahan === '1' && !masalahForm.deskripsi_singkat_perubahan.trim()) { setError('Deskripsi Singkat Perubahan wajib diisi.'); return; }
+
 
     try {
       setSaving(true);
@@ -935,11 +1007,16 @@ const PenangananRelasiPenggunaPage = () => {
       masalah_id: String(selectedMasalah.id),
     });
 
+    setError('');
     setShowMasalahInsidenForm(true);
   };
 
   const submitMasalahInsiden = async (event: FormEvent) => {
     event.preventDefault();
+
+    setError('');
+    if (!String(masalahInsidenForm.insiden_id ?? '').trim()) { setError('Insiden wajib diisi.'); return; }
+
 
     try {
       setSaving(true);
@@ -1048,12 +1125,6 @@ const PenangananRelasiPenggunaPage = () => {
         </div>
       )}
 
-      {error && (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-5">
           <h2 className="text-lg font-semibold text-slate-800">
@@ -1107,15 +1178,15 @@ const PenangananRelasiPenggunaPage = () => {
               <table className="min-w-[1500px] w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <Th>Kode Kueri</Th>
-                    <Th>Layanan</Th>
-                    <Th>Waktu Masuk</Th>
-                    <Th>Pelapor</Th>
-                    <Th>Jenis</Th>
-                    <Th>Judul</Th>
-                    <Th>Urgensi</Th>
-                    <Th>Status</Th>
-                    <Th>Aksi</Th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Kode Kueri</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Layanan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Waktu Masuk</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Pelapor</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Jenis</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Judul</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Urgensi</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Status</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-medium text-slate-700">Aksi</th>
                   </tr>
                 </thead>
 
@@ -1132,7 +1203,7 @@ const PenangananRelasiPenggunaPage = () => {
                           selectedKueriId === item.id ? 'bg-slate-50' : ''
                         }`}
                       >
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <button
                             type="button"
                             onClick={() => setSelectedKueriId(item.id)}
@@ -1140,26 +1211,26 @@ const PenangananRelasiPenggunaPage = () => {
                           >
                             {item.kode_kueri}
                           </button>
-                        </Td>
+                        </td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <div className="font-medium">{item.kode_layanan}</div>
                           <div className="text-xs text-slate-500">{item.nama_layanan}</div>
-                        </Td>
+                        </td>
 
-                        <Td>{formatDateTime(item.waktu_masuk)}</Td>
-                        <Td>{item.nama_pengguna || item.email_pelapor || '-'}</Td>
-                        <Td>{item.jenis}</Td>
-                        <Td>{item.judul}</Td>
-                        <Td>{item.urgensi}</Td>
-                        <Td>{item.status}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{formatDateTime(item.waktu_masuk)}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.nama_pengguna || item.email_pelapor || '-'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.jenis}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.judul}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.urgensi}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.status}</td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-center text-sm text-slate-700">
                           <ActionButtons
                             onEdit={() => openEditKueri(item)}
                             onDelete={() => deleteKueri(item)}
                           />
-                        </Td>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1191,13 +1262,13 @@ const PenangananRelasiPenggunaPage = () => {
               <table className="min-w-[1200px] w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <Th>Waktu</Th>
-                    <Th>PIC</Th>
-                    <Th>Jenis Tindakan</Th>
-                    <Th>Respons</Th>
-                    <Th>Status Setelah</Th>
-                    <Th>Realisasi Penyelesaian</Th>
-                    <Th>Dicatat Oleh</Th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Waktu</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">PIC</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Jenis Tindakan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Respons</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Status Setelah</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Realisasi Penyelesaian</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Dicatat Oleh</th>
                   </tr>
                 </thead>
 
@@ -1209,17 +1280,17 @@ const PenangananRelasiPenggunaPage = () => {
                   ) : (
                     selectedTanggapanKueri.map((item) => (
                       <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{formatDateTime(item.waktu_update)}</Td>
-                        <Td>{item.nama_pic}</Td>
-                        <Td>{item.jenis_tindakan}</Td>
-                        <Td>{item.respon}</Td>
-                        <Td>{item.status_setelah}</Td>
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{formatDateTime(item.waktu_update)}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.nama_pic}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.jenis_tindakan}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.respon}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.status_setelah}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           {item.realisasi_waktu_penyelesaian_menit !== null
                             ? `${item.realisasi_waktu_penyelesaian_menit} menit`
                             : '-'}
-                        </Td>
-                        <Td>{item.nama_pencatat}</Td>
+                        </td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.nama_pencatat}</td>
                       </tr>
                     ))
                   )}
@@ -1248,15 +1319,15 @@ const PenangananRelasiPenggunaPage = () => {
               <table className="min-w-[1500px] w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <Th>Kode Insiden</Th>
-                    <Th>Kueri Asal</Th>
-                    <Th>Layanan</Th>
-                    <Th>Waktu Terdeteksi</Th>
-                    <Th>Prioritas</Th>
-                    <Th>Diagnosa Awal</Th>
-                    <Th>Berulang</Th>
-                    <Th>Status</Th>
-                    <Th>Aksi</Th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Kode Insiden</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Kueri Asal</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Layanan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Waktu Terdeteksi</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Prioritas</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Diagnosa Awal</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Berulang</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Status</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-medium text-slate-700">Aksi</th>
                   </tr>
                 </thead>
 
@@ -1273,7 +1344,7 @@ const PenangananRelasiPenggunaPage = () => {
                           selectedInsidenId === item.id ? 'bg-slate-50' : ''
                         }`}
                       >
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <button
                             type="button"
                             onClick={() => setSelectedInsidenId(item.id)}
@@ -1281,27 +1352,27 @@ const PenangananRelasiPenggunaPage = () => {
                           >
                             {item.kode_insiden}
                           </button>
-                        </Td>
+                        </td>
 
-                        <Td>{item.kode_kueri_asal || '-'}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.kode_kueri_asal || '-'}</td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <div className="font-medium">{item.kode_layanan}</div>
                           <div className="text-xs text-slate-500">{item.nama_layanan}</div>
-                        </Td>
+                        </td>
 
-                        <Td>{formatDateTime(item.waktu_terdeteksi)}</Td>
-                        <Td>{item.prioritas}</Td>
-                        <Td>{item.diagnosa_awal || '-'}</Td>
-                        <Td>{Number(item.apakah_berulang) === 1 ? 'Ya' : 'Tidak'}</Td>
-                        <Td>{item.status}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{formatDateTime(item.waktu_terdeteksi)}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.prioritas}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.diagnosa_awal || '-'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{Number(item.apakah_berulang) === 1 ? 'Ya' : 'Tidak'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.status}</td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-center text-sm text-slate-700">
                           <ActionButtons
                             onEdit={() => openEditInsiden(item)}
                             onDelete={() => deleteInsiden(item)}
                           />
-                        </Td>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1333,13 +1404,13 @@ const PenangananRelasiPenggunaPage = () => {
               <table className="min-w-[1300px] w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <Th>Waktu</Th>
-                    <Th>PIC</Th>
-                    <Th>Jenis Penanganan</Th>
-                    <Th>Eskalasi Kepada</Th>
-                    <Th>Tindakan</Th>
-                    <Th>Status Setelah</Th>
-                    <Th>Dicatat Oleh</Th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Waktu</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">PIC</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Jenis Penanganan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Eskalasi Kepada</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Tindakan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Status Setelah</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Dicatat Oleh</th>
                   </tr>
                 </thead>
 
@@ -1351,13 +1422,13 @@ const PenangananRelasiPenggunaPage = () => {
                   ) : (
                     selectedPenangananInsiden.map((item) => (
                       <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{formatDateTime(item.waktu_tindakan)}</Td>
-                        <Td>{item.nama_pic}</Td>
-                        <Td>{item.jenis_penanganan}</Td>
-                        <Td>{item.eskalasi_kepada || '-'}</Td>
-                        <Td>{item.tindakan}</Td>
-                        <Td>{item.status_setelah}</Td>
-                        <Td>{item.nama_pencatat}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{formatDateTime(item.waktu_tindakan)}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.nama_pic}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.jenis_penanganan}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.eskalasi_kepada || '-'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.tindakan}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.status_setelah}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.nama_pencatat}</td>
                       </tr>
                     ))
                   )}
@@ -1386,14 +1457,14 @@ const PenangananRelasiPenggunaPage = () => {
               <table className="min-w-[1500px] w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <Th>Kode Masalah</Th>
-                    <Th>Diagnosa Akar Masalah</Th>
-                    <Th>Prioritas</Th>
-                    <Th>Solusi Sementara</Th>
-                    <Th>Solusi Permanen</Th>
-                    <Th>Perlu Perubahan</Th>
-                    <Th>Status</Th>
-                    <Th>Aksi</Th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Kode Masalah</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Diagnosa Akar Masalah</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Prioritas</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Solusi Sementara</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Solusi Permanen</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Perlu Perubahan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Status</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-medium text-slate-700">Aksi</th>
                   </tr>
                 </thead>
 
@@ -1410,7 +1481,7 @@ const PenangananRelasiPenggunaPage = () => {
                           selectedMasalahId === item.id ? 'bg-slate-50' : ''
                         }`}
                       >
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <button
                             type="button"
                             onClick={() => setSelectedMasalahId(item.id)}
@@ -1418,21 +1489,21 @@ const PenangananRelasiPenggunaPage = () => {
                           >
                             {item.kode_masalah}
                           </button>
-                        </Td>
+                        </td>
 
-                        <Td>{item.diagnosa_akar_masalah}</Td>
-                        <Td>{item.prioritas}</Td>
-                        <Td>{item.solusi_sementara || '-'}</Td>
-                        <Td>{item.solusi_permanen || '-'}</Td>
-                        <Td>{Number(item.memerlukan_perubahan) === 1 ? 'Ya' : 'Tidak'}</Td>
-                        <Td>{item.status}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.diagnosa_akar_masalah}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.prioritas}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.solusi_sementara || '-'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.solusi_permanen || '-'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{Number(item.memerlukan_perubahan) === 1 ? 'Ya' : 'Tidak'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.status}</td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-center text-sm text-slate-700">
                           <ActionButtons
                             onEdit={() => openEditMasalah(item)}
                             onDelete={() => deleteMasalah(item)}
                           />
-                        </Td>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1464,13 +1535,13 @@ const PenangananRelasiPenggunaPage = () => {
               <table className="min-w-[1100px] w-full">
                 <thead className="bg-slate-50">
                   <tr>
-                    <Th>Kode Insiden</Th>
-                    <Th>Layanan</Th>
-                    <Th>Prioritas</Th>
-                    <Th>Status Insiden</Th>
-                    <Th>Berulang</Th>
-                    <Th>Keterangan</Th>
-                    <Th>Aksi</Th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Kode Insiden</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Layanan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Prioritas</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Status Insiden</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Berulang</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">Keterangan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-medium text-slate-700">Aksi</th>
                   </tr>
                 </thead>
 
@@ -1482,19 +1553,19 @@ const PenangananRelasiPenggunaPage = () => {
                   ) : (
                     selectedMasalahInsiden.map((item) => (
                       <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{item.kode_insiden}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.kode_insiden}</td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <div className="font-medium">{item.kode_layanan}</div>
                           <div className="text-xs text-slate-500">{item.nama_layanan}</div>
-                        </Td>
+                        </td>
 
-                        <Td>{item.prioritas_insiden}</Td>
-                        <Td>{item.status_insiden}</Td>
-                        <Td>{Number(item.apakah_berulang) === 1 ? 'Ya' : 'Tidak'}</Td>
-                        <Td>{item.keterangan || '-'}</Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.prioritas_insiden}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.status_insiden}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{Number(item.apakah_berulang) === 1 ? 'Ya' : 'Tidak'}</td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">{item.keterangan || '-'}</td>
 
-                        <Td>
+                        <td className="px-4 py-3 align-middle text-sm text-slate-700">
                           <button
                             type="button"
                             onClick={() => deleteMasalahInsiden(item)}
@@ -1502,7 +1573,7 @@ const PenangananRelasiPenggunaPage = () => {
                           >
                             Hapus
                           </button>
-                        </Td>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1518,30 +1589,28 @@ const PenangananRelasiPenggunaPage = () => {
           title={editingKueriId ? 'Edit Kueri' : 'Tambah Kueri'}
           onClose={() => setShowKueriForm(false)}
         >
-          <form onSubmit={submitKueri}>
+          <form noValidate onSubmit={submitKueri}>
+            {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <FormGrid>
-              <Field label="Kode Kueri">
+              <Field label="Kode Kueri *">
                 <input
-                  required
                   value={kueriForm.kode_kueri}
                   onChange={(e) => setKueriForm({ ...kueriForm, kode_kueri: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Waktu Masuk">
+              <Field label="Waktu Masuk *">
                 <input
                   type="datetime-local"
-                  required
                   value={kueriForm.waktu_masuk}
                   onChange={(e) => setKueriForm({ ...kueriForm, waktu_masuk: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Layanan Digital">
+              <Field label="Layanan Digital *">
                 <select
-                  required
                   value={kueriForm.layanan_id}
                   onChange={(e) => setKueriForm({ ...kueriForm, layanan_id: e.target.value, target_kueri_id: '' })}
                   className={inputClass}
@@ -1588,9 +1657,8 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Kanal Masuk">
+              <Field label="Kanal Masuk *">
                 <input
-                  required
                   value={kueriForm.kanal_masuk}
                   onChange={(e) => setKueriForm({ ...kueriForm, kanal_masuk: e.target.value })}
                   className={inputClass}
@@ -1614,7 +1682,7 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Jenis Kueri">
+              <Field label="Jenis Kueri *">
                 <select
                   value={kueriForm.jenis}
                   onChange={(e) => setKueriForm({ ...kueriForm, jenis: e.target.value })}
@@ -1627,7 +1695,7 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Urgensi">
+              <Field label="Urgensi *">
                 <select
                   value={kueriForm.urgensi}
                   onChange={(e) => setKueriForm({ ...kueriForm, urgensi: e.target.value })}
@@ -1639,9 +1707,8 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Judul" full>
+              <Field label="Judul *" full>
                 <input
-                  required
                   value={kueriForm.judul}
                   onChange={(e) => setKueriForm({ ...kueriForm, judul: e.target.value })}
                   className={inputClass}
@@ -1656,9 +1723,8 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Deskripsi" full>
+              <Field label="Deskripsi *" full>
                 <textarea
-                  required
                   rows={4}
                   value={kueriForm.deskripsi}
                   onChange={(e) => setKueriForm({ ...kueriForm, deskripsi: e.target.value })}
@@ -1697,7 +1763,8 @@ const PenangananRelasiPenggunaPage = () => {
           title="Tambah Tanggapan Kueri"
           onClose={() => setShowTanggapanKueriForm(false)}
         >
-          <form onSubmit={submitTanggapanKueri}>
+          <form noValidate onSubmit={submitTanggapanKueri}>
+            {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <FormGrid>
               <Field label="Kueri" full>
                 <input
@@ -1707,9 +1774,8 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="PIC">
+              <Field label="PIC *">
                 <select
-                  required
                   value={tanggapanKueriForm.pic_id}
                   onChange={(e) => setTanggapanKueriForm({ ...tanggapanKueriForm, pic_id: e.target.value })}
                   className={inputClass}
@@ -1724,7 +1790,7 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Jenis Tindakan">
+              <Field label="Jenis Tindakan *">
                 <select
                   value={tanggapanKueriForm.jenis_tindakan}
                   onChange={(e) => {
@@ -1748,7 +1814,7 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Status Setelah">
+              <Field label="Status Setelah *">
                 <select
                   value={tanggapanKueriForm.status_setelah}
                   onChange={(e) => setTanggapanKueriForm({ ...tanggapanKueriForm, status_setelah: e.target.value })}
@@ -1764,9 +1830,8 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Respons" full>
+              <Field label="Respons *" full>
                 <textarea
-                  required
                   rows={4}
                   value={tanggapanKueriForm.respon}
                   onChange={(e) => setTanggapanKueriForm({ ...tanggapanKueriForm, respon: e.target.value })}
@@ -1788,20 +1853,19 @@ const PenangananRelasiPenggunaPage = () => {
           title={editingInsidenId ? 'Edit Insiden' : 'Tambah Insiden'}
           onClose={() => setShowInsidenForm(false)}
         >
-          <form onSubmit={submitInsiden}>
+          <form noValidate onSubmit={submitInsiden}>
+            {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <FormGrid>
-              <Field label="Kode Insiden">
+              <Field label="Kode Insiden *">
                 <input
-                  required
                   value={insidenForm.kode_insiden}
                   onChange={(e) => setInsidenForm({ ...insidenForm, kode_insiden: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Waktu Terdeteksi">
+              <Field label="Waktu Terdeteksi *">
                 <input
-                  required
                   type="datetime-local"
                   value={insidenForm.waktu_terdeteksi}
                   onChange={(e) => setInsidenForm({ ...insidenForm, waktu_terdeteksi: e.target.value })}
@@ -1809,9 +1873,8 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Layanan Digital">
+              <Field label="Layanan Digital *">
                 <select
-                  required
                   value={insidenForm.layanan_id}
                   onChange={(e) =>
                     setInsidenForm({
@@ -1865,16 +1928,15 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Kanal Masuk">
+              <Field label="Kanal Masuk *">
                 <input
-                  required
                   value={insidenForm.kanal_masuk}
                   onChange={(e) => setInsidenForm({ ...insidenForm, kanal_masuk: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Prioritas">
+              <Field label="Prioritas *">
                 <select
                   value={insidenForm.prioritas}
                   onChange={(e) =>
@@ -1908,9 +1970,8 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Deskripsi Insiden" full>
+              <Field label="Deskripsi Insiden *" full>
                 <textarea
-                  required
                   rows={4}
                   value={insidenForm.deskripsi_insiden}
                   onChange={(e) => setInsidenForm({ ...insidenForm, deskripsi_insiden: e.target.value })}
@@ -1961,9 +2022,10 @@ const PenangananRelasiPenggunaPage = () => {
           title="Tambah Penanganan Insiden"
           onClose={() => setShowPenangananInsidenForm(false)}
         >
-          <form onSubmit={submitPenangananInsiden}>
+          <form noValidate onSubmit={submitPenangananInsiden}>
+            {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <FormGrid>
-              <Field label="Insiden" full>
+              <Field label="Insiden *" full>
                 <input
                   disabled
                   value={selectedInsiden ? `${selectedInsiden.kode_insiden} - ${selectedInsiden.nama_layanan}` : ''}
@@ -1971,9 +2033,8 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="PIC">
+              <Field label="PIC *">
                 <select
-                  required
                   value={penangananInsidenForm.pic_id}
                   onChange={(e) => setPenangananInsidenForm({ ...penangananInsidenForm, pic_id: e.target.value })}
                   className={inputClass}
@@ -1988,7 +2049,7 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Jenis Penanganan">
+              <Field label="Jenis Penanganan *">
                 <select
                   value={penangananInsidenForm.jenis_penanganan}
                   onChange={(e) => {
@@ -2011,7 +2072,7 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Status Setelah">
+              <Field label="Status Setelah *">
                 <select
                   value={penangananInsidenForm.status_setelah}
                   onChange={(e) => setPenangananInsidenForm({ ...penangananInsidenForm, status_setelah: e.target.value })}
@@ -2027,18 +2088,17 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Eskalasi Kepada">
+              <Field label={penangananInsidenForm.jenis_penanganan === 'Eskalasi' ? 'Eskalasi Kepada *' : 'Eskalasi Kepada'}>
                 <input
-                  required={penangananInsidenForm.jenis_penanganan === 'Eskalasi'}
+                  
                   value={penangananInsidenForm.eskalasi_kepada}
                   onChange={(e) => setPenangananInsidenForm({ ...penangananInsidenForm, eskalasi_kepada: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Tindakan" full>
+              <Field label="Tindakan *" full>
                 <textarea
-                  required
                   rows={4}
                   value={penangananInsidenForm.tindakan}
                   onChange={(e) => setPenangananInsidenForm({ ...penangananInsidenForm, tindakan: e.target.value })}
@@ -2060,18 +2120,18 @@ const PenangananRelasiPenggunaPage = () => {
           title={editingMasalahId ? 'Edit Masalah' : 'Tambah Masalah'}
           onClose={() => setShowMasalahForm(false)}
         >
-          <form onSubmit={submitMasalah}>
+          <form noValidate onSubmit={submitMasalah}>
+            {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <FormGrid>
-              <Field label="Kode Masalah">
+              <Field label="Kode Masalah *">
                 <input
-                  required
                   value={masalahForm.kode_masalah}
                   onChange={(e) => setMasalahForm({ ...masalahForm, kode_masalah: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Prioritas">
+              <Field label="Prioritas *">
                 <select
                   value={masalahForm.prioritas}
                   onChange={(e) => setMasalahForm({ ...masalahForm, prioritas: e.target.value })}
@@ -2083,18 +2143,16 @@ const PenangananRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Diagnosa Akar Masalah" full>
+              <Field label="Diagnosa Akar Masalah *" full>
                 <input
-                  required
                   value={masalahForm.diagnosa_akar_masalah}
                   onChange={(e) => setMasalahForm({ ...masalahForm, diagnosa_akar_masalah: e.target.value })}
                   className={inputClass}
                 />
               </Field>
 
-              <Field label="Deskripsi Akar Masalah" full>
+              <Field label="Deskripsi Akar Masalah *" full>
                 <textarea
-                  required
                   rows={4}
                   value={masalahForm.deskripsi_akar_masalah}
                   onChange={(e) => setMasalahForm({ ...masalahForm, deskripsi_akar_masalah: e.target.value })}
@@ -2129,7 +2187,7 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Status">
+              <Field label="Status *">
                 <select
                   value={masalahForm.status}
                   onChange={(e) => setMasalahForm({ ...masalahForm, status: e.target.value })}
@@ -2168,9 +2226,8 @@ const PenangananRelasiPenggunaPage = () => {
 
               {masalahForm.memerlukan_perubahan === '1' && (
                 <>
-                  <Field label="Deskripsi Singkat Perubahan" full>
+                  <Field label="Deskripsi Singkat Perubahan *" full>
                     <textarea
-                      required
                       rows={3}
                       value={masalahForm.deskripsi_singkat_perubahan}
                       onChange={(e) => setMasalahForm({ ...masalahForm, deskripsi_singkat_perubahan: e.target.value })}
@@ -2204,7 +2261,8 @@ const PenangananRelasiPenggunaPage = () => {
           title="Hubungkan Insiden"
           onClose={() => setShowMasalahInsidenForm(false)}
         >
-          <form onSubmit={submitMasalahInsiden}>
+          <form noValidate onSubmit={submitMasalahInsiden}>
+            {error && <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <FormGrid>
               <Field label="Masalah" full>
                 <input
@@ -2214,9 +2272,8 @@ const PenangananRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Insiden" full>
+              <Field label="Insiden *" full>
                 <select
-                  required
                   value={masalahInsidenForm.insiden_id}
                   onChange={(e) => setMasalahInsidenForm({ ...masalahInsidenForm, insiden_id: e.target.value })}
                   className={inputClass}
@@ -2284,27 +2341,29 @@ const SectionHeader = ({
   subtitle: string;
   button: string;
   onClick: () => void;
-}) => (
-  <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-    <div>
-      <h3 className="font-semibold text-slate-800">
-        {title}
-      </h3>
+}) => {
+  const permissions = getUserRelationPermissions();
+  const canCreate = permissions.includes('user_relation.create');
 
-      <p className="mt-1 text-sm text-slate-500">
-        {subtitle}
-      </p>
+  return (
+    <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 className="font-semibold text-slate-800">{title}</h3>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      </div>
+
+      {canCreate && (
+        <button
+          type="button"
+          onClick={onClick}
+          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+        >
+          {button}
+        </button>
+      )}
     </div>
-
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-    >
-      {button}
-    </button>
-  </div>
-);
+  );
+};
 
 const SubSectionHeader = ({
   title,
@@ -2318,28 +2377,30 @@ const SubSectionHeader = ({
   button: string;
   disabled?: boolean;
   onClick: () => void;
-}) => (
-  <div className="flex flex-col gap-4 border-y border-slate-200 bg-slate-50 p-5 md:flex-row md:items-center md:justify-between">
-    <div>
-      <h3 className="font-semibold text-slate-800">
-        {title}
-      </h3>
+}) => {
+  const permissions = getUserRelationPermissions();
+  const canCreate = permissions.includes('user_relation.create');
 
-      <p className="mt-1 text-sm text-slate-500">
-        {subtitle}
-      </p>
+  return (
+    <div className="flex flex-col gap-4 border-y border-slate-200 bg-slate-50 p-5 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 className="font-semibold text-slate-800">{title}</h3>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      </div>
+
+      {canCreate && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onClick}
+          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {button}
+        </button>
+      )}
     </div>
-
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {button}
-    </button>
-  </div>
-);
+  );
+};
 
 const SearchBox = ({
   value,
@@ -2388,17 +2449,7 @@ const Selector = ({
   </div>
 );
 
-const Th = ({ children }: { children: ReactNode }) => (
-  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-    {children}
-  </th>
-);
 
-const Td = ({ children }: { children: ReactNode }) => (
-  <td className="px-4 py-3 text-sm text-slate-700">
-    {children}
-  </td>
-);
 
 const EmptyRow = ({
   colSpan,
@@ -2423,25 +2474,35 @@ const ActionButtons = ({
 }: {
   onEdit: () => void;
   onDelete: () => void;
-}) => (
-  <div className="flex gap-2">
-    <button
-      type="button"
-      onClick={onEdit}
-      className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-    >
-      Edit
-    </button>
+}) => {
+  const permissions = getUserRelationPermissions();
+  const canUpdate = permissions.includes('user_relation.update');
+  const canDelete = permissions.includes('user_relation.delete');
 
-    <button
-      type="button"
-      onClick={onDelete}
-      className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-    >
-      Hapus
-    </button>
-  </div>
-);
+  return (
+    <div className="flex items-center justify-center gap-2">
+      {canUpdate && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+        >
+          Edit
+        </button>
+      )}
+
+      {canDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+        >
+          Hapus
+        </button>
+      )}
+    </div>
+  );
+};
 
 const Modal = ({
   title,
@@ -2492,7 +2553,7 @@ const Field = ({
 }) => (
   <div className={full ? 'md:col-span-2' : ''}>
     <label className="text-sm font-medium text-slate-700">
-      {label}
+      {label.endsWith(' *') ? <>{label.slice(0, -2)} <span className="text-500">*</span></> : label}
     </label>
 
     {children}

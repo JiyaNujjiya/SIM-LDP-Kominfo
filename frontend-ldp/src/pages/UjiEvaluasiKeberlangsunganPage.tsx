@@ -139,6 +139,14 @@ const processSteps = [
 const UjiEvaluasiKeberlangsunganPage = () => {
   const navigate = useNavigate();
 
+  const savedUser = sessionStorage.getItem('user');
+  const user = savedUser ? JSON.parse(savedUser) : null;
+  const permissions: string[] = user?.permissions || [];
+
+  const canCreate = permissions.includes('continuity.create');
+  const canUpdate = permissions.includes('continuity.update');
+  const canDelete = permissions.includes('continuity.delete');
+
   const [bia, setBia] = useState<BiaItem[]>([]);
   const [insiden, setInsiden] = useState<InsidenItem[]>([]);
   const [strategi, setStrategi] = useState<StrategiItem[]>([]);
@@ -161,6 +169,8 @@ const UjiEvaluasiKeberlangsunganPage = () => {
   const [savingEvaluasi, setSavingEvaluasi] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [ujiFormError, setUjiFormError] = useState('');
+  const [evaluasiFormError, setEvaluasiFormError] = useState(''); 
 
   const inputClass = 'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500';
   const labelClass = 'text-sm font-medium text-slate-700';
@@ -260,8 +270,12 @@ const UjiEvaluasiKeberlangsunganPage = () => {
     setEvaluasi(results.flat());
   };
 
+  
   const fetchUserOptions = async () => {
-    const result = await request('http://localhost:5000/api/bcp/user-options');
+    const result = await request(
+      'http://localhost:5000/api/bcp/user-options-form13'
+    );
+
     setUserOptions(Array.isArray(result.data) ? result.data : []);
   };
 
@@ -329,6 +343,7 @@ const UjiEvaluasiKeberlangsunganPage = () => {
   }, [strategi, ujiForm.insiden_id]);
 
   const handleTambahUji = () => {
+    setUjiFormError('');
     setEditingUjiId(null);
     setUjiForm(emptyUjiForm);
     setMessage('');
@@ -337,6 +352,7 @@ const UjiEvaluasiKeberlangsunganPage = () => {
   };
 
   const handleEditUji = (item: UjiItem) => {
+    setUjiFormError('');
     setEditingUjiId(item.id);
     setUjiForm({
       insiden_id: String(item.insiden_id),
@@ -360,21 +376,55 @@ const UjiEvaluasiKeberlangsunganPage = () => {
     setShowUjiForm(false);
   };
 
+  
   const handleSubmitUji = async (event: FormEvent) => {
     event.preventDefault();
+    setUjiFormError('');
 
-    if (!editingUjiId && !ujiForm.insiden_id) {
-      setError('Insiden / gangguan wajib dipilih.');
+    if (!ujiForm.insiden_id) {
+      setUjiFormError('Insiden / Gangguan Potensial wajib dipilih.');
+      return;
+    }
+
+    if (!ujiForm.jenis_kejadian.trim()) {
+      setUjiFormError('Jenis Kejadian wajib diisi.');
+      return;
+    }
+
+    if (!ujiForm.jenis_uji) {
+      setUjiFormError('Jenis Uji wajib dipilih.');
+      return;
+    }
+
+    if (!ujiForm.tujuan_uji.trim()) {
+      setUjiFormError('Tujuan Uji wajib diisi.');
+      return;
+    }
+
+    if (!ujiForm.tanggal_uji) {
+      setUjiFormError('Tanggal Uji wajib diisi.');
+      return;
+    }
+
+    if (ujiForm.target_rto.trim() === '') {
+      setUjiFormError('Target RTO wajib diisi.');
+      return;
+    }
+
+    const targetRto = Number(ujiForm.target_rto);
+
+    if (!Number.isInteger(targetRto) || targetRto < 0) {
+      setUjiFormError('Target RTO harus berupa bilangan bulat 0 atau lebih.');
       return;
     }
 
     if (!ujiForm.judul_skenario.trim()) {
-      setError('Judul skenario wajib diisi.');
+      setUjiFormError('Judul Skenario wajib diisi.');
       return;
     }
 
-    if (ujiForm.target_rto !== '' && (!Number.isInteger(Number(ujiForm.target_rto)) || Number(ujiForm.target_rto) < 0)) {
-      setError('Target RTO harus berupa bilangan bulat 0 atau lebih.');
+    if (!ujiForm.kriteria_keberhasilan.trim()) {
+      setUjiFormError('Kriteria Keberhasilan wajib diisi.');
       return;
     }
 
@@ -384,35 +434,42 @@ const UjiEvaluasiKeberlangsunganPage = () => {
       setError('');
 
       const payload = {
-        strategi_id: ujiForm.strategi_id ? Number(ujiForm.strategi_id) : null,
-        jenis_kejadian: ujiForm.jenis_kejadian.trim() || null,
-        tujuan_uji: ujiForm.tujuan_uji.trim() || null,
-        jenis_uji: ujiForm.jenis_uji.trim() || null,
-        tanggal_uji: ujiForm.tanggal_uji || null,
-        kriteria_keberhasilan: ujiForm.kriteria_keberhasilan.trim() || null,
+        strategi_id: ujiForm.strategi_id
+          ? Number(ujiForm.strategi_id)
+          : null,
+        jenis_kejadian: ujiForm.jenis_kejadian.trim(),
+        tujuan_uji: ujiForm.tujuan_uji.trim(),
+        jenis_uji: ujiForm.jenis_uji,
+        tanggal_uji: ujiForm.tanggal_uji,
+        kriteria_keberhasilan: ujiForm.kriteria_keberhasilan.trim(),
         judul_skenario: ujiForm.judul_skenario.trim(),
-        target_rto: ujiForm.target_rto === '' ? null : Number(ujiForm.target_rto),
+        target_rto: targetRto
       };
 
       const result = await request(
-        editingUjiId
+        editingUjiId !== null
           ? `http://localhost:5000/api/bcp/uji/${editingUjiId}`
           : `http://localhost:5000/api/bcp/insiden/${ujiForm.insiden_id}/uji`,
         {
-          method: editingUjiId ? 'PUT' : 'POST',
-          body: JSON.stringify(payload),
+          method: editingUjiId !== null ? 'PUT' : 'POST',
+          body: JSON.stringify(payload)
         }
       );
 
-      setMessage(result.message || 'Data uji coba berhasil disimpan.');
       resetUjiForm();
       await refreshAll();
+      setMessage(result.message || 'Data uji coba berhasil disimpan.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan data uji coba.');
+      setUjiFormError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal menyimpan data uji coba.'
+      );
     } finally {
       setSavingUji(false);
     }
   };
+
 
   const handleDeleteUji = async (item: UjiItem) => {
     if (!window.confirm(`Hapus uji coba "${item.judul_skenario}"?`)) return;
@@ -429,6 +486,7 @@ const UjiEvaluasiKeberlangsunganPage = () => {
   };
 
   const handleTambahEvaluasi = () => {
+    setEvaluasiFormError('');
     setEditingEvaluasiId(null);
     setEvaluasiForm(emptyEvaluasiForm);
     setError('');
@@ -437,6 +495,7 @@ const UjiEvaluasiKeberlangsunganPage = () => {
   };
 
   const handleEditEvaluasi = (item: EvaluasiItem) => {
+    setEvaluasiFormError('');
     setEditingEvaluasiId(item.id);
     setEvaluasiForm({
       uji_id: String(item.uji_id),
@@ -461,50 +520,71 @@ const UjiEvaluasiKeberlangsunganPage = () => {
     setShowEvaluasiForm(false);
   };
 
-  const handleSubmitEvaluasi = async (event: FormEvent) => {
-    event.preventDefault();
+  
+const handleSubmitEvaluasi = async (event: FormEvent) => {
+  event.preventDefault();
+  setEvaluasiFormError('');
 
-    if (!editingEvaluasiId && !evaluasiForm.uji_id) {
-      setError('Skenario uji wajib dipilih.');
+  const requiredFields: [string, string][] = [
+    [evaluasiForm.uji_id, 'Kode Referensi / Skenario Uji'],
+    [evaluasiForm.hasil_uji, 'Hasil Uji / Ringkasan'],
+    [evaluasiForm.pembelajaran, 'Pembelajaran yang Didapat'],
+    [evaluasiForm.kendala, 'Kendala / Hambatan'],
+    [evaluasiForm.rekomendasi_perbaikan, 'Rekomendasi Perbaikan'],
+    [evaluasiForm.jenis_perbaikan, 'Jenis Perbaikan'],
+    [evaluasiForm.penanggung_jawab_id, 'Penanggung Jawab'],
+    [evaluasiForm.target_waktu, 'Target Waktu'],
+    [evaluasiForm.status, 'Status'],
+    [evaluasiForm.catatan, 'Catatan']
+  ];
+
+  for (const [value, label] of requiredFields) {
+    if (!value.trim()) {
+      setEvaluasiFormError(`${label} wajib diisi.`);
       return;
     }
+  }
 
-    try {
-      setSavingEvaluasi(true);
-      setMessage('');
-      setError('');
+  try {
+    setSavingEvaluasi(true);
+    setMessage('');
+    setError('');
 
-      const payload = {
-        hasil_uji: evaluasiForm.hasil_uji.trim() || null,
-        pembelajaran: evaluasiForm.pembelajaran.trim() || null,
-        kendala: evaluasiForm.kendala.trim() || null,
-        rekomendasi_perbaikan: evaluasiForm.rekomendasi_perbaikan.trim() || null,
-        jenis_perbaikan: evaluasiForm.jenis_perbaikan.trim() || null,
-        penanggung_jawab_id: evaluasiForm.penanggung_jawab_id ? Number(evaluasiForm.penanggung_jawab_id) : null,
-        target_waktu: evaluasiForm.target_waktu || null,
-        status: evaluasiForm.status,
-        catatan: evaluasiForm.catatan.trim() || null,
-      };
+    const payload = {
+      hasil_uji: evaluasiForm.hasil_uji.trim(),
+      pembelajaran: evaluasiForm.pembelajaran.trim(),
+      kendala: evaluasiForm.kendala.trim(),
+      rekomendasi_perbaikan: evaluasiForm.rekomendasi_perbaikan.trim(),
+      jenis_perbaikan: evaluasiForm.jenis_perbaikan,
+      penanggung_jawab_id: Number(evaluasiForm.penanggung_jawab_id),
+      target_waktu: evaluasiForm.target_waktu,
+      status: evaluasiForm.status,
+      catatan: evaluasiForm.catatan.trim()
+    };
 
-      const result = await request(
-        editingEvaluasiId
-          ? `http://localhost:5000/api/bcp/evaluasi/${editingEvaluasiId}`
-          : `http://localhost:5000/api/bcp/uji/${evaluasiForm.uji_id}/evaluasi`,
-        {
-          method: editingEvaluasiId ? 'PUT' : 'POST',
-          body: JSON.stringify(payload),
-        }
-      );
+    const result = await request(
+      editingEvaluasiId !== null
+        ? `http://localhost:5000/api/bcp/evaluasi/${editingEvaluasiId}`
+        : `http://localhost:5000/api/bcp/uji/${evaluasiForm.uji_id}/evaluasi`,
+      {
+        method: editingEvaluasiId !== null ? 'PUT' : 'POST',
+        body: JSON.stringify(payload)
+      }
+    );
 
-      setMessage(result.message || 'Data evaluasi berhasil disimpan.');
-      resetEvaluasiForm();
-      await refreshAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan data evaluasi.');
-    } finally {
-      setSavingEvaluasi(false);
-    }
-  };
+    resetEvaluasiForm();
+    await refreshAll();
+    setMessage(result.message || 'Data evaluasi berhasil disimpan.');
+  } catch (err) {
+    setEvaluasiFormError(
+      err instanceof Error
+        ? err.message
+        : 'Gagal menyimpan data evaluasi.'
+    );
+  } finally {
+    setSavingEvaluasi(false);
+  }
+};
 
   const handleDeleteEvaluasi = async (item: EvaluasiItem) => {
     if (!window.confirm(`Hapus evaluasi untuk "${item.judul_skenario}"?`)) return;
@@ -580,9 +660,11 @@ const UjiEvaluasiKeberlangsunganPage = () => {
             </p>
           </div>
 
-          <button type="button" onClick={handleTambahUji} disabled={insiden.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+          {canCreate && (
+            <button type="button" onClick={handleTambahUji} disabled={insiden.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
             Tambah Uji Coba
           </button>
+          )}
         </div>
 
         <div className="border-b border-slate-200 p-5">
@@ -590,17 +672,17 @@ const UjiEvaluasiKeberlangsunganPage = () => {
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="min-w-[1300px] w-full">
+          <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-sm">
             <thead className="bg-slate-50">
               <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">No</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Layanan</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Insiden</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Judul Skenario</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Jenis Uji</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Tanggal</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Target RTO</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">Aksi</th>
+                <th className="w-[60px] px-3 py-4 text-left font-semibold text-slate-600">No</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Layanan</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Insiden</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Judul Skenario</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Jenis Uji</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Tanggal</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Target RTO</th>
+                <th className="w-[140px] px-3 py-4 text-center font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
 
@@ -631,14 +713,18 @@ const UjiEvaluasiKeberlangsunganPage = () => {
                     <td className="px-4 py-3 text-sm text-slate-600">{item.tanggal_uji?.slice(0, 10) || '-'}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{item.target_rto === null ? '-' : item.target_rto}</td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-center gap-2">
-                        <button type="button" onClick={() => handleEditUji(item)} className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">
+                      <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
+                        {canUpdate && (
+                          <button type="button" onClick={() => handleEditUji(item)} className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">
                           Edit
                         </button>
+                        )}
 
-                        <button type="button" onClick={() => handleDeleteUji(item)} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                        {canDelete && (
+                          <button type="button" onClick={() => handleDeleteUji(item)} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
                           Hapus
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -661,9 +747,11 @@ const UjiEvaluasiKeberlangsunganPage = () => {
             </p>
           </div>
 
-          <button type="button" onClick={handleTambahEvaluasi} disabled={uji.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+          {canCreate && (
+            <button type="button" onClick={handleTambahEvaluasi} disabled={uji.length === 0} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
             Tambah Evaluasi
           </button>
+          )}
         </div>
 
         <div className="border-b border-slate-200 p-5">
@@ -671,17 +759,17 @@ const UjiEvaluasiKeberlangsunganPage = () => {
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="min-w-[1400px] w-full">
+          <table className="w-full min-w-[1200px] table-fixed border-collapse text-left text-sm">
             <thead className="bg-slate-50">
               <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Layanan</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Skenario Uji</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Hasil Uji</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Jenis Perbaikan</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Penanggung Jawab</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Target</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Status</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">Aksi</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Layanan</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Skenario Uji</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Hasil Uji</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Jenis Perbaikan</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Penanggung Jawab</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Target</th>
+                <th className="px-3 py-4 text-left font-semibold text-slate-600">Status</th>
+                <th className="w-[140px] px-3 py-4 text-center font-semibold text-slate-600">Aksi</th>
               </tr>
             </thead>
 
@@ -715,14 +803,18 @@ const UjiEvaluasiKeberlangsunganPage = () => {
                       <td className="px-4 py-3 text-sm text-slate-600">{item.target_waktu?.slice(0, 10) || '-'}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{item.status || '-'}</td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-center gap-2">
-                          <button type="button" onClick={() => handleEditEvaluasi(item)} className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">
+                        <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
+                          {canUpdate && (
+                            <button type="button" onClick={() => handleEditEvaluasi(item)} className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">
                             Edit
                           </button>
+                          )}
 
-                          <button type="button" onClick={() => handleDeleteEvaluasi(item)} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                          {canDelete && (
+                            <button type="button" onClick={() => handleDeleteEvaluasi(item)} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
                             Hapus
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -753,7 +845,12 @@ const UjiEvaluasiKeberlangsunganPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitUji} className="p-6">
+            <form onSubmit={handleSubmitUji} noValidate className="p-6">
+              {ujiFormError && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {ujiFormError}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>Insiden / Gangguan Potensial</label>
@@ -862,7 +959,12 @@ const UjiEvaluasiKeberlangsunganPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitEvaluasi} className="p-6">
+              <form onSubmit={handleSubmitEvaluasi} noValidate className="p-6">
+                {evaluasiFormError && (
+                  <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {evaluasiFormError}
+                  </div>
+                )}
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>Kode Referensi / Skenario Uji</label>

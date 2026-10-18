@@ -1,6 +1,20 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+
+const getUserRelationPermissions = (): string[] => {
+  const raw = sessionStorage.getItem('user');
+
+  if (!raw) return [];
+
+  try {
+    const currentUser = JSON.parse(raw);
+    return Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+  } catch {
+    return [];
+  }
+};
+
 const API = 'http://localhost:5000/api/relasi-pengguna';
 const PENGETAHUAN_API = 'http://localhost:5000/api/pengetahuan';
 
@@ -235,6 +249,7 @@ const EvaluasiRelasiPenggunaPage = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
 
   const inputClass = 'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500';
 
@@ -286,7 +301,21 @@ const EvaluasiRelasiPenggunaPage = () => {
         request(`${API}/rencana-perbaikan`),
       ]);
 
-      setInstansiOptions(rowsOf<InstansiOption>(instansiResult));
+      const currentUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+      const allowedInstansi = rowsOf<InstansiOption>(instansiResult);
+
+      const currentInstansiId = Number(
+        currentUser.instansi_id ?? currentUser.instansi?.id
+      );
+
+      const filteredInstansi =
+        currentUser.role === 'admin'
+          ? allowedInstansi
+          : allowedInstansi.filter(
+              (item) => Number(item.id) === currentInstansiId
+            );
+
+      setInstansiOptions(filteredInstansi);
       setUserOptions(rowsOf<UserOption>(userResult));
       setStandar(rowsOf<StandarItem>(standarResult));
       setTarget(rowsOf<TargetItem>(targetResult));
@@ -355,7 +384,9 @@ const EvaluasiRelasiPenggunaPage = () => {
     setEvaluasiForm({
       ...emptyEvaluasiForm,
       kode_evaluasi: `EV-${Date.now()}`,
+      instansi_id: instansiOptions.length === 1 ? String(instansiOptions[0].id) : '',
     });
+    setFormError('');
     setShowEvaluasiForm(true);
   };
 
@@ -370,11 +401,19 @@ const EvaluasiRelasiPenggunaPage = () => {
       status: item.status,
       catatan: item.catatan || '',
     });
+    setFormError('');
     setShowEvaluasiForm(true);
   };
 
   const submitEvaluasi = async (event: FormEvent) => {
     event.preventDefault();
+
+    setFormError('');
+    const required: [string, string][] = [['Kode Evaluasi', evaluasiForm.kode_evaluasi], ['Periode Mulai', evaluasiForm.periode_mulai], ['Periode Selesai', evaluasiForm.periode_selesai], ['Tanggal Evaluasi', evaluasiForm.tanggal_evaluasi], ['Status', evaluasiForm.status]];
+    const missing = required.find(([, value]) => !value.trim());
+    if (missing) { setFormError(`${missing[0]} wajib diisi.`); return; }
+    if (evaluasiForm.periode_selesai < evaluasiForm.periode_mulai) { setFormError('Periode Selesai tidak boleh sebelum Periode Mulai.'); return; }
+    if (evaluasiForm.tanggal_evaluasi < evaluasiForm.periode_mulai) { setFormError('Tanggal Evaluasi tidak boleh sebelum Periode Mulai.'); return; }
 
     try {
       setSaving(true);
@@ -383,7 +422,6 @@ const EvaluasiRelasiPenggunaPage = () => {
 
       const payload = {
         kode_evaluasi: evaluasiForm.kode_evaluasi.trim(),
-        instansi_id: Number(evaluasiForm.instansi_id),
         periode_mulai: evaluasiForm.periode_mulai,
         periode_selesai: evaluasiForm.periode_selesai,
         tanggal_evaluasi: evaluasiForm.tanggal_evaluasi,
@@ -403,7 +441,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       setShowEvaluasiForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi.');
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi.');
     } finally {
       setSaving(false);
     }
@@ -429,6 +467,7 @@ const EvaluasiRelasiPenggunaPage = () => {
 
     setEditingEvaluasiLayananId(null);
     setEvaluasiLayananForm(emptyEvaluasiLayananForm);
+    setFormError('');
     setShowEvaluasiLayananForm(true);
   };
 
@@ -441,6 +480,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       lesson_learned: item.lesson_learned || '',
       kesimpulan: item.kesimpulan || '',
     });
+    setFormError('');
     setShowEvaluasiLayananForm(true);
   };
 
@@ -448,6 +488,9 @@ const EvaluasiRelasiPenggunaPage = () => {
     event.preventDefault();
 
     if (!selectedEvaluasi) return;
+
+    setFormError('');
+    if (!editingEvaluasiLayananId && !evaluasiLayananForm.standar_layanan_id) { setFormError('Layanan / Standar wajib dipilih.'); return; }
 
     try {
       setSaving(true);
@@ -484,7 +527,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       setShowEvaluasiLayananForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi layanan.');
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi layanan.');
     } finally {
       setSaving(false);
     }
@@ -510,6 +553,7 @@ const EvaluasiRelasiPenggunaPage = () => {
 
     setEditingEvaluasiKueriInsidenId(null);
     setEvaluasiKueriInsidenForm(emptyEvaluasiKueriInsidenForm);
+    setFormError('');
     setShowEvaluasiKueriInsidenForm(true);
   };
 
@@ -524,6 +568,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       kesenjangan: item.kesenjangan || '',
       lesson_learned: item.lesson_learned || '',
     });
+    setFormError('');
     setShowEvaluasiKueriInsidenForm(true);
   };
 
@@ -531,6 +576,12 @@ const EvaluasiRelasiPenggunaPage = () => {
     event.preventDefault();
 
     if (!selectedEvaluasi) return;
+
+    setFormError('');
+    if (!editingEvaluasiKueriInsidenId && !evaluasiKueriInsidenForm.target_kueri_insiden_id) { setFormError('Target Kueri / Insiden wajib dipilih.'); return; }
+    for (const [label, value] of [['Rata-rata Waktu Respon', evaluasiKueriInsidenForm.rata_rata_waktu_respon_menit], ['Pencapaian Respon', evaluasiKueriInsidenForm.pencapaian_respon_persen], ['Rata-rata Waktu Penyelesaian', evaluasiKueriInsidenForm.rata_rata_waktu_penyelesaian_menit], ['Pencapaian Penyelesaian', evaluasiKueriInsidenForm.pencapaian_penyelesaian_persen]]) {
+      if (value && (!Number.isFinite(Number(value)) || Number(value) < 0 || (label.includes('Pencapaian') && Number(value) > 100))) { setFormError(`${label} tidak valid.`); return; }
+    }
 
     try {
       setSaving(true);
@@ -573,7 +624,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       setShowEvaluasiKueriInsidenForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi kueri dan insiden.');
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi kueri dan insiden.');
     } finally {
       setSaving(false);
     }
@@ -599,6 +650,7 @@ const EvaluasiRelasiPenggunaPage = () => {
 
     setEditingRencanaId(null);
     setRencanaPerbaikanForm(emptyRencanaPerbaikanForm);
+    setFormError('');
     setShowRencanaForm(true);
   };
 
@@ -618,6 +670,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       perubahan_id: item.perubahan_id ? String(item.perubahan_id) : '',
       catatan: item.catatan || '',
     });
+    setFormError('');
     setShowRencanaForm(true);
   };
 
@@ -625,6 +678,12 @@ const EvaluasiRelasiPenggunaPage = () => {
     event.preventDefault();
 
     if (!selectedEvaluasi) return;
+
+    setFormError('');
+    const sumberId = rencanaPerbaikanForm.sumber === 'layanan' ? rencanaPerbaikanForm.evaluasi_layanan_id : rencanaPerbaikanForm.evaluasi_kueri_insiden_id;
+    const required: [string, string][] = [['Sumber Evaluasi', editingRencanaId ? '1' : sumberId], ['Prioritas', rencanaPerbaikanForm.prioritas], ['PIC', rencanaPerbaikanForm.pic_id], ['Uraian Kesenjangan', rencanaPerbaikanForm.uraian_kesenjangan], ['Rencana Perbaikan', rencanaPerbaikanForm.rencana_perbaikan], ['Target Selesai', rencanaPerbaikanForm.target_selesai], ['Status', rencanaPerbaikanForm.status]];
+    const missing = required.find(([, value]) => !value.trim());
+    if (missing) { setFormError(`${missing[0]} wajib diisi.`); return; }
 
     try {
       setSaving(true);
@@ -670,7 +729,7 @@ const EvaluasiRelasiPenggunaPage = () => {
       setShowRencanaForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan rencana perbaikan.');
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan rencana perbaikan.');
     } finally {
       setSaving(false);
     }
@@ -693,7 +752,7 @@ const EvaluasiRelasiPenggunaPage = () => {
 
   const formatDate = (value: string | null | undefined) => {
     if (!value) return '-';
-    return new Date(`${value}T00:00:00`).toLocaleDateString('id-ID');
+    return new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString('id-ID');
   };
 
   return (
@@ -756,7 +815,7 @@ const EvaluasiRelasiPenggunaPage = () => {
         </div>
       )}
 
-      {error && (
+      {error && !showEvaluasiForm && !showEvaluasiLayananForm && !showEvaluasiKueriInsidenForm && !showRencanaForm && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
@@ -783,14 +842,14 @@ const EvaluasiRelasiPenggunaPage = () => {
           <table className="min-w-[1200px] w-full">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Kode Evaluasi</Th>
-                <Th>Instansi</Th>
-                <Th>Periode</Th>
-                <Th>Tanggal Evaluasi</Th>
-                <Th>Evaluator</Th>
-                <Th>Status</Th>
-                <Th>Catatan</Th>
-                <Th>Aksi</Th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Kode Evaluasi</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Instansi</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Periode</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Tanggal Evaluasi</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Evaluator</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Status</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Catatan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center">Aksi</th>
               </tr>
             </thead>
 
@@ -807,7 +866,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                       selectedEvaluasiId === item.id ? 'bg-slate-50' : ''
                     }`}
                   >
-                    <Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <button
                         type="button"
                         onClick={() => setSelectedEvaluasiId(item.id)}
@@ -815,21 +874,21 @@ const EvaluasiRelasiPenggunaPage = () => {
                       >
                         {item.kode_evaluasi}
                       </button>
-                    </Td>
+                    </td>
 
-                    <Td>{item.kode_instansi} - {item.nama_instansi}</Td>
-                    <Td>{formatDate(item.periode_mulai)} s.d. {formatDate(item.periode_selesai)}</Td>
-                    <Td>{formatDate(item.tanggal_evaluasi)}</Td>
-                    <Td>{item.nama_evaluator}</Td>
-                    <Td>{item.status}</Td>
-                    <Td>{item.catatan || '-'}</Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.kode_instansi} - {item.nama_instansi}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{formatDate(item.periode_mulai)} s.d. {formatDate(item.periode_selesai)}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{formatDate(item.tanggal_evaluasi)}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.nama_evaluator}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.status}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.catatan || '-'}</td>
 
-                    <Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <ActionButtons
                         onEdit={() => openEditEvaluasi(item)}
                         onDelete={() => deleteEvaluasi(item)}
                       />
-                    </Td>
+                    </td>
                   </tr>
                 ))
               )}
@@ -858,13 +917,13 @@ const EvaluasiRelasiPenggunaPage = () => {
           <table className="min-w-[1400px] w-full">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Layanan</Th>
-                <Th>Versi</Th>
-                <Th>Cakupan Layanan</Th>
-                <Th>Kesenjangan</Th>
-                <Th>Lesson Learned</Th>
-                <Th>Kesimpulan</Th>
-                <Th>Aksi</Th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Layanan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Versi</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Cakupan Layanan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Kesenjangan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Lesson Learned</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Kesimpulan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center">Aksi</th>
               </tr>
             </thead>
 
@@ -875,24 +934,24 @@ const EvaluasiRelasiPenggunaPage = () => {
                 <EmptyRow colSpan={7} text="Belum ada evaluasi capaian layanan." />
               ) : (
                 selectedEvaluasiLayanan.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
-                    <Td>
+                  <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <div className="font-medium">{item.kode_layanan}</div>
                       <div className="text-xs text-slate-500">{item.nama_layanan}</div>
-                    </Td>
+                    </td>
 
-                    <Td>{item.versi_standar}</Td>
-                    <Td>{item.cakupan_layanan_snapshot || '-'}</Td>
-                    <Td>{item.kesenjangan || '-'}</Td>
-                    <Td>{item.lesson_learned || '-'}</Td>
-                    <Td>{item.kesimpulan || '-'}</Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.versi_standar}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.cakupan_layanan_snapshot || '-'}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.kesenjangan || '-'}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.lesson_learned || '-'}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.kesimpulan || '-'}</td>
 
-                    <Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <ActionButtons
                         onEdit={() => openEditEvaluasiLayanan(item)}
                         onDelete={() => deleteEvaluasiLayanan(item)}
                       />
-                    </Td>
+                    </td>
                   </tr>
                 ))
               )}
@@ -921,18 +980,18 @@ const EvaluasiRelasiPenggunaPage = () => {
           <table className="min-w-[1700px] w-full">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Layanan</Th>
-                <Th>Jenis</Th>
-                <Th>Prioritas</Th>
-                <Th>Target Respon</Th>
-                <Th>Rata-rata Respon</Th>
-                <Th>Pencapaian Respon</Th>
-                <Th>Target Penyelesaian</Th>
-                <Th>Rata-rata Penyelesaian</Th>
-                <Th>Pencapaian Penyelesaian</Th>
-                <Th>Kesenjangan</Th>
-                <Th>Lesson Learned</Th>
-                <Th>Aksi</Th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Layanan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Jenis</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Prioritas</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Target Respon</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Rata-rata Respon</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Pencapaian Respon</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Target Penyelesaian</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Rata-rata Penyelesaian</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Pencapaian Penyelesaian</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Kesenjangan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Lesson Learned</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center">Aksi</th>
               </tr>
             </thead>
 
@@ -943,29 +1002,29 @@ const EvaluasiRelasiPenggunaPage = () => {
                 <EmptyRow colSpan={12} text="Belum ada evaluasi kueri dan insiden." />
               ) : (
                 selectedEvaluasiKueriInsiden.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
-                    <Td>
+                  <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <div className="font-medium">{item.kode_layanan}</div>
                       <div className="text-xs text-slate-500">{item.nama_layanan}</div>
-                    </Td>
+                    </td>
 
-                    <Td>{item.jenis}</Td>
-                    <Td>{item.prioritas}</Td>
-                    <Td>{item.target_waktu_respon_menit ?? '-'} menit</Td>
-                    <Td>{item.rata_rata_waktu_respon_menit ?? '-'} menit</Td>
-                    <Td>{item.pencapaian_respon_persen ?? '-'}%</Td>
-                    <Td>{item.target_waktu_penyelesaian_menit ?? '-'} menit</Td>
-                    <Td>{item.rata_rata_waktu_penyelesaian_menit ?? '-'} menit</Td>
-                    <Td>{item.pencapaian_penyelesaian_persen ?? '-'}%</Td>
-                    <Td>{item.kesenjangan || '-'}</Td>
-                    <Td>{item.lesson_learned || '-'}</Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.jenis}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.prioritas}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.target_waktu_respon_menit ?? '-'} menit</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.rata_rata_waktu_respon_menit ?? '-'} menit</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.pencapaian_respon_persen ?? '-'}%</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.target_waktu_penyelesaian_menit ?? '-'} menit</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.rata_rata_waktu_penyelesaian_menit ?? '-'} menit</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.pencapaian_penyelesaian_persen ?? '-'}%</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.kesenjangan || '-'}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.lesson_learned || '-'}</td>
 
-                    <Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <ActionButtons
                         onEdit={() => openEditEvaluasiKueriInsiden(item)}
                         onDelete={() => deleteEvaluasiKueriInsiden(item)}
                       />
-                    </Td>
+                    </td>
                   </tr>
                 ))
               )}
@@ -994,15 +1053,15 @@ const EvaluasiRelasiPenggunaPage = () => {
           <table className="min-w-[1500px] w-full">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Sumber Evaluasi</Th>
-                <Th>Uraian Kesenjangan</Th>
-                <Th>Rencana Perbaikan</Th>
-                <Th>Prioritas</Th>
-                <Th>PIC</Th>
-                <Th>Target Selesai</Th>
-                <Th>Status</Th>
-                <Th>Perubahan</Th>
-                <Th>Aksi</Th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Sumber Evaluasi</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Uraian Kesenjangan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Rencana Perbaikan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Prioritas</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">PIC</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Target Selesai</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Status</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-left">Perubahan</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center">Aksi</th>
               </tr>
             </thead>
 
@@ -1013,27 +1072,27 @@ const EvaluasiRelasiPenggunaPage = () => {
                 <EmptyRow colSpan={9} text="Belum ada rencana perbaikan." />
               ) : (
                 selectedRencana.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
-                    <Td>
+                  <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       {item.evaluasi_layanan_id
                         ? 'Evaluasi Layanan'
                         : 'Evaluasi Kueri / Insiden'}
-                    </Td>
+                    </td>
 
-                    <Td>{item.uraian_kesenjangan}</Td>
-                    <Td>{item.rencana_perbaikan}</Td>
-                    <Td>{item.prioritas}</Td>
-                    <Td>{item.nama_pic}</Td>
-                    <Td>{formatDate(item.target_selesai)}</Td>
-                    <Td>{item.status}</Td>
-                    <Td>{Number(item.memerlukan_perubahan) === 1 ? item.kode_perubahan || 'Ya' : 'Tidak'}</Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.uraian_kesenjangan}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.rencana_perbaikan}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.prioritas}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.nama_pic}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{formatDate(item.target_selesai)}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{item.status}</td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">{Number(item.memerlukan_perubahan) === 1 ? item.kode_perubahan || 'Ya' : 'Tidak'}</td>
 
-                    <Td>
+                    <td className="break-words px-4 py-3 align-middle text-sm text-slate-700">
                       <ActionButtons
                         onEdit={() => openEditRencana(item)}
                         onDelete={() => deleteRencana(item)}
                       />
-                    </Td>
+                    </td>
                   </tr>
                 ))
               )}
@@ -1047,9 +1106,12 @@ const EvaluasiRelasiPenggunaPage = () => {
           title={editingEvaluasiId ? 'Edit Evaluasi' : 'Tambah Evaluasi'}
           onClose={() => setShowEvaluasiForm(false)}
         >
-          <form onSubmit={submitEvaluasi}>
+          <form onSubmit={submitEvaluasi} noValidate>
+            {formError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
+            )}
             <FormGrid>
-              <Field label="Kode Evaluasi">
+              <Field label="Kode Evaluasi *">
                 <input
                   required
                   value={evaluasiForm.kode_evaluasi}
@@ -1058,24 +1120,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Instansi">
-                <select
-                  required
-                  value={evaluasiForm.instansi_id}
-                  onChange={(e) => setEvaluasiForm({ ...evaluasiForm, instansi_id: e.target.value })}
-                  className={inputClass}
-                >
-                  <option value="">Pilih instansi</option>
-
-                  {instansiOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.kode_instansi} - {item.nama_instansi}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Periode Mulai">
+              <Field label="Periode Mulai *">
                 <input
                   type="date"
                   required
@@ -1085,7 +1130,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Periode Selesai">
+              <Field label="Periode Selesai *">
                 <input
                   type="date"
                   required
@@ -1095,7 +1140,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Tanggal Evaluasi">
+              <Field label="Tanggal Evaluasi *">
                 <input
                   type="date"
                   required
@@ -1139,9 +1184,12 @@ const EvaluasiRelasiPenggunaPage = () => {
           title={editingEvaluasiLayananId ? 'Edit Evaluasi SLA-OLA Layanan' : 'Tambah Evaluasi SLA-OLA Layanan'}
           onClose={() => setShowEvaluasiLayananForm(false)}
         >
-          <form onSubmit={submitEvaluasiLayanan}>
+          <form onSubmit={submitEvaluasiLayanan} noValidate>
+            {formError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
+            )}
             <FormGrid>
-              <Field label="Layanan / Standar" full>
+              <Field label="Layanan / Standar *" full>
                 <select
                   required
                   disabled={editingEvaluasiLayananId !== null}
@@ -1209,9 +1257,12 @@ const EvaluasiRelasiPenggunaPage = () => {
           title={editingEvaluasiKueriInsidenId ? 'Edit Evaluasi Kueri / Insiden' : 'Tambah Evaluasi Kueri / Insiden'}
           onClose={() => setShowEvaluasiKueriInsidenForm(false)}
         >
-          <form onSubmit={submitEvaluasiKueriInsiden}>
+          <form onSubmit={submitEvaluasiKueriInsiden} noValidate>
+            {formError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
+            )}
             <FormGrid>
-              <Field label="Target Kueri / Insiden" full>
+              <Field label="Target Kueri / Insiden *" full>
                 <select
                   required
                   disabled={editingEvaluasiKueriInsidenId !== null}
@@ -1305,7 +1356,10 @@ const EvaluasiRelasiPenggunaPage = () => {
           title={editingRencanaId ? 'Edit Rencana Perbaikan' : 'Tambah Rencana Perbaikan'}
           onClose={() => setShowRencanaForm(false)}
         >
-          <form onSubmit={submitRencana}>
+          <form onSubmit={submitRencana} noValidate>
+            {formError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>
+            )}
             <FormGrid>
               {!editingRencanaId && (
                 <>
@@ -1328,7 +1382,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                   </Field>
 
                   {rencanaPerbaikanForm.sumber === 'layanan' ? (
-                    <Field label="Evaluasi Layanan">
+                    <Field label="Evaluasi Layanan *">
                       <select
                         required
                         value={rencanaPerbaikanForm.evaluasi_layanan_id}
@@ -1345,7 +1399,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                       </select>
                     </Field>
                   ) : (
-                    <Field label="Evaluasi Kueri / Insiden">
+                    <Field label="Evaluasi Kueri / Insiden *">
                       <select
                         required
                         value={rencanaPerbaikanForm.evaluasi_kueri_insiden_id}
@@ -1377,7 +1431,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="PIC">
+              <Field label="PIC *">
                 <select
                   required
                   value={rencanaPerbaikanForm.pic_id}
@@ -1394,7 +1448,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Uraian Kesenjangan" full>
+              <Field label="Uraian Kesenjangan *" full>
                 <textarea
                   required
                   rows={3}
@@ -1404,7 +1458,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Rencana Perbaikan" full>
+              <Field label="Rencana Perbaikan *" full>
                 <textarea
                   required
                   rows={4}
@@ -1414,7 +1468,7 @@ const EvaluasiRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Target Selesai">
+              <Field label="Target Selesai *">
                 <input
                   type="date"
                   required
@@ -1499,27 +1553,29 @@ const SectionHeader = ({
   subtitle: string;
   button: string;
   onClick: () => void;
-}) => (
-  <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-    <div>
-      <h2 className="text-lg font-semibold text-slate-800">
-        {title}
-      </h2>
+}) => {
+  const permissions = getUserRelationPermissions();
+  const canCreate = permissions.includes('user_relation.create');
 
-      <p className="mt-1 text-sm text-slate-500">
-        {subtitle}
-      </p>
+  return (
+    <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      </div>
+
+      {canCreate && (
+        <button
+          type="button"
+          onClick={onClick}
+          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+        >
+          {button}
+        </button>
+      )}
     </div>
-
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-    >
-      {button}
-    </button>
-  </div>
-);
+  );
+};
 
 const SubSectionHeader = ({
   title,
@@ -1531,22 +1587,27 @@ const SubSectionHeader = ({
   button: string;
   disabled?: boolean;
   onClick: () => void;
-}) => (
-  <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-    <p className="text-sm font-semibold text-slate-800">
-      {title}
-    </p>
+}) => {
+  const permissions = getUserRelationPermissions();
+  const canCreate = permissions.includes('user_relation.create');
 
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {button}
-    </button>
-  </div>
-);
+  return (
+    <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
+      <p className="text-sm font-semibold text-slate-800">{title}</p>
+
+      {canCreate && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onClick}
+          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {button}
+        </button>
+      )}
+    </div>
+  );
+};
 
 const ActionButtons = ({
   onEdit,
@@ -1554,37 +1615,37 @@ const ActionButtons = ({
 }: {
   onEdit: () => void;
   onDelete: () => void;
-}) => (
-  <div className="flex gap-2">
-    <button
-      type="button"
-      onClick={onEdit}
-      className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-    >
-      Edit
-    </button>
+}) => {
+  const permissions = getUserRelationPermissions();
+  const canUpdate = permissions.includes('user_relation.update');
+  const canDelete = permissions.includes('user_relation.delete');
 
-    <button
-      type="button"
-      onClick={onDelete}
-      className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-    >
-      Hapus
-    </button>
-  </div>
-);
+  return (
+    <div className="flex items-center justify-center gap-2">
+      {canUpdate && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+        >
+          Edit
+        </button>
+      )}
 
-const Th = ({ children }: { children: ReactNode }) => (
-  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-    {children}
-  </th>
-);
+      {canDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+        >
+          Hapus
+        </button>
+      )}
+    </div>
+  );
+};
 
-const Td = ({ children }: { children: ReactNode }) => (
-  <td className="px-4 py-3 text-sm text-slate-700">
-    {children}
-  </td>
-);
+
 
 const EmptyRow = ({
   colSpan,

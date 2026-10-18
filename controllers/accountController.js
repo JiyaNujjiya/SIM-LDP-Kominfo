@@ -11,13 +11,14 @@ exports.getAccounts = async (req, res) => {
         u.role,
         u.role_id,
         r.nama_role,
+        u.nama_instansi,
+        u.nama_unit,
+        u.jabatan,
         u.upr_instansi,
         u.created_at
       FROM users u
-
       LEFT JOIN roles r
         ON r.id = u.role_id
-
       ORDER BY
         u.created_at DESC,
         u.id DESC
@@ -49,6 +50,11 @@ exports.getRoles = async (req, res) => {
         nama_role,
         deskripsi
       FROM roles
+      WHERE LOWER(nama_role) IN (
+        'admin',
+        'pengelola',
+        'pimpinan'
+      )
       ORDER BY id ASC
     `);
 
@@ -76,18 +82,29 @@ exports.createAccount = async (req, res) => {
     email,
     password,
     role_id,
-    upr_instansi
+    nama_instansi,
+    nama_unit,
+    jabatan
   } = req.body;
 
-  if (
-    !nama ||
-    !email ||
-    !password ||
-    !role_id
-  ) {
+  if (!nama?.trim()) {
     return res.status(400).json({
       message:
-        'Nama, email, password, dan role wajib diisi.'
+        'Nama wajib diisi.'
+    });
+  }
+
+  if (!email?.trim()) {
+    return res.status(400).json({
+      message:
+        'Email wajib diisi.'
+    });
+  }
+
+  if (!password) {
+    return res.status(400).json({
+      message:
+        'Password wajib diisi.'
     });
   }
 
@@ -98,19 +115,30 @@ exports.createAccount = async (req, res) => {
     });
   }
 
+  if (!role_id) {
+    return res.status(400).json({
+      message:
+        'Role wajib dipilih.'
+    });
+  }
+
   try {
     const [existingUsers] =
       await db.query(
         `
           SELECT id
           FROM users
-          WHERE email = ?
+          WHERE LOWER(email) = LOWER(?)
           LIMIT 1
         `,
-        [email]
+        [
+          email.trim()
+        ]
       );
 
-    if (existingUsers.length > 0) {
+    if (
+      existingUsers.length > 0
+    ) {
       return res.status(400).json({
         message:
           'Email sudah digunakan.'
@@ -127,28 +155,31 @@ exports.createAccount = async (req, res) => {
           WHERE id = ?
           LIMIT 1
         `,
-        [role_id]
+        [
+          role_id
+        ]
       );
 
-    if (roles.length === 0) {
+    if (
+      roles.length === 0
+    ) {
       return res.status(400).json({
         message:
           'Role tidak valid.'
       });
     }
 
-    const role = roles[0];
-
     const roleEnum =
-      String(role.nama_role)
+      String(
+        roles[0].nama_role
+      )
         .trim()
         .toLowerCase();
 
     const allowedRoles = [
       'admin',
       'pengelola',
-      'pimpinan',
-      'auditor'
+      'pimpinan'
     ];
 
     if (
@@ -161,6 +192,52 @@ exports.createAccount = async (req, res) => {
           'Role tidak didukung.'
       });
     }
+
+    if (
+      roleEnum !== 'admin'
+    ) {
+      if (
+        !nama_instansi?.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            'Instansi wajib diisi untuk Pengelola dan Pimpinan.'
+        });
+      }
+
+      if (
+        !nama_unit?.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            'Unit / Bidang wajib diisi untuk Pengelola dan Pimpinan.'
+        });
+      }
+
+      if (
+        !jabatan?.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            'Jabatan wajib diisi untuk Pengelola dan Pimpinan.'
+        });
+      }
+    }
+
+    const finalInstansi =
+      roleEnum === 'admin'
+        ? null
+        : nama_instansi.trim();
+
+    const finalUnit =
+      roleEnum === 'admin'
+        ? null
+        : nama_unit.trim();
+
+    const finalJabatan =
+      roleEnum === 'admin'
+        ? null
+        : jabatan.trim();
 
     const hashedPassword =
       await bcrypt.hash(
@@ -177,17 +254,27 @@ exports.createAccount = async (req, res) => {
             password,
             role,
             role_id,
+            nama_instansi,
+            nama_unit,
+            jabatan,
             upr_instansi
           )
-          VALUES (?, ?, ?, ?, ?, ?)
+          VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?
+          )
         `,
         [
           nama.trim(),
-          email.trim().toLowerCase(),
+          email
+            .trim()
+            .toLowerCase(),
           hashedPassword,
           roleEnum,
-          role.id,
-          upr_instansi?.trim() || null
+          roles[0].id,
+          finalInstansi,
+          finalUnit,
+          finalJabatan,
+          finalInstansi
         ]
       );
 
@@ -220,7 +307,9 @@ exports.updateAccount = async (req, res) => {
     nama,
     email,
     role_id,
-    upr_instansi
+    nama_instansi,
+    nama_unit,
+    jabatan
   } = req.body;
 
   if (
@@ -233,14 +322,24 @@ exports.updateAccount = async (req, res) => {
     });
   }
 
-  if (
-    !nama ||
-    !email ||
-    !role_id
-  ) {
+  if (!nama?.trim()) {
     return res.status(400).json({
       message:
-        'Nama, email, dan role wajib diisi.'
+        'Nama wajib diisi.'
+    });
+  }
+
+  if (!email?.trim()) {
+    return res.status(400).json({
+      message:
+        'Email wajib diisi.'
+    });
+  }
+
+  if (!role_id) {
+    return res.status(400).json({
+      message:
+        'Role wajib dipilih.'
     });
   }
 
@@ -248,15 +347,21 @@ exports.updateAccount = async (req, res) => {
     const [accounts] =
       await db.query(
         `
-          SELECT id, role_id
+          SELECT
+            id,
+            role_id
           FROM users
           WHERE id = ?
           LIMIT 1
         `,
-        [accountId]
+        [
+          accountId
+        ]
       );
 
-    if (accounts.length === 0) {
+    if (
+      accounts.length === 0
+    ) {
       return res.status(404).json({
         message:
           'Akun tidak ditemukan.'
@@ -267,7 +372,9 @@ exports.updateAccount = async (req, res) => {
       accountId ===
         Number(req.user.id) &&
       Number(role_id) !==
-        Number(accounts[0].role_id)
+        Number(
+          accounts[0].role_id
+        )
     ) {
       return res.status(400).json({
         message:
@@ -280,17 +387,19 @@ exports.updateAccount = async (req, res) => {
         `
           SELECT id
           FROM users
-          WHERE email = ?
+          WHERE LOWER(email) = LOWER(?)
             AND id <> ?
           LIMIT 1
         `,
         [
-          email.trim().toLowerCase(),
+          email.trim(),
           accountId
         ]
       );
 
-    if (emailRows.length > 0) {
+    if (
+      emailRows.length > 0
+    ) {
       return res.status(400).json({
         message:
           'Email sudah digunakan akun lain.'
@@ -307,10 +416,14 @@ exports.updateAccount = async (req, res) => {
           WHERE id = ?
           LIMIT 1
         `,
-        [role_id]
+        [
+          role_id
+        ]
       );
 
-    if (roles.length === 0) {
+    if (
+      roles.length === 0
+    ) {
       return res.status(400).json({
         message:
           'Role tidak valid.'
@@ -324,25 +437,94 @@ exports.updateAccount = async (req, res) => {
         .trim()
         .toLowerCase();
 
+    const allowedRoles = [
+      'admin',
+      'pengelola',
+      'pimpinan'
+    ];
+
+    if (
+      !allowedRoles.includes(
+        roleEnum
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          'Role tidak didukung.'
+      });
+    }
+
+    if (
+      roleEnum !== 'admin'
+    ) {
+      if (
+        !nama_instansi?.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            'Instansi wajib diisi untuk Pengelola dan Pimpinan.'
+        });
+      }
+
+      if (
+        !nama_unit?.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            'Unit / Bidang wajib diisi untuk Pengelola dan Pimpinan.'
+        });
+      }
+
+      if (
+        !jabatan?.trim()
+      ) {
+        return res.status(400).json({
+          message:
+            'Jabatan wajib diisi untuk Pengelola dan Pimpinan.'
+        });
+      }
+    }
+
+    const finalInstansi =
+      roleEnum === 'admin'
+        ? null
+        : nama_instansi.trim();
+
+    const finalUnit =
+      roleEnum === 'admin'
+        ? null
+        : nama_unit.trim();
+
+    const finalJabatan =
+      roleEnum === 'admin'
+        ? null
+        : jabatan.trim();
+
     await db.query(
       `
         UPDATE users
-
         SET
           nama = ?,
           email = ?,
           role = ?,
           role_id = ?,
+          nama_instansi = ?,
+          nama_unit = ?,
+          jabatan = ?,
           upr_instansi = ?
-
         WHERE id = ?
       `,
       [
         nama.trim(),
-        email.trim().toLowerCase(),
+        email
+          .trim()
+          .toLowerCase(),
         roleEnum,
         roles[0].id,
-        upr_instansi?.trim() || null,
+        finalInstansi,
+        finalUnit,
+        finalJabatan,
+        finalInstansi,
         accountId
       ]
     );
@@ -385,13 +567,17 @@ exports.resetAccountPassword = async (req, res) => {
     });
   }
 
-  if (
-    !password ||
-    !confirmPassword
-  ) {
+  if (!password) {
     return res.status(400).json({
       message:
-        'Password dan konfirmasi password wajib diisi.'
+        'Password baru wajib diisi.'
+    });
+  }
+
+  if (!confirmPassword) {
+    return res.status(400).json({
+      message:
+        'Konfirmasi password wajib diisi.'
     });
   }
 
@@ -423,10 +609,14 @@ exports.resetAccountPassword = async (req, res) => {
           WHERE id = ?
           LIMIT 1
         `,
-        [accountId]
+        [
+          accountId
+        ]
       );
 
-    if (accounts.length === 0) {
+    if (
+      accounts.length === 0
+    ) {
       return res.status(404).json({
         message:
           'Akun tidak ditemukan.'

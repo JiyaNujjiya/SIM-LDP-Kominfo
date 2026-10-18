@@ -32,13 +32,6 @@ type ImplementasiItem = {
   dibuat_oleh?: string;
 };
 
-type UnitOption = {
-  id: number;
-  kode_unit: string;
-  nama_unit: string;
-  nama_instansi?: string;
-};
-
 type UserOption = {
   id: number;
   nama: string;
@@ -251,10 +244,6 @@ export default function ImplementasiPerubahanPage() {
   const [implementasi, setImplementasi] =
     useState<ImplementasiItem | null>(null);
 
-  const [unitOptions, setUnitOptions] = useState<
-    UnitOption[]
-  >([]);
-
   const [userOptions, setUserOptions] = useState<
     UserOption[]
   >([]);
@@ -332,7 +321,6 @@ export default function ImplementasiPerubahanPage() {
   const [implementasiForm, setImplementasiForm] = useState({
     tanggal_rencana_pelaksanaan: "",
     jangka_waktu_pelaksanaan: "",
-    unit_pelaksana_id: "",
     pic_implementasi_id: "",
     sumber_daya_manusia: "",
     sumber_daya_tik: "",
@@ -435,27 +423,8 @@ export default function ImplementasiPerubahanPage() {
 
   const fetchOptions = async () => {
     try {
-      const [unitResult, userResult] =
-        await Promise.all([
-          request(
-            `${API}/perubahan/unit-options`
-          ),
-          request(
-            `${API}/perubahan/user-options`
-          ),
-        ]);
-
-      setUnitOptions(
-        Array.isArray(unitResult?.data)
-          ? unitResult.data
-          : []
-      );
-
-      setUserOptions(
-        Array.isArray(userResult?.data)
-          ? userResult.data
-          : []
-      );
+      const result = await request(`${API}/perubahan/user-options`);
+      setUserOptions(Array.isArray(result?.data) ? result.data : []);
     } catch (err) {
       setError(
         err instanceof Error
@@ -665,7 +634,6 @@ export default function ImplementasiPerubahanPage() {
     setImplementasiForm({
       tanggal_rencana_pelaksanaan: "",
       jangka_waktu_pelaksanaan: "",
-      unit_pelaksana_id: "",
       pic_implementasi_id: "",
       sumber_daya_manusia: "",
       sumber_daya_tik: "",
@@ -699,9 +667,6 @@ export default function ImplementasiPerubahanPage() {
           ) || "",
         jangka_waktu_pelaksanaan:
           implementasi.jangka_waktu_pelaksanaan || "",
-        unit_pelaksana_id: String(
-          implementasi.unit_pelaksana_id || ""
-        ),
         pic_implementasi_id: String(
           implementasi.pic_implementasi_id || ""
         ),
@@ -736,21 +701,19 @@ export default function ImplementasiPerubahanPage() {
         .map((item) => item.trim())
         .filter(Boolean);
 
-    if (
-      !implementasiForm.tanggal_rencana_pelaksanaan ||
-      !implementasiForm.jangka_waktu_pelaksanaan.trim() ||
-      !implementasiForm.unit_pelaksana_id ||
-      !implementasiForm.pic_implementasi_id ||
-      !implementasiForm.sumber_daya_manusia.trim() ||
-      !implementasiForm.sumber_daya_tik.trim() ||
-      implementasiForm.alokasi_anggaran === "" ||
-      Number(implementasiForm.alokasi_anggaran) < 0 ||
-      !implementasiForm.skema_pembiayaan.trim() ||
-      indikatorBersih.length === 0
-    ) {
-      setError(
-        "Seluruh data Formulir 3.1 wajib diisi dengan benar."
-      );
+    const fieldsWajib = [
+      ["Tanggal Pelaksanaan", Boolean(implementasiForm.tanggal_rencana_pelaksanaan)],
+      ["Jangka Waktu Pelaksanaan", Boolean(implementasiForm.jangka_waktu_pelaksanaan.trim())],
+      ["PIC Implementasi", Boolean(implementasiForm.pic_implementasi_id)],
+      ["Sumber Daya Manusia", Boolean(implementasiForm.sumber_daya_manusia.trim())],
+      ["Sumber Daya TIK", Boolean(implementasiForm.sumber_daya_tik.trim())],
+      ["Alokasi Anggaran", implementasiForm.alokasi_anggaran !== "" && Number.isFinite(Number(implementasiForm.alokasi_anggaran)) && Number(implementasiForm.alokasi_anggaran) >= 0],
+      ["Skema Pembiayaan", Boolean(implementasiForm.skema_pembiayaan.trim())],
+      ["Indikator Keberhasilan", indikatorBersih.length > 0],
+    ] as const;
+    const belumDiisi = fieldsWajib.filter(([, valid]) => !valid).map(([label]) => label);
+    if (belumDiisi.length > 0) {
+      setError(`Lengkapi kolom wajib: ${belumDiisi.join(", ")}.`);
       return;
     }
 
@@ -764,9 +727,6 @@ export default function ImplementasiPerubahanPage() {
           implementasiForm.tanggal_rencana_pelaksanaan,
         jangka_waktu_pelaksanaan:
           implementasiForm.jangka_waktu_pelaksanaan.trim(),
-        unit_pelaksana_id: Number(
-          implementasiForm.unit_pelaksana_id
-        ),
         pic_implementasi_id: Number(
           implementasiForm.pic_implementasi_id
         ),
@@ -1937,7 +1897,7 @@ export default function ImplementasiPerubahanPage() {
               className="mb-5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:max-w-md"
             />
 
-            {error && (
+            {error && !showImplementasiForm && !showStrategiForm && !showStakeholderForm && !showKomunikasiForm && !showPelatihanForm && (
               <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
@@ -1949,8 +1909,8 @@ export default function ImplementasiPerubahanPage() {
               </div>
             )}
 
-            <div className="overflow-hidden rounded-lg border border-slate-200">
-              <table className="w-full table-fixed">
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full min-w-[860px] table-fixed">
                 <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                   <tr>
                     <th className="px-4 py-3 font-semibold">
@@ -2102,7 +2062,7 @@ export default function ImplementasiPerubahanPage() {
         </div>
       </div>
 
-      {error && (
+      {error && !showImplementasiForm && !showStrategiForm && !showStakeholderForm && !showKomunikasiForm && !showPelatihanForm && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
@@ -2249,14 +2209,6 @@ export default function ImplementasiPerubahanPage() {
                     </p>
                   </div>
 
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-slate-500">
-                      Unit Pelaksana
-                    </p>
-                    <p className="mt-1 font-semibold text-slate-800">
-                      {implementasi.nama_unit_pelaksana || "-"}
-                    </p>
-                  </div>
 
                   <div>
                     <p className="text-xs font-semibold uppercase text-slate-500">
@@ -2281,8 +2233,8 @@ export default function ImplementasiPerubahanPage() {
                   </div>
 
                   <div className="p-6">
-                    <div className="overflow-hidden rounded-lg border border-slate-200">
-                      <table className="w-full table-fixed">
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full min-w-[860px] table-fixed">
                         <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                           <tr>
                             <th className="w-[25%] px-4 py-3">
@@ -2337,15 +2289,15 @@ export default function ImplementasiPerubahanPage() {
                   </div>
 
                   <div className="p-6">
-                    <div className="overflow-hidden rounded-lg border border-slate-200">
-                      <table className="w-full table-fixed">
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full min-w-[860px] table-fixed">
                         <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                           <tr>
                             <th className="w-[40%] px-4 py-3">
-                              Alokasi Anggaran
+                              Alokasi Anggaran <span className="text-red-600">*</span>
                             </th>
                             <th className="w-[60%] px-4 py-3">
-                              Skema Pembiayaan
+                              Skema Pembiayaan <span className="text-red-600">*</span>
                             </th>
                           </tr>
                         </thead>
@@ -2618,8 +2570,8 @@ export default function ImplementasiPerubahanPage() {
                 </div>
 
                 <div className="p-6">
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <table className="w-full table-fixed">
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full min-w-[860px] table-fixed">
                       <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                         <tr>
                           <th className="w-[25%] px-4 py-3">
@@ -2735,8 +2687,8 @@ export default function ImplementasiPerubahanPage() {
                 </div>
 
                 <div className="p-6">
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <table className="w-full table-fixed">
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full min-w-[860px] table-fixed">
                       <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                         <tr>
                           <th className="w-[25%] px-4 py-3">
@@ -2864,8 +2816,8 @@ export default function ImplementasiPerubahanPage() {
                 </div>
 
                 <div className="p-6">
-                  <div className="overflow-hidden rounded-lg border border-slate-200">
-                    <table className="w-full table-fixed">
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full min-w-[860px] table-fixed">
                       <thead className="bg-slate-50 text-left text-sm font-semibold text-slate-700">
                         <tr>
                           <th className="w-[25%] px-4 py-3">
@@ -2985,6 +2937,11 @@ export default function ImplementasiPerubahanPage() {
               </div>
 
               <div className="space-y-6 p-5">
+                {error && (
+                  <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
                 <div>
                   <h4 className="mb-4 text-sm font-semibold text-slate-900">
                     Informasi Pelaksanaan
@@ -2993,7 +2950,7 @@ export default function ImplementasiPerubahanPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Tanggal Pelaksanaan
+                        Tanggal Pelaksanaan <span className="text-red-600">*</span>
                       </label>
 
                       <input
@@ -3009,12 +2966,13 @@ export default function ImplementasiPerubahanPage() {
                           })
                         }
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
+                        required
                       />
                     </div>
 
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Jangka Waktu Pelaksanaan
+                        Jangka Waktu Pelaksanaan <span className="text-red-600">*</span>
                       </label>
 
                       <input
@@ -3031,46 +2989,13 @@ export default function ImplementasiPerubahanPage() {
                         }
                         placeholder="Contoh: 30 hari"
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
+                        required
                       />
                     </div>
 
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Unit Pelaksana
-                      </label>
-
-                      <select
-                        value={
-                          implementasiForm.unit_pelaksana_id
-                        }
-                        onChange={(e) =>
-                          setImplementasiForm({
-                            ...implementasiForm,
-                            unit_pelaksana_id:
-                              e.target.value,
-                          })
-                        }
-                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-                      >
-                        <option value="">
-                          Pilih unit pelaksana
-                        </option>
-
-                        {unitOptions.map((unit) => (
-                          <option
-                            key={unit.id}
-                            value={unit.id}
-                          >
-                            {unit.kode_unit} -{" "}
-                            {unit.nama_unit}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        PIC Implementasi
+                        PIC Implementasi <span className="text-red-600">*</span>
                       </label>
 
                       <select
@@ -3101,6 +3026,7 @@ export default function ImplementasiPerubahanPage() {
                               : ""}
                           </option>
                         ))}
+                        required
                       </select>
                     </div>
                   </div>
@@ -3114,7 +3040,7 @@ export default function ImplementasiPerubahanPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Sumber Daya Manusia
+                        Sumber Daya Manusia <span className="text-red-600">*</span>
                       </label>
 
                       <textarea
@@ -3131,12 +3057,13 @@ export default function ImplementasiPerubahanPage() {
                         }
                         placeholder="Jelaskan sumber daya manusia yang dibutuhkan"
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
+                        required
                       />
                     </div>
 
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Sumber Daya TIK
+                        Sumber Daya TIK <span className="text-red-600">*</span>
                       </label>
 
                       <textarea
@@ -3153,6 +3080,7 @@ export default function ImplementasiPerubahanPage() {
                         }
                         placeholder="Jelaskan sumber daya TIK yang dibutuhkan"
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
+                        required
                       />
                     </div>
                   </div>
@@ -3166,7 +3094,7 @@ export default function ImplementasiPerubahanPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Alokasi Anggaran
+                        Alokasi Anggaran <span className="text-red-600">*</span>
                       </label>
 
                       <input
@@ -3184,12 +3112,13 @@ export default function ImplementasiPerubahanPage() {
                         }
                         placeholder="Contoh: 6000000"
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
+                        required
                       />
                     </div>
 
                     <div>
                       <label className="mb-1 block text-sm font-semibold text-slate-700">
-                        Skema Pembiayaan
+                        Skema Pembiayaan <span className="text-red-600">*</span>
                       </label>
 
                       <input
@@ -3206,6 +3135,7 @@ export default function ImplementasiPerubahanPage() {
                         }
                         placeholder="Contoh: APBD"
                         className="w-full rounded-md border border-slate-300 px-3 py-2"
+                        required
                       />
                     </div>
                   </div>
@@ -3215,7 +3145,7 @@ export default function ImplementasiPerubahanPage() {
                   <div className="mb-4 flex items-center justify-between gap-4">
                     <div>
                       <h4 className="text-sm font-semibold text-slate-900">
-                        Indikator Keberhasilan Perubahan
+                        Indikator Keberhasilan Perubahan <span className="text-red-600">*</span>
                       </h4>
 
                       <p className="mt-1 text-xs text-slate-500">
@@ -3271,6 +3201,7 @@ export default function ImplementasiPerubahanPage() {
                             }}
                             placeholder="Masukkan indikator keberhasilan"
                             className="flex-1 rounded-md border border-slate-300 px-3 py-2"
+                        required
                           />
 
                           {implementasiForm.indikator_keberhasilan
@@ -3320,8 +3251,56 @@ export default function ImplementasiPerubahanPage() {
                 >
                   {saving
                     ? "Menyimpan..."
-                    : "Simpan Formulir 3.1"}
+                    : "Simpan"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showStrategiForm && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="my-8 w-full max-w-3xl rounded-xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 p-5">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {strategi ? "Edit Formulir 3.2 - Informasi Strategi Perubahan" : "Tambah Formulir 3.2 - Informasi Strategi Perubahan"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">Isi minimal satu bagian strategi. Isian bertanda * wajib dilengkapi bila bagian tersebut digunakan.</p>
+              </div>
+              <div className="space-y-5 p-5">
+                {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-slate-900">Strategi IT</h4>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-700">Strategi IT {Boolean(strategiForm.deskripsi_strategi_it.trim() || strategiForm.rollback_plan.trim()) && <span className="text-red-600">*</span>}</label>
+                    <input type="text" value={strategiForm.strategi_it_generik} onChange={(e) => setStrategiForm({...strategiForm, strategi_it_generik:e.target.value})} placeholder="Masukkan strategi IT" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-700">Deskripsi Strategi IT {Boolean(strategiForm.strategi_it_generik.trim() || strategiForm.rollback_plan.trim()) && <span className="text-red-600">*</span>}</label>
+                    <textarea rows={3} value={strategiForm.deskripsi_strategi_it} onChange={(e) => setStrategiForm({...strategiForm, deskripsi_strategi_it:e.target.value})} placeholder="Jelaskan strategi IT" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-700">Rollback Plan</label>
+                    <textarea rows={3} value={strategiForm.rollback_plan} onChange={(e) => setStrategiForm({...strategiForm, rollback_plan:e.target.value})} placeholder="Rencana pemulihan apabila pelaksanaan gagal" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </div>
+                </div>
+                <div className="space-y-4 border-t border-slate-200 pt-5">
+                  <h4 className="font-semibold text-slate-900">Strategi Organisasi</h4>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-700">Strategi Organisasi {Boolean(strategiForm.detail_strategi_organisasi.trim()) && <span className="text-red-600">*</span>}</label>
+                    <input type="text" value={strategiForm.strategi_organisasi_generik} onChange={(e) => setStrategiForm({...strategiForm, strategi_organisasi_generik:e.target.value})} placeholder="Masukkan strategi organisasi" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-semibold text-slate-700">Detail Strategi Organisasi {Boolean(strategiForm.strategi_organisasi_generik.trim()) && <span className="text-red-600">*</span>}</label>
+                    <textarea rows={3} value={strategiForm.detail_strategi_organisasi} onChange={(e) => setStrategiForm({...strategiForm, detail_strategi_organisasi:e.target.value})} placeholder="Jelaskan strategi organisasi" className="w-full rounded-md border border-slate-300 px-3 py-2" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
+                <button type="button" disabled={saving} onClick={() => {setShowStrategiForm(false);setError("");}} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Batal</button>
+                <button type="button" disabled={saving} onClick={handleSaveStrategi} className="rounded-md bg-slate-800 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan"}</button>
               </div>
             </div>
           </div>
@@ -3339,10 +3318,11 @@ export default function ImplementasiPerubahanPage() {
               </h3>
             </div>
 
+            {error && <div role="alert" className="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <div className="grid gap-4 p-5 md:grid-cols-2">
               <input
                 type="text"
-                placeholder="Nama stakeholder"
+                placeholder="Nama stakeholder *"
                 value={
                   stakeholderForm.nama_stakeholder
                 }
@@ -3353,12 +3333,13 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
                 type="text"
-                placeholder="Kategori pemangku kepentingan"
+                placeholder="Kategori pemangku kepentingan *"
                 value={
                   stakeholderForm.kategori_pemangku_kepentingan
                 }
@@ -3369,12 +3350,13 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
                 type="text"
-                placeholder="Sifat resistensi"
+                placeholder="Sifat resistensi *"
                 value={
                   stakeholderForm.sifat_resistensi
                 }
@@ -3385,12 +3367,13 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
                 type="text"
-                placeholder="Tingkat resistensi"
+                placeholder="Tingkat resistensi *"
                 value={
                   stakeholderForm.tingkat_resistensi
                 }
@@ -3401,7 +3384,8 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
             </div>
 
@@ -3440,10 +3424,11 @@ export default function ImplementasiPerubahanPage() {
                 </h3>
               </div>
 
+            {error && <div role="alert" className="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
               <div className="space-y-4 p-5">
                 <textarea
                   rows={3}
-                  placeholder="Informasi yang akan disampaikan"
+                  placeholder="Informasi yang akan disampaikan *"
                   value={
                     komunikasiForm.informasi
                   }
@@ -3458,7 +3443,7 @@ export default function ImplementasiPerubahanPage() {
 
                 <input
                   type="text"
-                  placeholder="Pengirim / informan"
+                  placeholder="Pengirim / informan *"
                   value={
                     komunikasiForm.pengirim_informan
                   }
@@ -3474,7 +3459,7 @@ export default function ImplementasiPerubahanPage() {
 
                 <input
                   type="text"
-                  placeholder="Target audiens"
+                  placeholder="Target audiens *"
                   value={
                     komunikasiForm.target_audiens
                   }
@@ -3533,7 +3518,7 @@ export default function ImplementasiPerubahanPage() {
                               e.target.value
                             )
                           }
-                          placeholder="Contoh: Email, Rapat, Portal Internal"
+                          placeholder="Contoh: Email, Rapat, Portal Internal *"
                           className="flex-1 rounded-md border border-slate-300 px-3 py-2"
                         />
 
@@ -3593,10 +3578,11 @@ export default function ImplementasiPerubahanPage() {
               </h3>
             </div>
 
+            {error && <div role="alert" className="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
             <div className="grid gap-4 p-5 md:grid-cols-2">
               <input
                 type="text"
-                placeholder="Nama pelatihan"
+                placeholder="Nama pelatihan *"
                 value={
                   pelatihanForm.nama_pelatihan
                 }
@@ -3607,12 +3593,13 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
                 type="text"
-                placeholder="Target peserta"
+                placeholder="Target peserta *"
                 value={
                   pelatihanForm.target_peserta
                 }
@@ -3623,13 +3610,14 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
                 type="number"
                 min="1"
-                placeholder="Target jumlah"
+                placeholder="Target jumlah *"
                 value={
                   pelatihanForm.target_jumlah
                 }
@@ -3640,12 +3628,13 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
                 type="text"
-                placeholder="Metode pelatihan"
+                placeholder="Metode pelatihan *"
                 value={
                   pelatihanForm.metode_pelatihan
                 }
@@ -3656,7 +3645,8 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2"
               />
 
               <input
@@ -3671,7 +3661,8 @@ export default function ImplementasiPerubahanPage() {
                       e.target.value,
                   })
                 }
-                className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
+                required
+                  className="rounded-md border border-slate-300 px-3 py-2 md:col-span-2"
               />
             </div>
 

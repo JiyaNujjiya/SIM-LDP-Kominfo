@@ -456,107 +456,120 @@ export default function KonteksRisikoPage() {
           )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                {[
-                  'No',
-                  'Nama Instansi',
-                  'Nama UPR',
-                  'Tahun',
-                  'Pemilik Risiko',
-                  'Selera Risiko',
-                  'Aksi',
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600"
-                  >
-                    {head}
+        <div className="p-5">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                  <th className="px-4 py-3 font-semibold">
+                    No
                   </th>
-                ))}
-              </tr>
-            </thead>
 
-            <tbody>
-              {konteksList.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada data penetapan konteks.
-                  </td>
+                  <th className="px-4 py-3 font-semibold">
+                    Nama Instansi
+                  </th>
+
+                  <th className="px-4 py-3 font-semibold">
+                    Nama UPR
+                  </th>
+
+                  <th className="px-4 py-3 font-semibold">
+                    Tahun
+                  </th>
+
+                  <th className="px-4 py-3 font-semibold">
+                    Pemilik Risiko
+                  </th>
+
+                  <th className="px-4 py-3 font-semibold">
+                    Selera Risiko
+                  </th>
+
+                  <th className="px-4 py-3 text-center font-semibold">
+                    Aksi
+                  </th>
                 </tr>
-              ) : (
-                konteksList.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-slate-100 hover:bg-slate-50"
-                  >
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {index + 1}
-                    </td>
+              </thead>
 
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {item.nama_instansi || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {item.nama_upr || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.tahun_pelaksanaan || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      {item.pemilik_risiko || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.besaran_selera_risiko ?? '-'}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            fetchDetailKonteks(item.id)
-                          }
-                          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          Detail
-                        </button>
-
-                        {canUpdate && (
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(item)}
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                          >
-                            Edit
-                          </button>
-                        )}
-
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(item)}
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                          >
-                            Hapus
-                          </button>
-                        )}
-                      </div>
+              <tbody>
+                {konteksList.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-10 text-center text-sm text-slate-500"
+                    >
+                      Belum ada data penetapan konteks.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  konteksList.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-slate-100 hover:bg-slate-50"
+                    >
+                      <td className="px-4 py-3 text-slate-600">
+                        {index + 1}
+                      </td>
+
+                      <td className="px-4 py-3 font-medium text-slate-800">
+                        {item.nama_instansi || '-'}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-700">
+                        {item.nama_upr || '-'}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-600">
+                        {item.tahun_pelaksanaan || '-'}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-700">
+                        {item.pemilik_risiko || '-'}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-600">
+                        {item.besaran_selera_risiko ?? '-'}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              fetchDetailKonteks(item.id)
+                            }
+                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                          >
+                            Detail
+                          </button>
+
+                          {canUpdate && (
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(item)}
+                              className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            >
+                              Edit
+                            </button>
+                          )}
+
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item)}
+                              className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                            >
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

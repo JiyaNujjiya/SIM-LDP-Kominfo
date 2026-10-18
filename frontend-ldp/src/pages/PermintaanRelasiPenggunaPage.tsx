@@ -5,7 +5,7 @@ const API = 'http://localhost:5000/api/relasi-pengguna';
 
 type LayananOption = {
   id: number;
-  kode_layanan: string;
+  kode_layanan?: string | null;
   nama_layanan: string;
 };
 
@@ -31,8 +31,9 @@ type PermintaanItem = {
   kode_request: string;
   pengguna_id: number | null;
   nama_pengguna: string | null;
-  layanan_id: number;
-  kode_layanan: string;
+  layanan_id: number | null;
+  katalog_layanan_id: number | null;
+  kode_layanan: string | null;
   nama_layanan: string;
   standar_layanan_id: number | null;
   versi_standar: number | null;
@@ -159,6 +160,14 @@ const processSteps = [
 const PermintaanRelasiPenggunaPage = () => {
   const navigate = useNavigate();
 
+  const savedUser = sessionStorage.getItem('user');
+  const user = savedUser ? JSON.parse(savedUser) : null;
+  const permissions: string[] = user?.permissions || [];
+
+  const canCreate = permissions.includes('user_relation.create');
+  const canUpdate = permissions.includes('user_relation.update');
+  const canDelete = permissions.includes('user_relation.delete');
+
   const [layananOptions, setLayananOptions] = useState<LayananOption[]>([]);
   const [userOptions, setUserOptions] = useState<UserOption[]>([]);
   const [standar, setStandar] = useState<StandarItem[]>([]);
@@ -182,6 +191,8 @@ const PermintaanRelasiPenggunaPage = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
+  const [detailPermintaan, setDetailPermintaan] = useState<PermintaanItem | null>(null);
 
   const inputClass = 'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500';
 
@@ -214,7 +225,7 @@ const PermintaanRelasiPenggunaPage = () => {
       setError('');
 
       const [layananResult, userResult, standarResult, permintaanResult, tanggapanResult, evaluasiResult] = await Promise.all([
-        request(`${API}/layanan-options`),
+        request(`${API}/katalog-layanan`),
         request(`${API}/user-options`),
         request(`${API}/standar-layanan`),
         request(`${API}/permintaan-layanan`),
@@ -285,26 +296,13 @@ const PermintaanRelasiPenggunaPage = () => {
     [evaluasi, selectedPermintaanId]
   );
 
-  const getStandarForLayanan = (layananId: number) => {
-    const kandidat = standar.filter((item) => {
-      if (item.layanan_id !== undefined) return Number(item.layanan_id) === Number(layananId);
-
-      return permintaan.some(
-        (requestItem) =>
-          requestItem.layanan_id === Number(layananId) &&
-          requestItem.standar_layanan_id === item.id
-      );
-    });
-
-    return kandidat.find((item) => item.status === 'Aktif') || kandidat[0] || null;
-  };
-
   const openTambahPermintaan = () => {
     setEditingPermintaanId(null);
     setPermintaanForm({
       ...emptyPermintaanForm,
       kode_request: `MRP-${Date.now()}`,
     });
+    setFormError('');
     setShowPermintaanForm(true);
   };
 
@@ -313,7 +311,7 @@ const PermintaanRelasiPenggunaPage = () => {
     setPermintaanForm({
       kode_request: item.kode_request,
       pengguna_id: item.pengguna_id ? String(item.pengguna_id) : '',
-      layanan_id: String(item.layanan_id),
+      layanan_id: String(item.katalog_layanan_id || ''),
       waktu_masuk: item.waktu_masuk ? item.waktu_masuk.slice(0, 16) : '',
       cakupan_layanan_terkait: item.cakupan_layanan_terkait || '',
       email_pelapor: item.email_pelapor || '',
@@ -323,11 +321,30 @@ const PermintaanRelasiPenggunaPage = () => {
       deskripsi_permintaan: item.deskripsi_permintaan || '',
       urgensi: item.urgensi || 'Rendah',
     });
+    setFormError('');
     setShowPermintaanForm(true);
   };
 
   const submitPermintaan = async (event: FormEvent) => {
     event.preventDefault();
+    const checks: [string, string, 'pilih' | 'isi'][] = [
+      ['Kode Request', permintaanForm.kode_request, 'isi'],
+      ['Waktu Masuk', permintaanForm.waktu_masuk, 'isi'],
+      ['Katalog Layanan', permintaanForm.layanan_id, 'pilih'],
+      ['Kanal Masuk', permintaanForm.kanal_masuk, 'isi'],
+      ['Deskripsi Permintaan', permintaanForm.deskripsi_permintaan, 'isi'],
+      ['Urgensi', permintaanForm.urgensi, 'pilih'],
+    ];
+    const missing = checks.find(([, value]) => !String(value || '').trim());
+    if (missing) {
+      setFormError(`${missing[0]} wajib ${missing[2] === 'pilih' ? 'dipilih' : 'diisi'}.`);
+      return;
+    }
+    if (permintaanForm.email_pelapor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(permintaanForm.email_pelapor)) {
+      setFormError('Email Pelapor tidak valid.');
+      return;
+    }
+    setFormError('');
 
     try {
       setSaving(true);
@@ -335,13 +352,11 @@ const PermintaanRelasiPenggunaPage = () => {
       setError('');
 
       const layananId = Number(permintaanForm.layanan_id);
-      const standarAktif = getStandarForLayanan(layananId);
 
       const payload = {
         kode_request: permintaanForm.kode_request.trim(),
         pengguna_id: permintaanForm.pengguna_id ? Number(permintaanForm.pengguna_id) : null,
-        layanan_id: layananId,
-        standar_layanan_id: standarAktif?.id || null,
+        katalog_layanan_id: layananId,
         waktu_masuk: permintaanForm.waktu_masuk,
         cakupan_layanan_terkait: permintaanForm.cakupan_layanan_terkait.trim() || null,
         email_pelapor: permintaanForm.email_pelapor.trim() || null,
@@ -367,7 +382,7 @@ const PermintaanRelasiPenggunaPage = () => {
       setShowPermintaanForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan permintaan layanan.');
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan permintaan layanan.');
     } finally {
       setSaving(false);
     }
@@ -398,11 +413,17 @@ const PermintaanRelasiPenggunaPage = () => {
       ...emptyTanggapanForm,
       permintaan_layanan_id: String(selectedPermintaan.id),
     });
+    setFormError('');
     setShowTanggapanForm(true);
   };
 
   const submitTanggapan = async (event: FormEvent) => {
     event.preventDefault();
+    if (!tanggapanForm.pic_id) { setFormError('PIC wajib dipilih.'); return; }
+    if (!tanggapanForm.jenis_tindakan) { setFormError('Jenis Tindakan wajib dipilih.'); return; }
+    if (!tanggapanForm.status_setelah) { setFormError('Status Setelah wajib dipilih.'); return; }
+    if (!tanggapanForm.tindakan.trim()) { setFormError('Tindakan wajib diisi.'); return; }
+    setFormError('');
 
     try {
       setSaving(true);
@@ -425,7 +446,7 @@ const PermintaanRelasiPenggunaPage = () => {
       setShowTanggapanForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal mencatat tanggapan.');
+      setFormError(err instanceof Error ? err.message : 'Gagal mencatat tanggapan.');
     } finally {
       setSaving(false);
     }
@@ -438,11 +459,17 @@ const PermintaanRelasiPenggunaPage = () => {
       ...emptyEvaluasiForm,
       permintaan_layanan_id: String(selectedPermintaan.id),
     });
+    setFormError('');
     setShowEvaluasiForm(true);
   };
 
   const submitEvaluasi = async (event: FormEvent) => {
     event.preventDefault();
+    if (evaluasiForm.realisasi_waktu_respon_menit.trim() === '') { setFormError('Realisasi Waktu Respon wajib diisi.'); return; }
+    if (!Number.isInteger(Number(evaluasiForm.realisasi_waktu_respon_menit)) || Number(evaluasiForm.realisasi_waktu_respon_menit) < 0) { setFormError('Realisasi Waktu Respon harus berupa bilangan bulat 0 atau lebih.'); return; }
+    if (evaluasiForm.realisasi_waktu_penyelesaian_menit.trim() === '') { setFormError('Realisasi Waktu Penyelesaian wajib diisi.'); return; }
+    if (!Number.isInteger(Number(evaluasiForm.realisasi_waktu_penyelesaian_menit)) || Number(evaluasiForm.realisasi_waktu_penyelesaian_menit) < 0) { setFormError('Realisasi Waktu Penyelesaian harus berupa bilangan bulat 0 atau lebih.'); return; }
+    setFormError('');
 
     try {
       setSaving(true);
@@ -494,7 +521,7 @@ const PermintaanRelasiPenggunaPage = () => {
       setShowEvaluasiForm(false);
       await fetchAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi.');
+      setFormError(err instanceof Error ? err.message : 'Gagal menyimpan evaluasi.');
     } finally {
       setSaving(false);
     }
@@ -594,13 +621,15 @@ const PermintaanRelasiPenggunaPage = () => {
             </p>
           </div>
 
-          <button
+          {canCreate && (
+            <button
             type="button"
             onClick={openTambahPermintaan}
             className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
           >
             Tambah Permintaan
           </button>
+          )}
         </div>
 
         <div className="border-b border-slate-200 p-5">
@@ -613,83 +642,130 @@ const PermintaanRelasiPenggunaPage = () => {
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="min-w-[1500px] w-full">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Kode Request</Th>
-                <Th>Pengguna</Th>
-                <Th>Layanan</Th>
-                <Th>Waktu Masuk</Th>
-                <Th>Kanal</Th>
-                <Th>Deskripsi</Th>
-                <Th>Urgensi</Th>
-                <Th>Status</Th>
-                <Th>Aksi</Th>
+                {[
+                  'No',
+                  'Kode Request',
+                  'Pengguna',
+                  'Layanan',
+                  'Waktu Masuk',
+                  'Kanal',
+                  'Deskripsi',
+                  'Urgensi',
+                  'Status'
+                ].map((judul) => (
+                  <th
+                    key={judul}
+                    className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700"
+                  >
+                    {judul}
+                  </th>
+                ))}
+                <th className="border-b border-slate-200 px-4 py-3 text-center text-sm font-medium text-slate-700">
+                  Aksi
+                </th>
               </tr>
             </thead>
+              <tbody>
+                {loading ? (
+                  <EmptyRow colSpan={10} text="Memuat data..." />
+                ) : filteredPermintaan.length === 0 ? (
+                  <EmptyRow colSpan={10} text="Belum ada permintaan layanan." />
+                ) : (
+                  filteredPermintaan.map((item, index) => (
+                    <tr
+                      key={item.id}
+                      className={`border-b border-slate-100 hover:bg-slate-50 ${
+                        selectedPermintaanId === item.id ? 'bg-slate-50' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {index + 1}
+                      </td>
 
-            <tbody>
-              {loading ? (
-                <EmptyRow colSpan={9} text="Memuat data..." />
-              ) : filteredPermintaan.length === 0 ? (
-                <EmptyRow colSpan={9} text="Belum ada permintaan layanan." />
-              ) : (
-                filteredPermintaan.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={`border-b border-slate-100 align-top hover:bg-slate-50 ${
-                      selectedPermintaanId === item.id ? 'bg-slate-50' : ''
-                    }`}
-                  >
-                    <Td>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPermintaanId(item.id)}
-                        className="font-semibold text-slate-800 hover:underline"
-                      >
-                        {item.kode_request}
-                      </button>
-                    </Td>
-
-                    <Td>{item.nama_pengguna || '-'}</Td>
-
-                    <Td>
-                      <div className="font-medium">{item.kode_layanan}</div>
-                      <div className="text-xs text-slate-500">{item.nama_layanan}</div>
-                    </Td>
-
-                    <Td>{formatDateTime(item.waktu_masuk)}</Td>
-                    <Td>{item.kanal_masuk}</Td>
-                    <Td>{item.deskripsi_permintaan}</Td>
-                    <Td>{item.urgensi}</Td>
-                    <Td>{item.status}</Td>
-
-                    <Td>
-                      <div className="flex gap-2">
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedPermintaanId(item.id);
-                            openEditPermintaan(item);
-                          }}
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                          onClick={() => setSelectedPermintaanId(item.id)}
+                          className="font-semibold text-slate-800 hover:underline"
                         >
-                          Edit
+                          {item.kode_request}
                         </button>
+                      </td>
 
-                        <button
-                          type="button"
-                          onClick={() => deletePermintaan(item)}
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.nama_pengguna || '-'}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        <div className="font-medium">
+                          {item.kode_layanan}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {item.nama_layanan}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {formatDateTime(item.waktu_masuk)}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.kanal_masuk}
+                      </td>
+
+                      <td className="max-w-xs break-words px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.deskripsi_permintaan}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.urgensi}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.status}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-center text-sm text-slate-700">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setDetailPermintaan(item)}
+                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          >
+                            Detail
+                          </button>
+
+                          {canUpdate && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPermintaanId(item.id);
+                                openEditPermintaan(item);
+                              }}
+                              className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                            >
+                              Edit
+                            </button>
+                          )}
+
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => deletePermintaan(item)}
+                              className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                            >
+                              Hapus
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
           </table>
         </div>
 
@@ -722,7 +798,8 @@ const PermintaanRelasiPenggunaPage = () => {
             </select>
           </div>
 
-          <button
+          {canCreate && (
+            <button
             type="button"
             disabled={!selectedPermintaan}
             onClick={openTambahTanggapan}
@@ -730,41 +807,78 @@ const PermintaanRelasiPenggunaPage = () => {
           >
             Tambah Tanggapan
           </button>
+          )}
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="min-w-[1200px] w-full">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Waktu</Th>
-                <Th>PIC</Th>
-                <Th>Jenis Tindakan</Th>
-                <Th>Tindakan</Th>
-                <Th>Status Setelah</Th>
-                <Th>Catatan</Th>
-                <Th>Dicatat Oleh</Th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Waktu
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  PIC
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Jenis Tindakan
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Tindakan
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Status Setelah
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Catatan
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Dicatat Oleh
+                </th>
               </tr>
             </thead>
+              <tbody>
+                {!selectedPermintaan ? (
+                  <EmptyRow colSpan={7} text="Pilih permintaan layanan terlebih dahulu." />
+                ) : selectedTanggapan.length === 0 ? (
+                  <EmptyRow colSpan={7} text="Belum ada riwayat tanggapan." />
+                ) : (
+                  selectedTanggapan.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-slate-100 hover:bg-slate-50"
+                    >
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {formatDateTime(item.waktu_update)}
+                      </td>
 
-            <tbody>
-              {!selectedPermintaan ? (
-                <EmptyRow colSpan={7} text="Pilih permintaan layanan terlebih dahulu." />
-              ) : selectedTanggapan.length === 0 ? (
-                <EmptyRow colSpan={7} text="Belum ada riwayat tanggapan." />
-              ) : (
-                selectedTanggapan.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <Td>{formatDateTime(item.waktu_update)}</Td>
-                    <Td>{item.nama_pic}</Td>
-                    <Td>{item.jenis_tindakan}</Td>
-                    <Td>{item.tindakan}</Td>
-                    <Td>{item.status_setelah}</Td>
-                    <Td>{item.catatan || '-'}</Td>
-                    <Td>{item.nama_pencatat}</Td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.nama_pic}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.jenis_tindakan}
+                      </td>
+
+                      <td className="max-w-xs break-words px-4 py-3 align-middle text-sm leading-relaxed text-slate-700">
+                        {item.tindakan}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.status_setelah}
+                      </td>
+
+                      <td className="max-w-xs break-words px-4 py-3 align-middle text-sm leading-relaxed text-slate-700">
+                        {item.catatan || '-'}
+                      </td>
+
+                      <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                        {item.nama_pencatat}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
           </table>
         </div>
 
@@ -793,7 +907,8 @@ const PermintaanRelasiPenggunaPage = () => {
             )}
           </div>
 
-          <button
+          {canCreate && (
+            <button
             type="button"
             disabled={
               !selectedPermintaan ||
@@ -805,40 +920,89 @@ const PermintaanRelasiPenggunaPage = () => {
           >
             {selectedEvaluasi ? 'Sudah Dievaluasi' : 'Tambah Evaluasi'}
           </button>
+          )}
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="min-w-[1400px] w-full">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <Th>Request</Th>
-                <Th>Target Respon</Th>
-                <Th>Realisasi Respon</Th>
-                <Th>Pencapaian Respon</Th>
-                <Th>Target Penyelesaian</Th>
-                <Th>Realisasi Penyelesaian</Th>
-                <Th>Pencapaian Penyelesaian</Th>
-                <Th>Ketepatan</Th>
-                <Th>Evaluator</Th>
-                <Th>Catatan</Th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Request
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Target Respon
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Realisasi Respon
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Pencapaian Respon
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Target Penyelesaian
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Realisasi Penyelesaian
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Pencapaian Penyelesaian
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Ketepatan
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Evaluator
+                </th>
+                <th className="border-b border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-700">
+                  Catatan
+                </th>
               </tr>
             </thead>
-
             <tbody>
               {!selectedEvaluasi ? (
                 <EmptyRow colSpan={10} text="Belum ada evaluasi untuk permintaan ini." />
               ) : (
                 <tr className="border-b border-slate-100 hover:bg-slate-50">
-                  <Td>{selectedEvaluasi.kode_request}</Td>
-                  <Td>{selectedEvaluasi.target_waktu_respon_menit ?? '-'} menit</Td>
-                  <Td>{selectedEvaluasi.realisasi_waktu_respon_menit ?? '-'} menit</Td>
-                  <Td>{selectedEvaluasi.pencapaian_respon_persen ?? '-'}%</Td>
-                  <Td>{selectedEvaluasi.target_waktu_penyelesaian_menit ?? '-'} menit</Td>
-                  <Td>{selectedEvaluasi.realisasi_waktu_penyelesaian_menit ?? '-'} menit</Td>
-                  <Td>{selectedEvaluasi.pencapaian_penyelesaian_persen ?? '-'}%</Td>
-                  <Td>{selectedEvaluasi.keterangan_ketepatan}</Td>
-                  <Td>{selectedEvaluasi.nama_evaluator}</Td>
-                  <Td>{selectedEvaluasi.catatan || '-'}</Td>
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.kode_request}
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.target_waktu_respon_menit ?? '-'} menit
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.realisasi_waktu_respon_menit ?? '-'} menit
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.pencapaian_respon_persen ?? '-'}%
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.target_waktu_penyelesaian_menit ?? '-'} menit
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.realisasi_waktu_penyelesaian_menit ?? '-'} menit
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.pencapaian_penyelesaian_persen ?? '-'}%
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.keterangan_ketepatan}
+                  </td>
+
+                  <td className="px-4 py-3 align-middle text-sm text-slate-700">
+                    {selectedEvaluasi.nama_evaluator}
+                  </td>
+
+                  <td className="max-w-xs break-words px-4 py-3 align-middle text-sm leading-relaxed text-slate-700">
+                    {selectedEvaluasi.catatan || '-'}
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -846,14 +1010,25 @@ const PermintaanRelasiPenggunaPage = () => {
         </div>
       </div>
 
+      {detailPermintaan && (
+        <Modal title="Detail Permintaan Layanan" onClose={() => setDetailPermintaan(null)}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {([['Kode Request', detailPermintaan.kode_request], ['Pengguna', detailPermintaan.nama_pengguna], ['Katalog Layanan', detailPermintaan.nama_layanan], ['Waktu Masuk', formatDateTime(detailPermintaan.waktu_masuk)], ['Kanal Masuk', detailPermintaan.kanal_masuk], ['Urgensi', detailPermintaan.urgensi], ['Status', detailPermintaan.status], ['Email Pelapor', detailPermintaan.email_pelapor], ['Nomor HP Pelapor', detailPermintaan.nomor_hp_pelapor], ['Cakupan Layanan Terkait', detailPermintaan.cakupan_layanan_terkait], ['URL Persyaratan / Bukti', detailPermintaan.url_persyaratan_bukti], ['Deskripsi Permintaan', detailPermintaan.deskripsi_permintaan]] as [string, string | null][]).map(([label, value]) => (
+              <div key={label}><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 break-words text-sm text-slate-800">{value || '-'}</p></div>
+            ))}
+          </div>
+          <div className="mt-5 flex justify-end"><button type="button" onClick={() => setDetailPermintaan(null)} className="rounded-md bg-slate-800 px-4 py-2 text-sm text-white">Tutup</button></div>
+        </Modal>
+      )}
       {showPermintaanForm && (
         <Modal
           title={editingPermintaanId ? 'Edit Permintaan Layanan' : 'Tambah Permintaan Layanan'}
           onClose={() => setShowPermintaanForm(false)}
         >
-          <form onSubmit={submitPermintaan}>
+          <form onSubmit={submitPermintaan} noValidate>
+            {formError && <div role="alert" className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
             <FormGrid>
-              <Field label="Kode Request">
+              <Field label="Kode Request" required>
                 <input
                   required
                   value={permintaanForm.kode_request}
@@ -862,7 +1037,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Waktu Masuk">
+              <Field label="Waktu Masuk" required>
                 <input
                   type="datetime-local"
                   required
@@ -887,17 +1062,17 @@ const PermintaanRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Layanan Digital">
+              <Field label="Katalog Layanan" required>
                 <select
                   required
                   value={permintaanForm.layanan_id}
                   onChange={(e) => setPermintaanForm({ ...permintaanForm, layanan_id: e.target.value })}
                   className={inputClass}
                 >
-                  <option value="">Pilih layanan</option>
+                  <option value="">Pilih katalog layanan</option>
                   {layananOptions.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.kode_layanan} - {item.nama_layanan}
+                      {item.nama_layanan}
                     </option>
                   ))}
                 </select>
@@ -920,7 +1095,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Kanal Masuk">
+              <Field label="Kanal Masuk" required>
                 <input
                   required
                   value={permintaanForm.kanal_masuk}
@@ -930,7 +1105,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Urgensi">
+              <Field label="Urgensi" required>
                 <select
                   value={permintaanForm.urgensi}
                   onChange={(e) => setPermintaanForm({ ...permintaanForm, urgensi: e.target.value })}
@@ -958,7 +1133,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Deskripsi Permintaan" full>
+              <Field label="Deskripsi Permintaan" required full>
                 <textarea
                   required
                   rows={4}
@@ -982,7 +1157,8 @@ const PermintaanRelasiPenggunaPage = () => {
           title="Tambah Tanggapan Permintaan"
           onClose={() => setShowTanggapanForm(false)}
         >
-          <form onSubmit={submitTanggapan}>
+          <form onSubmit={submitTanggapan} noValidate>
+            {formError && <div role="alert" className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
             <FormGrid>
               <Field label="Permintaan Layanan" full>
                 <input
@@ -996,7 +1172,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="PIC">
+              <Field label="PIC" required>
                 <select
                   required
                   value={tanggapanForm.pic_id}
@@ -1012,7 +1188,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Jenis Tindakan">
+              <Field label="Jenis Tindakan" required>
                 <select
                   value={tanggapanForm.jenis_tindakan}
                   onChange={(e) => {
@@ -1037,7 +1213,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Status Setelah">
+              <Field label="Status Setelah" required>
                 <select
                   value={tanggapanForm.status_setelah}
                   onChange={(e) => setTanggapanForm({ ...tanggapanForm, status_setelah: e.target.value })}
@@ -1053,7 +1229,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 </select>
               </Field>
 
-              <Field label="Tindakan" full>
+              <Field label="Tindakan" required full>
                 <textarea
                   required
                   rows={4}
@@ -1086,7 +1262,8 @@ const PermintaanRelasiPenggunaPage = () => {
           title="Evaluasi Permintaan Layanan"
           onClose={() => setShowEvaluasiForm(false)}
         >
-          <form onSubmit={submitEvaluasi}>
+          <form onSubmit={submitEvaluasi} noValidate>
+            {formError && <div role="alert" className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{formError}</div>}
             <FormGrid>
               <Field label="Permintaan Layanan" full>
                 <input
@@ -1100,7 +1277,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Realisasi Waktu Respon (menit)">
+              <Field label="Realisasi Waktu Respon (menit)" required>
                 <input
                   type="number"
                   min="0"
@@ -1111,7 +1288,7 @@ const PermintaanRelasiPenggunaPage = () => {
                 />
               </Field>
 
-              <Field label="Realisasi Waktu Penyelesaian (menit)">
+              <Field label="Realisasi Waktu Penyelesaian (menit)" required>
                 <input
                   type="number"
                   min="0"
@@ -1142,18 +1319,6 @@ const PermintaanRelasiPenggunaPage = () => {
     </div>
   );
 };
-
-const Th = ({ children }: { children: ReactNode }) => (
-  <th className="border-b border-slate-200 px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-    {children}
-  </th>
-);
-
-const Td = ({ children }: { children: ReactNode }) => (
-  <td className="px-4 py-3 text-sm text-slate-700">
-    {children}
-  </td>
-);
 
 const EmptyRow = ({ colSpan, text }: { colSpan: number; text: string }) => (
   <tr>
@@ -1204,15 +1369,17 @@ const FormGrid = ({ children }: { children: ReactNode }) => (
 const Field = ({
   label,
   full = false,
+  required = false,
   children,
 }: {
   label: string;
   full?: boolean;
+  required?: boolean;
   children: ReactNode;
 }) => (
   <div className={full ? 'md:col-span-2' : ''}>
     <label className="text-sm font-medium text-slate-700">
-      {label}
+      {label}{required && <span className="ml-1">*</span>}
     </label>
 
     {children}

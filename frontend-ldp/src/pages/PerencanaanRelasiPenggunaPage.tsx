@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const API = 'http://localhost:5000/api/relasi-pengguna';
@@ -16,36 +17,1013 @@ type ModalType =
   | 'rencana'
   | 'media';
 
-type LayananOption = {
-  id: number;
-  kode_layanan: string;
-  nama_layanan: string;
-  jenis_layanan: string | null;
-  deskripsi: string | null;
+type TabType = 'mrp1a' | 'mrp1b';
+
+type FieldType = 'text' | 'number' | 'date' | 'textarea' | 'select';
+
+type FieldConfig = {
+  key: string;
+  label: string;
+  type?: FieldType;
+  required?: boolean;
+  options?: { value: string; label: string }[];
+  placeholder?: string;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  full?: boolean;
+  disabledOnEdit?: boolean;
+};
+
+type TableColumn = {
+  label: string;
+  key?: string;
+  render?: (item: DataRow) => React.ReactNode;
+};
+
+type DetailItem = {
+  title: string;
+  fields: { label: string; value: string }[];
 };
 
 type UserOption = {
   id: number;
   nama: string;
-  email: string;
-  role: string;
+  email?: string;
+  role?: string;
 };
 
 const processSteps = [
-  { number: 1, label: 'Perencanaan Layanan', route: '/relasi-pengguna/perencanaan' },
-  { number: 2, label: 'Pengajuan Layanan', route: '/relasi-pengguna/pengajuan' },
-  { number: 3, label: 'Penanganan Kueri', route: '/relasi-pengguna/penanganan' },
-  { number: 4, label: 'Evaluasi', route: '/relasi-pengguna/evaluasi' },
+  {
+    number: 1,
+    label: 'Perencanaan Layanan',
+    route: '/relasi-pengguna/perencanaan',
+  },
+  {
+    number: 2,
+    label: 'Pengajuan Layanan',
+    route: '/relasi-pengguna/pengajuan',
+  },
+  {
+    number: 3,
+    label: 'Penanganan Kueri',
+    route: '/relasi-pengguna/penanganan',
+  },
+  {
+    number: 4,
+    label: 'Evaluasi',
+    route: '/relasi-pengguna/evaluasi',
+  },
 ];
 
-const emptyForm: Record<string, string> = {};
+const modalTitles: Record<ModalType, string> = {
+  katalog: 'Katalog Layanan',
+  standar: 'Standar Layanan',
+  sla: 'SLA Layanan',
+  ola: 'OLA Layanan',
+  indikator: 'Indikator Tambahan',
+  target: 'Target Kueri / Insiden',
+  'layanan-terkait': 'Layanan Terkait',
+  rencana: 'Rencana Komunikasi',
+  media: 'Media Komunikasi',
+};
+
+const endpointMap: Record<ModalType, string> = {
+  katalog: '/katalog-layanan',
+  standar: '/standar-layanan',
+  sla: '/sla-layanan',
+  ola: '/ola-layanan',
+  indikator: '/indikator-tambahan-standar',
+  target: '/target-kueri-insiden',
+  'layanan-terkait': '/katalog-layanan-terkait',
+  rencana: '/rencana-komunikasi',
+  media: '/media-komunikasi',
+};
+
+const statusKatalog = [
+  { value: 'Draft', label: 'Draft' },
+  { value: 'Aktif', label: 'Aktif' },
+  { value: 'Tidak Aktif', label: 'Tidak Aktif' },
+];
+
+const statusStandar = [
+  { value: 'Draft', label: 'Draft' },
+  { value: 'Aktif', label: 'Aktif' },
+  { value: 'Berakhir', label: 'Berakhir' },
+];
+
+const statusRencana = [
+  { value: 'Draft', label: 'Draft' },
+  { value: 'Aktif', label: 'Aktif' },
+  { value: 'Selesai', label: 'Selesai' },
+  { value: 'Dibatalkan', label: 'Dibatalkan' },
+];
+
+const prioritasOptions = [
+  { value: 'Rendah', label: 'Rendah' },
+  { value: 'Sedang', label: 'Sedang' },
+  { value: 'Tinggi', label: 'Tinggi' },
+];
+
+const valueText = (value: any): string => {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+const dateValue = (value: any) => {
+  if (!value) return '';
+  const text = String(value);
+  return text.slice(0, 10);
+};
+
+const displayDate = (value: any) => dateValue(value) || '-';
+
+const minuteText = (value: any) =>
+  value === null || value === undefined || value === ''
+    ? '-'
+    : `${value} menit`;
+
+const percentText = (value: any) =>
+  value === null || value === undefined || value === ''
+    ? '-'
+    : `${value}%`;
+
+const layananLabel = (item: DataRow) => {
+  const kode = item.kode_layanan || '';
+  const nama = item.nama_layanan || '';
+  return [kode, nama].filter(Boolean).join(' - ') || '-';
+};
+
+const tableColumns: Record<ModalType, TableColumn[]> = {
+  katalog: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Kategori', key: 'kategori_layanan' },
+    { label: 'Tipe', key: 'tipe_layanan' },
+    { label: 'Cakupan Pengguna', key: 'target_cakupan_pengguna' },
+    { label: 'Service Owner', key: 'service_owner' },
+    { label: 'Status', key: 'status' },
+  ],
+  standar: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Versi', key: 'versi' },
+    { label: 'Berlaku Mulai', render: (item) => displayDate(item.berlaku_mulai) },
+    { label: 'Berlaku Sampai', render: (item) => displayDate(item.berlaku_sampai) },
+    { label: 'Status', key: 'status' },
+  ],
+  sla: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Versi', key: 'versi_standar' },
+    { label: 'Jam Layanan', key: 'jam_layanan' },
+    { label: 'Service Desk', key: 'jam_service_desk' },
+    {
+      label: 'Respon',
+      render: (item) => minuteText(item.target_waktu_respon_menit),
+    },
+    {
+      label: 'Penyelesaian',
+      render: (item) => minuteText(item.target_waktu_penyelesaian_menit),
+    },
+    {
+      label: 'Ketersediaan',
+      render: (item) => percentText(item.target_ketersediaan_persen),
+    },
+  ],
+  ola: [
+    { label: 'Layanan', render: layananLabel },
+    {
+      label: 'Kecepatan',
+      render: (item) =>
+        item.target_kecepatan == null
+          ? '-'
+          : `${item.target_kecepatan} ${item.satuan_kecepatan || ''}`,
+    },
+    {
+      label: 'Kapasitas',
+      render: (item) =>
+        item.target_kapasitas == null
+          ? '-'
+          : `${item.target_kapasitas} ${item.satuan_kapasitas || ''}`,
+    },
+    {
+      label: 'Ketersediaan',
+      render: (item) => percentText(item.target_ketersediaan_persen),
+    },
+    {
+      label: 'RTO',
+      render: (item) => minuteText(item.target_rto_menit),
+    },
+    {
+      label: 'RPO',
+      render: (item) => minuteText(item.target_rpo_menit),
+    },
+    {
+      label: 'Respon',
+      render: (item) => minuteText(item.target_waktu_respon_menit),
+    },
+    {
+      label: 'Penyelesaian',
+      render: (item) => minuteText(item.target_waktu_penyelesaian_menit),
+    },
+  ],
+  indikator: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Objek', key: 'objek' },
+    { label: 'Jenis Standar', key: 'jenis_standar' },
+    { label: 'Prioritas', key: 'prioritas' },
+    { label: 'Indikator', key: 'nama_indikator' },
+    {
+      label: 'Target',
+      render: (item) =>
+        `${valueText(item.target_nilai)} ${item.satuan || ''}`,
+    },
+    { label: 'Arah Target', key: 'arah_target' },
+  ],
+  target: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Jenis', key: 'jenis' },
+    { label: 'Prioritas', key: 'prioritas' },
+    {
+      label: 'Respon SLA',
+      render: (item) => minuteText(item.sla_waktu_respon_menit),
+    },
+    {
+      label: 'Penyelesaian SLA',
+      render: (item) => minuteText(item.sla_waktu_penyelesaian_menit),
+    },
+    {
+      label: 'Respon OLA',
+      render: (item) => minuteText(item.ola_waktu_respon_menit),
+    },
+    {
+      label: 'Penyelesaian OLA',
+      render: (item) => minuteText(item.ola_waktu_penyelesaian_menit),
+    },
+  ],
+  'layanan-terkait': [
+    { label: 'Katalog Layanan', render: layananLabel },
+    {
+      label: 'Layanan Terkait',
+      render: (item) =>
+        item.nama_layanan_terkait ||
+        item.layanan_terkait ||
+        item.nama_terkait ||
+        valueText(item.layanan_terkait_id),
+    },
+    { label: 'Keterangan', key: 'keterangan' },
+  ],
+  rencana: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Informasi', key: 'informasi' },
+    { label: 'Manajemen Terkait', key: 'manajemen_terkait' },
+    { label: 'Pembuat Informasi', key: 'pembuat_informasi' },
+    { label: 'Target Audiens', key: 'target_audiens' },
+    { label: 'Periode', key: 'periode_komunikasi' },
+    { label: 'Status', key: 'status' },
+  ],
+  media: [
+    { label: 'Layanan', render: layananLabel },
+    { label: 'Informasi', key: 'informasi' },
+    { label: 'Bentuk Media', key: 'bentuk_media' },
+    { label: 'Kanal Komunikasi', key: 'kanal_komunikasi' },
+    { label: 'Keterangan', key: 'keterangan' },
+  ],
+};
+
+const formatFieldLabel = (key: string) =>
+  key
+    .replace(/_id$/i, ' ID')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const numberFields = new Set([
+  'versi',
+  'target_kecepatan',
+  'target_kapasitas',
+  'target_ketersediaan_persen',
+  'target_rto_menit',
+  'target_rpo_menit',
+  'target_waktu_respon_menit',
+  'target_waktu_penyelesaian_menit',
+  'target_nilai',
+  'sla_waktu_respon_menit',
+  'sla_waktu_penyelesaian_menit',
+  'ola_waktu_respon_menit',
+  'ola_waktu_penyelesaian_menit',
+]);
+
+const getDefaults = (type: ModalType): Record<string, string> => {
+  switch (type) {
+    case 'katalog':
+    case 'rencana':
+      return { status: 'Draft' };
+    case 'standar':
+      return { versi: '1', status: 'Draft' };
+    case 'indikator':
+      return {
+        objek: 'Layanan',
+        jenis_standar: 'SLA',
+        prioritas: 'Tidak Berlaku',
+        arah_target: 'Minimal',
+      };
+    case 'target':
+      return { jenis: 'Kueri', prioritas: 'Rendah' };
+    default:
+      return {};
+  }
+};
+
+const getSubmitConfig = (
+  type: ModalType,
+  editingId: number | null,
+  form: Record<string, string>
+) => {
+  const textOrNull = (key: string) =>
+    !form[key]?.trim() ? null : form[key].trim();
+
+  const numberOrNull = (key: string) =>
+    form[key] === undefined || form[key] === ''
+      ? null
+      : Number(form[key]);
+
+  let payload: Record<string, any> = {};
+
+  if (type === 'katalog') {
+    payload = {
+      nama_layanan: form.nama_layanan.trim(),
+      kategori_layanan: textOrNull('kategori_layanan'),
+      tipe_layanan: textOrNull('tipe_layanan'),
+      target_cakupan_pengguna: textOrNull('target_cakupan_pengguna'),
+      service_owner_id: numberOrNull('service_owner_id'),
+      kanal_layanan: textOrNull('kanal_layanan'),
+      tautan_layanan: textOrNull('tautan_layanan'),
+      ruang_lingkup_layanan: textOrNull('ruang_lingkup_layanan'),
+      stakeholder_terkait: textOrNull('stakeholder_terkait'),
+      status: form.status || 'Draft',
+    };
+  }
+
+  if (type === 'standar') {
+    payload = {
+      berlaku_mulai: form.berlaku_mulai,
+      berlaku_sampai: form.berlaku_sampai || null,
+      status: form.status || 'Draft',
+      catatan: textOrNull('catatan'),
+    };
+
+    if (editingId === null) {
+      payload.katalog_layanan_id = Number(form.katalog_layanan_id);
+      payload.versi = Number(form.versi || 1);
+    }
+  }
+
+  if (type === 'sla') {
+    payload = {
+      jam_layanan: textOrNull('jam_layanan'),
+      jam_service_desk: textOrNull('jam_service_desk'),
+      target_waktu_respon_menit: numberOrNull('target_waktu_respon_menit'),
+      target_waktu_penyelesaian_menit: numberOrNull(
+        'target_waktu_penyelesaian_menit'
+      ),
+      target_ketersediaan_persen: numberOrNull(
+        'target_ketersediaan_persen'
+      ),
+    };
+  }
+
+  if (type === 'ola') {
+    payload = {
+      target_kecepatan: numberOrNull('target_kecepatan'),
+      satuan_kecepatan: textOrNull('satuan_kecepatan'),
+      target_kapasitas: numberOrNull('target_kapasitas'),
+      satuan_kapasitas: textOrNull('satuan_kapasitas'),
+      target_ketersediaan_persen: numberOrNull(
+        'target_ketersediaan_persen'
+      ),
+      target_rto_menit: numberOrNull('target_rto_menit'),
+      target_rpo_menit: numberOrNull('target_rpo_menit'),
+      target_waktu_respon_menit: numberOrNull('target_waktu_respon_menit'),
+      target_waktu_penyelesaian_menit: numberOrNull(
+        'target_waktu_penyelesaian_menit'
+      ),
+    };
+  }
+
+  if (type === 'indikator') {
+    payload = {
+      objek: form.objek || 'Layanan',
+      jenis_standar: form.objek === 'Insiden'
+        ? 'OLA'
+        : form.jenis_standar || 'SLA',
+      prioritas: form.objek === 'Layanan'
+        ? 'Tidak Berlaku'
+        : form.prioritas || 'Rendah',
+      nama_indikator: form.nama_indikator.trim(),
+      target_nilai: Number(form.target_nilai),
+      satuan: form.satuan.trim(),
+      arah_target: form.arah_target || 'Minimal',
+    };
+  }
+
+  if (type === 'target') {
+    payload = {
+      jenis: form.jenis || 'Kueri',
+      prioritas: form.prioritas || 'Rendah',
+      sla_jam_layanan: textOrNull('sla_jam_layanan'),
+      sla_jam_service_desk: textOrNull('sla_jam_service_desk'),
+      sla_waktu_respon_menit: numberOrNull('sla_waktu_respon_menit'),
+      sla_waktu_penyelesaian_menit: numberOrNull(
+        'sla_waktu_penyelesaian_menit'
+      ),
+      ola_waktu_respon_menit: numberOrNull('ola_waktu_respon_menit'),
+      ola_waktu_penyelesaian_menit: numberOrNull(
+        'ola_waktu_penyelesaian_menit'
+      ),
+    };
+  }
+
+  if (type === 'layanan-terkait') {
+    payload = {
+      layanan_terkait_id: Number(form.layanan_terkait_id),
+      keterangan: textOrNull('keterangan'),
+    };
+
+    if (editingId === null) {
+      payload.katalog_layanan_id = Number(form.katalog_layanan_id);
+    }
+  }
+
+  if (type === 'rencana') {
+    payload = {
+      katalog_layanan_id: Number(form.katalog_layanan_id),
+      informasi: form.informasi.trim(),
+      manajemen_terkait: textOrNull('manajemen_terkait'),
+      pembuat_informasi_id: numberOrNull('pembuat_informasi_id'),
+      target_audiens: form.target_audiens.trim(),
+      periode_komunikasi: form.periode_komunikasi.trim(),
+      status: form.status || 'Draft',
+    };
+  }
+
+  if (type === 'media') {
+    payload = {
+      bentuk_media: form.bentuk_media.trim(),
+      kanal_komunikasi: form.kanal_komunikasi.trim(),
+      keterangan: textOrNull('keterangan'),
+    };
+
+    if (editingId === null) {
+      payload.rencana_komunikasi_id = Number(form.rencana_komunikasi_id);
+    }
+  }
+
+  
+    if (editingId === null) {
+      if (['sla', 'ola', 'target'].includes(type)) {
+        payload.katalog_layanan_id = Number(form.katalog_layanan_id);
+      }
+
+      if (type === 'indikator') {
+        payload.standar_layanan_id = Number(form.standar_layanan_id);
+      }
+    }
+
+
+  return {
+    endpoint: editingId === null
+      ? endpointMap[type]
+      : `${endpointMap[type]}/${editingId}`,
+    payload,
+  };
+};
+
+const getFields = (
+  type: ModalType,
+  katalog: DataRow[],
+  standar: DataRow[],
+  rencana: DataRow[],
+  layananOptions: DataRow[],
+  userOptions: UserOption[],
+  form: Record<string, string>
+): FieldConfig[] => {
+  const katalogField: FieldConfig = {
+    key: 'katalog_layanan_id',
+    label: 'Katalog Layanan',
+    type: 'select',
+    required: true,
+    disabledOnEdit: true,
+    options: katalog.map((item) => ({
+      value: String(item.id),
+      label: layananLabel(item),
+    })),
+  };
+
+  const standarField: FieldConfig = {
+    key: 'standar_layanan_id',
+    label: 'Standar Layanan',
+    type: 'select',
+    required: true,
+    disabledOnEdit: true,
+    options: standar.map((item) => ({
+      value: String(item.id),
+      label: `${layananLabel(item)} - Versi ${item.versi}`,
+    })),
+  };
+
+  const statusField = (
+    options: { value: string; label: string }[]
+  ): FieldConfig => ({
+    key: 'status',
+    label: 'Status',
+    type: 'select',
+    required: true,
+    options,
+  });
+
+  switch (type) {
+    case 'katalog':
+      return [
+        {
+          key: 'nama_layanan',
+          label: 'Nama Layanan',
+          required: true,
+          maxLength: 200,
+          placeholder: 'Contoh: Layanan Pengaduan Masyarakat Online',
+        },
+        {
+          key: 'kategori_layanan',
+          label: 'Kategori Layanan',
+          maxLength: 100,
+        },
+        {
+          key: 'tipe_layanan',
+          label: 'Tipe Layanan',
+          maxLength: 100,
+        },
+        {
+          key: 'target_cakupan_pengguna',
+          label: 'Target / Cakupan Pengguna',
+        },
+        {
+          key: 'service_owner_id',
+          label: 'Service Owner',
+          type: 'select',
+          options: userOptions.map((item) => ({
+            value: String(item.id),
+            label: item.nama,
+          })),
+        },
+        {
+          key: 'kanal_layanan',
+          label: 'Kanal Layanan',
+          maxLength: 150,
+        },
+        {
+          key: 'tautan_layanan',
+          label: 'Tautan Layanan',
+          maxLength: 255,
+        },
+        statusField(statusKatalog),
+        {
+          key: 'ruang_lingkup_layanan',
+          label: 'Ruang Lingkup Layanan',
+          type: 'textarea',
+          full: true,
+        },
+        {
+          key: 'stakeholder_terkait',
+          label: 'Stakeholder Terkait',
+          type: 'textarea',
+          full: true,
+        },
+      ];
+
+    case 'standar':
+      return [
+        katalogField,
+        {
+          key: 'versi',
+          label: 'Versi',
+          type: 'number',
+          required: true,
+          min: 1,
+          step: 1,
+          disabledOnEdit: true,
+        },
+        {
+          key: 'berlaku_mulai',
+          label: 'Berlaku Mulai',
+          type: 'date',
+          required: true,
+        },
+        {
+          key: 'berlaku_sampai',
+          label: 'Berlaku Sampai',
+          type: 'date',
+        },
+        statusField(statusStandar),
+        {
+          key: 'catatan',
+          label: 'Catatan',
+          type: 'textarea',
+          full: true,
+        },
+      ];
+
+    case 'sla':
+      return [
+        katalogField,
+        {
+          key: 'jam_layanan',
+          label: 'Jam Layanan',
+          placeholder: 'Contoh: Senin-Jumat 08.00-16.00',
+        },
+        {
+          key: 'jam_service_desk',
+          label: 'Jam Service Desk',
+          placeholder: 'Contoh: 24x7',
+        },
+        {
+          key: 'target_waktu_respon_menit',
+          label: 'Target Waktu Respon (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'target_waktu_penyelesaian_menit',
+          label: 'Target Waktu Penyelesaian (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'target_ketersediaan_persen',
+          label: 'Target Ketersediaan (%)',
+          type: 'number',
+          min: 0,
+          max: 100,
+          step: 0.01,
+        },
+      ];
+
+    case 'ola':
+      return [
+        katalogField,
+        {
+          key: 'target_kecepatan',
+          label: 'Target Kecepatan',
+          type: 'number',
+          min: 0,
+          step: 0.01,
+        },
+        {
+          key: 'satuan_kecepatan',
+          label: 'Satuan Kecepatan',
+          placeholder: 'Contoh: Mbps',
+        },
+        {
+          key: 'target_kapasitas',
+          label: 'Target Kapasitas',
+          type: 'number',
+          min: 0,
+          step: 0.01,
+        },
+        {
+          key: 'satuan_kapasitas',
+          label: 'Satuan Kapasitas',
+          placeholder: 'Contoh: Pengguna bersamaan',
+        },
+        {
+          key: 'target_ketersediaan_persen',
+          label: 'Target Ketersediaan (%)',
+          type: 'number',
+          min: 0,
+          max: 100,
+          step: 0.01,
+        },
+        {
+          key: 'target_rto_menit',
+          label: 'Target RTO (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'target_rpo_menit',
+          label: 'Target RPO (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'target_waktu_respon_menit',
+          label: 'Target Waktu Respon (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'target_waktu_penyelesaian_menit',
+          label: 'Target Waktu Penyelesaian (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+      ];
+
+    case 'indikator':
+      return [
+        standarField,
+        {
+          key: 'objek',
+          label: 'Objek',
+          type: 'select',
+          required: true,
+          options: [
+            { value: 'Layanan', label: 'Layanan' },
+            { value: 'Kueri', label: 'Kueri' },
+            { value: 'Insiden', label: 'Insiden' },
+          ],
+        },
+        {
+          key: 'jenis_standar',
+          label: 'Jenis Standar',
+          type: 'select',
+          required: true,
+          options: form.objek === 'Insiden'
+            ? [{ value: 'OLA', label: 'OLA' }]
+            : [
+                { value: 'SLA', label: 'SLA' },
+                { value: 'OLA', label: 'OLA' },
+              ],
+        },
+        {
+          key: 'prioritas',
+          label: 'Prioritas',
+          type: 'select',
+          required: true,
+          options: form.objek === 'Layanan'
+            ? [
+                {
+                  value: 'Tidak Berlaku',
+                  label: 'Tidak Berlaku',
+                },
+              ]
+            : prioritasOptions,
+        },
+        {
+          key: 'nama_indikator',
+          label: 'Nama Indikator',
+          required: true,
+          maxLength: 150,
+        },
+        {
+          key: 'target_nilai',
+          label: 'Target Nilai',
+          type: 'number',
+          required: true,
+          min: 0,
+          step: 0.01,
+        },
+        {
+          key: 'satuan',
+          label: 'Satuan',
+          required: true,
+          maxLength: 50,
+        },
+        {
+          key: 'arah_target',
+          label: 'Arah Target',
+          type: 'select',
+          required: true,
+          options: [
+            { value: 'Minimal', label: 'Minimal' },
+            { value: 'Maksimal', label: 'Maksimal' },
+            { value: 'Tepat', label: 'Tepat' },
+          ],
+        },
+      ];
+
+    case 'target':
+      return [
+        katalogField,
+        {
+          key: 'jenis',
+          label: 'Jenis',
+          type: 'select',
+          required: true,
+          options: [
+            { value: 'Kueri', label: 'Kueri' },
+            { value: 'Insiden', label: 'Insiden' },
+          ],
+        },
+        {
+          key: 'prioritas',
+          label: 'Prioritas',
+          type: 'select',
+          required: true,
+          options: prioritasOptions,
+        },
+        {
+          key: 'sla_jam_layanan',
+          label: 'Jam Layanan SLA',
+        },
+        {
+          key: 'sla_jam_service_desk',
+          label: 'Jam Service Desk SLA',
+        },
+        {
+          key: 'sla_waktu_respon_menit',
+          label: 'Waktu Respon SLA (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'sla_waktu_penyelesaian_menit',
+          label: 'Waktu Penyelesaian SLA (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'ola_waktu_respon_menit',
+          label: 'Waktu Respon OLA (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+        {
+          key: 'ola_waktu_penyelesaian_menit',
+          label: 'Waktu Penyelesaian OLA (menit)',
+          type: 'number',
+          min: 0,
+          step: 1,
+        },
+      ];
+
+    case 'layanan-terkait':
+      return [
+        katalogField,
+        {
+          key: 'layanan_terkait_id',
+          label: 'Layanan Terkait',
+          type: 'select',
+          required: true,
+          options: layananOptions.map((item) => ({
+            value: String(item.id),
+            label: layananLabel(item),
+          })),
+        },
+        {
+          key: 'keterangan',
+          label: 'Keterangan',
+          type: 'textarea',
+          full: true,
+        },
+      ];
+
+    case 'rencana':
+      return [
+        {
+          ...katalogField,
+          disabledOnEdit: false,
+        },
+        {
+          key: 'pembuat_informasi_id',
+          label: 'Pembuat Informasi',
+          type: 'select',
+          options: userOptions.map((item) => ({
+            value: String(item.id),
+            label: item.nama,
+          })),
+        },
+        {
+          key: 'informasi',
+          label: 'Informasi',
+          type: 'textarea',
+          required: true,
+          full: true,
+        },
+        {
+          key: 'manajemen_terkait',
+          label: 'Manajemen Terkait',
+          maxLength: 100,
+        },
+        {
+          key: 'target_audiens',
+          label: 'Target Audiens',
+          required: true,
+        },
+        {
+          key: 'periode_komunikasi',
+          label: 'Periode Komunikasi',
+          required: true,
+          maxLength: 100,
+          placeholder: 'Contoh: Setiap bulan',
+        },
+        statusField(statusRencana),
+      ];
+
+    case 'media':
+      return [
+        {
+          key: 'rencana_komunikasi_id',
+          label: 'Rencana Komunikasi',
+          type: 'select',
+          required: true,
+          disabledOnEdit: true,
+          options: rencana.map((item) => ({
+            value: String(item.id),
+            label: `${layananLabel(item)} - ${item.informasi || ''}`,
+          })),
+        },
+        {
+          key: 'bentuk_media',
+          label: 'Bentuk Media',
+          required: true,
+          maxLength: 100,
+          placeholder: 'Contoh: Infografis',
+        },
+        {
+          key: 'kanal_komunikasi',
+          label: 'Kanal Komunikasi',
+          required: true,
+          maxLength: 100,
+          placeholder: 'Contoh: Website Resmi',
+        },
+        {
+          key: 'keterangan',
+          label: 'Keterangan',
+          type: 'textarea',
+          full: true,
+        },
+      ];
+  }
+};
+
+
+const validateForm = (
+  type: ModalType,
+  fields: FieldConfig[],
+  form: Record<string, string>
+): string[] => {
+  for (const field of fields) {
+    const value = String(form[field.key] ?? '').trim();
+
+    if (field.required && !value) {
+      const action = field.type === 'select' ? 'dipilih' : 'diisi';
+      return [`${field.label} wajib ${action}.`];
+    }
+
+    if (field.maxLength && value.length > field.maxLength) {
+      return [`${field.label} maksimal ${field.maxLength} karakter.`];
+    }
+
+    if (field.type === 'number' && value !== '') {
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return [`${field.label} harus berupa angka.`];
+      }
+
+      if (field.min !== undefined && number < field.min) {
+        return [`${field.label} minimal ${field.min}.`];
+      }
+
+      if (field.max !== undefined && number > field.max) {
+        return [`${field.label} maksimal ${field.max}.`];
+      }
+
+      if (
+        (field.key.endsWith('_menit') || field.key === 'versi') &&
+        !Number.isInteger(number)
+      ) {
+        return [`${field.label} harus berupa bilangan bulat.`];
+      }
+    }
+  }
+
+  if (
+    type === 'standar' &&
+    form.berlaku_mulai &&
+    form.berlaku_sampai &&
+    form.berlaku_sampai < form.berlaku_mulai
+  ) {
+    return ['Berlaku Sampai tidak boleh sebelum Berlaku Mulai.'];
+  }
+
+  return [];
+};
 
 const PerencanaanRelasiPenggunaPage = () => {
   const navigate = useNavigate();
 
-  const [activeFormTab, setActiveFormTab] = useState<'mrp1a' | 'mrp1b'>('mrp1a');
+  const [activeFormTab, setActiveFormTab] = useState<TabType>('mrp1a');
 
-  const [layananOptions, setLayananOptions] = useState<LayananOption[]>([]);
+  const [layananOptions, setLayananOptions] = useState<DataRow[]>([]);
   const [userOptions, setUserOptions] = useState<UserOption[]>([]);
 
   const [katalog, setKatalog] = useState<DataRow[]>([]);
@@ -58,24 +1036,36 @@ const PerencanaanRelasiPenggunaPage = () => {
   const [rencana, setRencana] = useState<DataRow[]>([]);
   const [media, setMedia] = useState<DataRow[]>([]);
 
-  const [searchKatalog, setSearchKatalog] = useState('');
-  const [searchStandar, setSearchStandar] = useState('');
-  const [searchTarget, setSearchTarget] = useState('');
-  const [searchRencana, setSearchRencana] = useState('');
-
   const [modalType, setModalType] = useState<ModalType | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<Record<string, string>>(emptyForm);
+  const [form, setForm] = useState<Record<string, string>>({});
+
+  const [detailItem, setDetailItem] = useState<DetailItem | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [formErrors, setFormErrors] = useState<string[]>([]);
+
+  const [searches, setSearches] = useState<Partial<Record<ModalType, string>>>({});
 
   const inputClass =
-    'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500 focus:ring-1 focus:ring-slate-500 disabled:bg-slate-100 disabled:text-slate-500';
+    'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 disabled:bg-slate-100 disabled:text-slate-500';
 
-  const labelClass = 'text-sm font-medium text-slate-700';
+  let permissions: string[] = [];
+
+  try {
+    const saved = sessionStorage.getItem('user');
+    const user = saved ? JSON.parse(saved) : null;
+    permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+  } catch {
+    permissions = [];
+  }
+
+  const canCreate = permissions.includes('user_relation.create');
+  const canUpdate = permissions.includes('user_relation.update');
+  const canDelete = permissions.includes('user_relation.delete');
 
   const request = async (url: string, options: RequestInit = {}) => {
     const response = await fetch(url, {
@@ -90,13 +1080,15 @@ const PerencanaanRelasiPenggunaPage = () => {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.message || 'Terjadi kesalahan saat memproses data.');
+      throw new Error(
+        result.message || 'Terjadi kesalahan saat memproses data.'
+      );
     }
 
     return result;
   };
 
-  const rows = (result: any) => {
+  const rows = (result: any): DataRow[] => {
     if (Array.isArray(result)) return result;
     if (Array.isArray(result?.data)) return result.data;
     return [];
@@ -116,7 +1108,7 @@ const PerencanaanRelasiPenggunaPage = () => {
         olaResult,
         indikatorResult,
         targetResult,
-        layananTerkaitResult,
+        terkaitResult,
         rencanaResult,
         mediaResult,
       ] = await Promise.all([
@@ -134,18 +1126,22 @@ const PerencanaanRelasiPenggunaPage = () => {
       ]);
 
       setLayananOptions(rows(layananResult));
-      setUserOptions(rows(userResult));
+      setUserOptions(rows(userResult) as UserOption[]);
       setKatalog(rows(katalogResult));
       setStandar(rows(standarResult));
       setSla(rows(slaResult));
       setOla(rows(olaResult));
       setIndikator(rows(indikatorResult));
       setTarget(rows(targetResult));
-      setLayananTerkait(rows(layananTerkaitResult));
+      setLayananTerkait(rows(terkaitResult));
       setRencana(rows(rencanaResult));
       setMedia(rows(mediaResult));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal mengambil data perencanaan layanan.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Gagal mengambil data perencanaan layanan.'
+      );
     } finally {
       setLoading(false);
     }
@@ -155,250 +1151,375 @@ const PerencanaanRelasiPenggunaPage = () => {
     fetchAll();
   }, []);
 
-  const setField = (field: string, value: string) => {
-    setForm((current) => ({ ...current, [field]: value }));
+  const dataMap: Record<ModalType, DataRow[]> = {
+    katalog,
+    standar,
+    sla,
+    ola,
+    indikator,
+    target,
+    'layanan-terkait': layananTerkait,
+    rencana,
+    media,
   };
 
-  const closeModal = () => {
-    setModalType(null);
-    setEditingId(null);
-    setForm(emptyForm);
-  };
+  const fields = modalType
+    ? getFields(
+        modalType,
+        katalog,
+        standar,
+        rencana,
+        layananOptions,
+        userOptions,
+        form
+      )
+    : [];
 
-  const openCreate = (type: ModalType, defaults: Record<string, string> = {}) => {
+  const openCreate = (type: ModalType) => {
     setEditingId(null);
     setModalType(type);
-    setForm(defaults);
+    setForm(getDefaults(type));
+    setFormErrors([]);
     setMessage('');
     setError('');
   };
 
   const openEdit = (type: ModalType, item: DataRow) => {
-    setEditingId(item.id);
+    const values: Record<string, string> = {};
+
+    const currentFields = getFields(
+      type,
+      katalog,
+      standar,
+      rencana,
+      layananOptions,
+      userOptions,
+      {}
+    );
+
+    for (const field of currentFields) {
+      if (field.type === 'date') {
+        values[field.key] = dateValue(item[field.key]);
+      } else {
+        values[field.key] =
+          item[field.key] === null || item[field.key] === undefined
+            ? ''
+            : String(item[field.key]);
+      }
+    }
+
+    setForm({ ...getDefaults(type), ...values });
+    setEditingId(Number(item.id));
     setModalType(type);
+    setFormErrors([]);
     setMessage('');
     setError('');
-
-    if (type === 'katalog') {
-      setForm({
-        layanan_id: String(item.layanan_id),
-        kategori_layanan: item.kategori_layanan || '',
-        tipe_layanan: item.tipe_layanan || '',
-        target_cakupan_pengguna: item.target_cakupan_pengguna || '',
-        service_owner_id: item.service_owner_id ? String(item.service_owner_id) : '',
-        kanal_layanan: item.kanal_layanan || '',
-        tautan_layanan: item.tautan_layanan || '',
-        ruang_lingkup_layanan: item.ruang_lingkup_layanan || '',
-        stakeholder_terkait: item.stakeholder_terkait || '',
-        status: item.status || 'Draft',
-      });
-    }
-
-    if (type === 'standar') {
-      setForm({
-        katalog_layanan_id: String(item.katalog_layanan_id),
-        versi: String(item.versi),
-        berlaku_mulai: dateValue(item.berlaku_mulai),
-        berlaku_sampai: dateValue(item.berlaku_sampai),
-        status: item.status || 'Draft',
-        catatan: item.catatan || '',
-      });
-    }
-
-    if (type === 'sla') {
-      setForm({
-        standar_layanan_id: String(item.standar_layanan_id),
-        jam_layanan: item.jam_layanan || '',
-        jam_service_desk: item.jam_service_desk || '',
-        target_waktu_respon_menit: valueString(item.target_waktu_respon_menit),
-        target_waktu_penyelesaian_menit: valueString(item.target_waktu_penyelesaian_menit),
-        target_ketersediaan_persen: valueString(item.target_ketersediaan_persen),
-      });
-    }
-
-    if (type === 'ola') {
-      setForm({
-        standar_layanan_id: String(item.standar_layanan_id),
-        target_kecepatan: valueString(item.target_kecepatan),
-        satuan_kecepatan: item.satuan_kecepatan || '',
-        target_kapasitas: valueString(item.target_kapasitas),
-        satuan_kapasitas: item.satuan_kapasitas || '',
-        target_ketersediaan_persen: valueString(item.target_ketersediaan_persen),
-        target_rto_menit: valueString(item.target_rto_menit),
-        target_rpo_menit: valueString(item.target_rpo_menit),
-        target_waktu_respon_menit: valueString(item.target_waktu_respon_menit),
-        target_waktu_penyelesaian_menit: valueString(item.target_waktu_penyelesaian_menit),
-      });
-    }
-
-    if (type === 'indikator') {
-      setForm({
-        standar_layanan_id: String(item.standar_layanan_id),
-        objek: item.objek || 'Layanan',
-        jenis_standar: item.jenis_standar || 'SLA',
-        prioritas: item.prioritas || 'Tidak Berlaku',
-        nama_indikator: item.nama_indikator || '',
-        target_nilai: valueString(item.target_nilai),
-        satuan: item.satuan || '',
-        arah_target: item.arah_target || 'Minimal',
-      });
-    }
-
-    if (type === 'target') {
-      setForm({
-        standar_layanan_id: String(item.standar_layanan_id),
-        jenis: item.jenis || 'Kueri',
-        prioritas: item.prioritas || 'Rendah',
-        sla_jam_layanan: item.sla_jam_layanan || '',
-        sla_jam_service_desk: item.sla_jam_service_desk || '',
-        sla_waktu_respon_menit: valueString(item.sla_waktu_respon_menit),
-        sla_waktu_penyelesaian_menit: valueString(item.sla_waktu_penyelesaian_menit),
-        ola_waktu_respon_menit: valueString(item.ola_waktu_respon_menit),
-        ola_waktu_penyelesaian_menit: valueString(item.ola_waktu_penyelesaian_menit),
-      });
-    }
-
-    if (type === 'layanan-terkait') {
-      setForm({
-        katalog_layanan_id: String(item.katalog_layanan_id),
-        layanan_terkait_id: String(item.layanan_terkait_id),
-        keterangan: item.keterangan || '',
-      });
-    }
-
-    if (type === 'rencana') {
-      setForm({
-        layanan_id: String(item.layanan_id),
-        informasi: item.informasi || '',
-        manajemen_terkait: item.manajemen_terkait || '',
-        pembuat_informasi_id: item.pembuat_informasi_id ? String(item.pembuat_informasi_id) : '',
-        target_audiens: item.target_audiens || '',
-        periode_komunikasi: item.periode_komunikasi || '',
-        status: item.status || 'Draft',
-      });
-    }
-
-    if (type === 'media') {
-      setForm({
-        rencana_komunikasi_id: String(item.rencana_komunikasi_id),
-        bentuk_media: item.bentuk_media || '',
-        kanal_komunikasi: item.kanal_komunikasi || '',
-        keterangan: item.keterangan || '',
-      });
-    }
   };
 
-  const handleSubmit = async (event: FormEvent) => {
+  const closeModal = () => {
+    setModalType(null);
+    setEditingId(null);
+    setForm({});
+    setFormErrors([]);
+  };
+
+  const setField = (key: string, value: string) => {
+    setForm((current) => {
+      if (key === 'objek') {
+        return {
+          ...current,
+          objek: value,
+          jenis_standar:
+            value === 'Insiden'
+              ? 'OLA'
+              : current.jenis_standar || 'SLA',
+          prioritas: value === 'Layanan' ? 'Tidak Berlaku' : 'Rendah',
+        };
+      }
+
+      if (key === 'katalog_layanan_id' && modalType === 'rencana') {
+        return {
+          ...current,
+          katalog_layanan_id: value,
+          pembuat_informasi_id: '',
+        };
+      }
+
+      return { ...current, [key]: value };
+    });
+
+    setFormErrors([]);
+  };
+
+  const openDetail = (type: ModalType, item: DataRow) => {
+    const currentFields = getFields(
+      type,
+      katalog,
+      standar,
+      rencana,
+      layananOptions,
+      userOptions,
+      {}
+    );
+
+    const knownLabels = new Map(
+      currentFields.map((field) => [field.key, field.label])
+    );
+
+    const excluded = new Set([
+      'id',
+      'created_by',
+      'updated_by',
+      'created_at',
+      'updated_at',
+    ]);
+
+    const detailFields = Object.entries(item)
+      .filter(([key]) => !excluded.has(key))
+      .map(([key, value]) => {
+        let formattedValue = valueText(value);
+
+        if (
+          (key === 'berlaku_mulai' || key === 'berlaku_sampai') &&
+          value
+        ) {
+          formattedValue = displayDate(value);
+        }
+
+        return {
+          label: knownLabels.get(key) || formatFieldLabel(key),
+          value: formattedValue,
+        };
+      });
+
+    setDetailItem({
+      title: modalTitles[type],
+      fields: detailFields,
+    });
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!modalType) return;
+    if (!modalType || saving) return;
+
+    const errors = validateForm(modalType, fields, form);
+
+    if (errors.length > 0) {
+      setFormErrors(errors);
+      return;
+    }
 
     try {
       setSaving(true);
       setMessage('');
       setError('');
+      setFormErrors([]);
 
       const config = getSubmitConfig(modalType, editingId, form);
 
       const result = await request(`${API}${config.endpoint}`, {
-        method: editingId ? 'PUT' : 'POST',
+        method: editingId !== null ? 'PUT' : 'POST',
         body: JSON.stringify(config.payload),
       });
 
-      setMessage(result.message || 'Data berhasil disimpan.');
       closeModal();
       await fetchAll();
+      setMessage(result.message || 'Data berhasil disimpan.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan data.');
+      setFormErrors([
+        err instanceof Error ? err.message : 'Gagal menyimpan data.',
+      ]);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (type: ModalType, item: DataRow) => {
-    const endpoint = getDeleteEndpoint(type, item.id);
-
-    if (!window.confirm('Hapus data ini?')) return;
+    if (!window.confirm(`Hapus data ${modalTitles[type]} ini?`)) return;
 
     try {
       setMessage('');
       setError('');
 
-      const result = await request(`${API}${endpoint}`, { method: 'DELETE' });
+      const result = await request(
+        `${API}${endpointMap[type]}/${item.id}`,
+        { method: 'DELETE' }
+      );
 
-      setMessage(result.message || 'Data berhasil dihapus.');
       await fetchAll();
+      setMessage(result.message || 'Data berhasil dihapus.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menghapus data.');
+      setError(
+        err instanceof Error ? err.message : 'Gagal menghapus data.'
+      );
     }
   };
 
-  const filteredKatalog = useMemo(() => {
-    const keyword = searchKatalog.trim().toLowerCase();
+  const renderTable = (
+    type: ModalType,
+    title: string,
+    subtitle: string,
+    buttonLabel: string,
+    options: {
+      searchable?: boolean;
+      disabled?: boolean;
+      data?: DataRow[];
+    } = {}
+  ) => {
+    const data = options.data || dataMap[type];
+    const keyword = (searches[type] || '').trim().toLowerCase();
 
-    if (!keyword) return katalog;
+    const displayedData = keyword
+      ? data.filter((item) =>
+          Object.values(item).some((value) =>
+            valueText(value).toLowerCase().includes(keyword)
+          )
+        )
+      : data;
 
-    return katalog.filter((item) =>
-      [
-        item.kode_layanan,
-        item.nama_layanan,
-        item.kategori_layanan,
-        item.tipe_layanan,
-        item.service_owner,
-        item.status,
-      ].some((value) => String(value || '').toLowerCase().includes(keyword))
+    const columns = tableColumns[type];
+
+    return (
+      <div className="border-b border-slate-200">
+        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-semibold text-slate-800">{title}</h3>
+            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          </div>
+
+          {canCreate && (
+            <button
+              type="button"
+              disabled={options.disabled}
+              onClick={() => openCreate(type)}
+              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {buttonLabel}
+            </button>
+          )}
+        </div>
+
+        {options.searchable && (
+          <div className="border-b border-slate-200 p-5">
+            <input
+              type="text"
+              value={searches[type] || ''}
+              onChange={(event) =>
+                setSearches((current) => ({
+                  ...current,
+                  [type]: event.target.value,
+                }))
+              }
+              placeholder={`Cari ${title.toLowerCase()}...`}
+              className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+            />
+          </div>
+        )}
+
+        <div className="overflow-x-auto p-5">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <th className="px-4 py-3 text-left font-semibold">No</th>
+
+                {columns.map((column, index) => (
+                  <th
+                    key={`${column.label}-${index}`}
+                    className="px-4 py-3 text-left font-semibold"
+                  >
+                    {column.label}
+                  </th>
+                ))}
+
+                <th className="px-4 py-3 text-center font-semibold">
+                  Aksi
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={columns.length + 2}
+                    className="px-4 py-10 text-center text-sm text-slate-500"
+                  >
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : displayedData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columns.length + 2}
+                    className="px-4 py-10 text-center text-sm text-slate-500"
+                  >
+                    Belum ada data {title.toLowerCase()}.
+                  </td>
+                </tr>
+              ) : (
+                displayedData.map((item, index) => (
+                  <tr
+                    key={item.id}
+                    className="border-b border-slate-100 hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {index + 1}
+                    </td>
+
+                    {columns.map((column, columnIndex) => (
+                      <td
+                        key={`${column.label}-${columnIndex}`}
+                        className="max-w-[260px] px-4 py-3 align-middle text-sm text-slate-700"
+                      >
+                        <div className="line-clamp-2 break-words">
+                          {column.render
+                            ? column.render(item)
+                            : valueText(item[column.key || ''])}
+                        </div>
+                      </td>
+                    ))}
+
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => openDetail(type, item)}
+                          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          Detail
+                        </button>
+
+                        {canUpdate && (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(type, item)}
+                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            Edit
+                          </button>
+                        )}
+
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(type, item)}
+                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                          >
+                            Hapus
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     );
-  }, [katalog, searchKatalog]);
-
-  const filteredStandar = useMemo(() => {
-    const keyword = searchStandar.trim().toLowerCase();
-
-    if (!keyword) return standar;
-
-    return standar.filter((item) =>
-      [
-        item.kode_layanan,
-        item.nama_layanan,
-        item.versi,
-        item.status,
-      ].some((value) => String(value || '').toLowerCase().includes(keyword))
-    );
-  }, [standar, searchStandar]);
-
-  const filteredTarget = useMemo(() => {
-    const keyword = searchTarget.trim().toLowerCase();
-
-    if (!keyword) return target;
-
-    return target.filter((item) =>
-      [
-        item.kode_layanan,
-        item.nama_layanan,
-        item.jenis,
-        item.prioritas,
-      ].some((value) => String(value || '').toLowerCase().includes(keyword))
-    );
-  }, [target, searchTarget]);
-
-  const filteredRencana = useMemo(() => {
-    const keyword = searchRencana.trim().toLowerCase();
-
-    if (!keyword) return rencana;
-
-    return rencana.filter((item) =>
-      [
-        item.kode_layanan,
-        item.nama_layanan,
-        item.informasi,
-        item.target_audiens,
-        item.periode_komunikasi,
-        item.status,
-      ].some((value) => String(value || '').toLowerCase().includes(keyword))
-    );
-  }, [rencana, searchRencana]);
-
-  const indikatorLayanan = indikator.filter((item) => item.objek === 'Layanan');
-  const indikatorKueriInsiden = indikator.filter((item) => ['Kueri', 'Insiden'].includes(item.objek));
+  };
 
   return (
     <div className="p-6">
@@ -406,7 +1527,6 @@ const PerencanaanRelasiPenggunaPage = () => {
         <h1 className="text-2xl font-bold text-slate-800">
           Manajemen Relasi Pengguna
         </h1>
-
         <p className="mt-1 text-sm text-slate-500">
           Proses 1 - Perencanaan Layanan
         </p>
@@ -414,43 +1534,39 @@ const PerencanaanRelasiPenggunaPage = () => {
 
       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between gap-2">
-          {processSteps.map((step, index) => {
-            const active = step.number === 1;
-
-            return (
-              <div key={step.number} className="flex flex-1 items-start">
-                <button
-                  type="button"
-                  onClick={() => navigate(step.route)}
-                  className="flex min-w-[120px] flex-col items-center text-center"
+          {processSteps.map((step, index) => (
+            <div key={step.number} className="flex flex-1 items-start">
+              <button
+                type="button"
+                onClick={() => navigate(step.route)}
+                className="flex min-w-[120px] flex-col items-center text-center"
+              >
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
+                    step.number === 1
+                      ? 'border-slate-800 bg-slate-800 text-white'
+                      : 'border-slate-300 bg-white text-slate-500'
+                  }`}
                 >
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold ${
-                      active
-                        ? 'border-slate-800 bg-slate-800 text-white'
-                        : 'border-slate-300 bg-white text-slate-500'
-                    }`}
-                  >
-                    {step.number}
-                  </div>
+                  {step.number}
+                </div>
 
-                  <span
-                    className={`mt-2 text-xs ${
-                      active
-                        ? 'font-semibold text-slate-800'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                </button>
+                <span
+                  className={`mt-2 text-xs ${
+                    step.number === 1
+                      ? 'font-semibold text-slate-800'
+                      : 'text-slate-500'
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </button>
 
-                {index < processSteps.length - 1 && (
-                  <div className="mt-[18px] h-px flex-1 bg-slate-200" />
-                )}
-              </div>
-            );
-          })}
+              {index < processSteps.length - 1 && (
+                <div className="mt-[18px] h-px flex-1 bg-slate-200" />
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -471,7 +1587,6 @@ const PerencanaanRelasiPenggunaPage = () => {
           <h2 className="text-lg font-semibold text-slate-800">
             Perencanaan Layanan
           </h2>
-
           <p className="mt-1 text-sm text-slate-500">
             Formulir MRP1a dan MRP1b Manajemen Relasi Pengguna.
           </p>
@@ -502,248 +1617,60 @@ const PerencanaanRelasiPenggunaPage = () => {
             MRP1b - Komunikasi Pengguna
           </button>
         </div>
-
+        
         {activeFormTab === 'mrp1a' && (
           <div>
             <div className="border-b border-slate-200 bg-slate-50 p-5">
               <h3 className="font-semibold text-slate-800">
                 Bagian 1 - Katalog, SLA, OLA Layanan
               </h3>
-
               <p className="mt-1 text-sm text-slate-500">
-                Dokumentasi katalog layanan serta target SLA dan OLA layanan digital.
+                Dokumentasi katalog layanan serta target SLA dan OLA.
               </p>
             </div>
 
-            <SectionHeader
-              title="Katalog Layanan"
-              subtitle="Informasi dasar dan cakupan setiap layanan digital."
-              button="Tambah Katalog"
-              onClick={() => openCreate('katalog', { status: 'Draft' })}
-            />
+            {renderTable(
+              'katalog',
+              'Katalog Layanan',
+              'Informasi dasar dan cakupan setiap layanan.',
+              'Tambah Katalog',
+              { searchable: true }
+            )}
 
-            <SearchBox
-              value={searchKatalog}
-              onChange={setSearchKatalog}
-              placeholder="Cari katalog layanan..."
-            />
+            {renderTable(
+              'sla',
+              'Service Level Agreement (SLA)',
+              'Target layanan yang disepakati terhadap pengguna.',
+              'Tambah SLA'
+            )}
 
-            <div className="overflow-x-auto p-5">
-              <table className="min-w-[1400px] w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <Th>Layanan</Th>
-                    <Th>Kategori</Th>
-                    <Th>Tipe</Th>
-                    <Th>Cakupan Pengguna</Th>
-                    <Th>Service Owner</Th>
-                    <Th>Kanal</Th>
-                    <Th>Status</Th>
-                    <Th center>Aksi</Th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {loading ? (
-                    <EmptyRow colSpan={8} text="Memuat data..." />
-                  ) : filteredKatalog.length === 0 ? (
-                    <EmptyRow colSpan={8} text="Belum ada katalog layanan." />
-                  ) : (
-                    filteredKatalog.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
-                        <Td>
-                          <div className="font-medium">{item.kode_layanan}</div>
-                          <div className="mt-1 text-xs text-slate-500">{item.nama_layanan}</div>
-                        </Td>
-
-                        <Td>{item.kategori_layanan || '-'}</Td>
-                        <Td>{item.tipe_layanan || '-'}</Td>
-                        <Td>{item.target_cakupan_pengguna || '-'}</Td>
-                        <Td>{item.service_owner || '-'}</Td>
-                        <Td>{item.kanal_layanan || '-'}</Td>
-                        <Td>{item.status}</Td>
-
-                        <ActionTd
-                          onEdit={() => openEdit('katalog', item)}
-                          onDelete={() => handleDelete('katalog', item)}
-                        />
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>  
-
-            <SectionHeader
-              title="Service Level Agreement (SLA)"
-              subtitle="Target layanan yang disepakati terhadap pengguna."
-              button="Tambah SLA"
-              disabled={standar.length === 0}
-              onClick={() => openCreate('sla')}
-            />
-
-            <div className="overflow-x-auto p-5">
-              <table className="min-w-[1300px] w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <Th>Layanan</Th>
-                    <Th>Versi</Th>
-                    <Th>Jam Layanan</Th>
-                    <Th>Service Desk</Th>
-                    <Th>Respon</Th>
-                    <Th>Penyelesaian</Th>
-                    <Th>Ketersediaan</Th>
-                    <Th center>Aksi</Th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {sla.length === 0 ? (
-                    <EmptyRow colSpan={8} text="Belum ada SLA layanan." />
-                  ) : (
-                    sla.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{item.kode_layanan} - {item.nama_layanan}</Td>
-                        <Td>{item.versi_standar}</Td>
-                        <Td>{item.jam_layanan || '-'}</Td>
-                        <Td>{item.jam_service_desk || '-'}</Td>
-                        <Td>{minuteText(item.target_waktu_respon_menit)}</Td>
-                        <Td>{minuteText(item.target_waktu_penyelesaian_menit)}</Td>
-                        <Td>{percentText(item.target_ketersediaan_persen)}</Td>
-
-                        <ActionTd
-                          onEdit={() => openEdit('sla', item)}
-                          onDelete={() => handleDelete('sla', item)}
-                        />
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <SectionHeader
-              title="Operational Level Agreement (OLA)"
-              subtitle="Target operasional internal untuk mendukung pencapaian SLA."
-              button="Tambah OLA"
-              disabled={standar.length === 0}
-              onClick={() => openCreate('ola')}
-            />
-
-            <div className="overflow-x-auto p-5">
-              <table className="min-w-[1600px] w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <Th>Layanan</Th>
-                    <Th>Kecepatan</Th>
-                    <Th>Kapasitas</Th>
-                    <Th>Ketersediaan</Th>
-                    <Th>RTO</Th>
-                    <Th>RPO</Th>
-                    <Th>Respon</Th>
-                    <Th>Penyelesaian</Th>
-                    <Th center>Aksi</Th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {ola.length === 0 ? (
-                    <EmptyRow colSpan={9} text="Belum ada OLA layanan." />
-                  ) : (
-                    ola.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{item.kode_layanan} - {item.nama_layanan}</Td>
-                        <Td>{item.target_kecepatan ?? '-'} {item.satuan_kecepatan || ''}</Td>
-                        <Td>{item.target_kapasitas ?? '-'} {item.satuan_kapasitas || ''}</Td>
-                        <Td>{percentText(item.target_ketersediaan_persen)}</Td>
-                        <Td>{minuteText(item.target_rto_menit)}</Td>
-                        <Td>{minuteText(item.target_rpo_menit)}</Td>
-                        <Td>{minuteText(item.target_waktu_respon_menit)}</Td>
-                        <Td>{minuteText(item.target_waktu_penyelesaian_menit)}</Td>
-
-                        <ActionTd
-                          onEdit={() => openEdit('ola', item)}
-                          onDelete={() => handleDelete('ola', item)}
-                        />
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {renderTable(
+              'ola',
+              'Operational Level Agreement (OLA)',
+              'Target operasional internal untuk mendukung SLA.',
+              'Tambah OLA',
+              { disabled: standar.length === 0 }
+            )}
 
             <div className="border-y border-slate-200 bg-slate-50 p-5">
               <h3 className="font-semibold text-slate-800">
                 Bagian 2 - SLA, OLA Kueri & Insiden
               </h3>
-
               <p className="mt-1 text-sm text-slate-500">
-                Target SLA dan OLA penanganan kueri dan insiden berdasarkan prioritas.
+                Target penanganan kueri dan insiden berdasarkan prioritas.
               </p>
             </div>
 
-            <SectionHeader
-              title="Target SLA & OLA Kueri / Insiden"
-              subtitle="Target waktu penanganan berdasarkan jenis dan prioritas."
-              button="Tambah Target"
-              disabled={standar.length === 0}
-              onClick={() =>
-                openCreate('target', {
-                  jenis: 'Kueri',
-                  prioritas: 'Rendah',
-                })
+            {renderTable(
+              'target',
+              'Target SLA & OLA Kueri / Insiden',
+              'Target waktu penanganan berdasarkan jenis dan prioritas.',
+              'Tambah Target',
+              {
+                searchable: true,
+                disabled: standar.length === 0,
               }
-            />
-
-            <SearchBox
-              value={searchTarget}
-              onChange={setSearchTarget}
-              placeholder="Cari target kueri atau insiden..."
-            />
-
-            <div className="overflow-x-auto p-5">
-              <table className="min-w-[1500px] w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <Th>Layanan</Th>
-                    <Th>Jenis</Th>
-                    <Th>Prioritas</Th>
-                    <Th>Jam Layanan SLA</Th>
-                    <Th>Service Desk</Th>
-                    <Th>Respon SLA</Th>
-                    <Th>Penyelesaian SLA</Th>
-                    <Th>Respon OLA</Th>
-                    <Th>Penyelesaian OLA</Th>
-                    <Th center>Aksi</Th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredTarget.length === 0 ? (
-                    <EmptyRow colSpan={10} text="Belum ada target kueri atau insiden." />
-                  ) : (
-                    filteredTarget.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{item.kode_layanan} - {item.nama_layanan}</Td>
-                        <Td>{item.jenis}</Td>
-                        <Td>{item.prioritas}</Td>
-                        <Td>{item.sla_jam_layanan || '-'}</Td>
-                        <Td>{item.sla_jam_service_desk || '-'}</Td>
-                        <Td>{minuteText(item.sla_waktu_respon_menit)}</Td>
-                        <Td>{minuteText(item.sla_waktu_penyelesaian_menit)}</Td>
-                        <Td>{minuteText(item.ola_waktu_respon_menit)}</Td>
-                        <Td>{minuteText(item.ola_waktu_penyelesaian_menit)}</Td>
-
-                        <ActionTd
-                          onEdit={() => openEdit('target', item)}
-                          onDelete={() => handleDelete('target', item)}
-                        />
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            )}
           </div>
         )}
 
@@ -753,115 +1680,64 @@ const PerencanaanRelasiPenggunaPage = () => {
               <h3 className="font-semibold text-slate-800">
                 Formulir MRP1b - Komunikasi Pengguna
               </h3>
-
               <p className="mt-1 text-sm text-slate-500">
-                Perencanaan informasi, target audiens, media, kanal, dan jadwal komunikasi kepada pengguna.
+                Perencanaan informasi, audiens, media, kanal, dan jadwal komunikasi.
               </p>
             </div>
 
-            <SectionHeader
-              title="Rencana Komunikasi"
-              subtitle="Rencana penyampaian informasi layanan kepada pengguna."
-              button="Tambah Rencana"
-              onClick={() =>
-                openCreate('rencana', {
-                  status: 'Draft',
-                })
-              }
-            />
+            {renderTable(
+              'rencana',
+              'Rencana Komunikasi',
+              'Rencana penyampaian informasi layanan kepada pengguna.',
+              'Tambah Rencana',
+              { searchable: true, disabled: katalog.length === 0 }
+            )}
 
-            <SearchBox
-              value={searchRencana}
-              onChange={setSearchRencana}
-              placeholder="Cari rencana komunikasi..."
-            />
-
-            <div className="overflow-x-auto p-5">
-              <table className="min-w-[1500px] w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <Th>Layanan</Th>
-                    <Th>Informasi</Th>
-                    <Th>Manajemen Terkait</Th>
-                    <Th>Pembuat Informasi</Th>
-                    <Th>Target Audiens</Th>
-                    <Th>Periode</Th>
-                    <Th>Status</Th>
-                    <Th center>Aksi</Th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredRencana.length === 0 ? (
-                    <EmptyRow colSpan={8} text="Belum ada rencana komunikasi." />
-                  ) : (
-                    filteredRencana.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-100 align-top hover:bg-slate-50">
-                        <Td>{item.kode_layanan} - {item.nama_layanan}</Td>
-                        <Td>{item.informasi}</Td>
-                        <Td>{item.manajemen_terkait || '-'}</Td>
-                        <Td>{item.pembuat_informasi || '-'}</Td>
-                        <Td>{item.target_audiens}</Td>
-                        <Td>{item.periode_komunikasi}</Td>
-                        <Td>{item.status}</Td>
-
-                        <ActionTd
-                          onEdit={() => openEdit('rencana', item)}
-                          onDelete={() => handleDelete('rencana', item)}
-                        />
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <SectionHeader
-              title="Media Komunikasi"
-              subtitle="Bentuk media dan kanal yang digunakan pada setiap rencana komunikasi."
-              button="Tambah Media"
-              disabled={rencana.length === 0}
-              onClick={() => openCreate('media')}
-            />
-
-            <div className="overflow-x-auto p-5">
-              <table className="min-w-[1100px] w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <Th>Layanan</Th>
-                    <Th>Informasi</Th>
-                    <Th>Bentuk Media</Th>
-                    <Th>Kanal Komunikasi</Th>
-                    <Th>Keterangan</Th>
-                    <Th center>Aksi</Th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {media.length === 0 ? (
-                    <EmptyRow colSpan={6} text="Belum ada media komunikasi." />
-                  ) : (
-                    media.map((item) => (
-                      <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <Td>{item.kode_layanan} - {item.nama_layanan}</Td>
-                        <Td>{item.informasi}</Td>
-                        <Td>{item.bentuk_media}</Td>
-                        <Td>{item.kanal_komunikasi}</Td>
-                        <Td>{item.keterangan || '-'}</Td>
-
-                        <ActionTd
-                          onEdit={() => openEdit('media', item)}
-                          onDelete={() => handleDelete('media', item)}
-                        />
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {renderTable(
+              'media',
+              'Media Komunikasi',
+              'Bentuk media dan kanal pada setiap rencana komunikasi.',
+              'Tambah Media',
+              { disabled: rencana.length === 0 }
+            )}
           </div>
         )}
       </div>
+
+      {detailItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <div className="border-b border-slate-200 p-5">
+              <h3 className="text-lg font-semibold text-slate-800">
+                Detail {detailItem.title}
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+              {detailItem.fields.map((field, index) => (
+                <div key={`${field.label}-${index}`}>
+                  <p className="text-xs font-semibold text-slate-500">
+                    {field.label}
+                  </p>
+                  <p className="mt-1 break-words whitespace-pre-wrap text-sm text-slate-800">
+                    {field.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-200 p-5">
+              <button
+                type="button"
+                onClick={() => setDetailItem(null)}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -869,9 +1745,8 @@ const PerencanaanRelasiPenggunaPage = () => {
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  {editingId ? 'Edit' : 'Tambah'} {modalTitle(modalType)}
+                  {editingId !== null ? 'Edit' : 'Tambah'} {modalTitles[modalType]}
                 </h2>
-
                 <p className="mt-1 text-sm text-slate-500">
                   Manajemen Relasi Pengguna - Perencanaan Layanan
                 </p>
@@ -881,650 +1756,116 @@ const PerencanaanRelasiPenggunaPage = () => {
                 type="button"
                 onClick={closeModal}
                 className="text-xl text-slate-400 hover:text-slate-600"
+                aria-label="Tutup formulir"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6">
-              {modalType === 'katalog' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Layanan Digital"
-                    required
-                    disabled={editingId !== null}
-                    value={form.layanan_id || ''}
-                    onChange={(value) => setField('layanan_id', value)}
-                    options={layananOptions.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan}`,
-                    }))}
-                  />
-
-                  <FieldInput
-                    label="Kategori Layanan"
-                    value={form.kategori_layanan || ''}
-                    onChange={(value) => setField('kategori_layanan', value)}
-                    maxLength={100}
-                  />
-
-                  <FieldInput
-                    label="Tipe Layanan"
-                    value={form.tipe_layanan || ''}
-                    onChange={(value) => setField('tipe_layanan', value)}
-                    maxLength={100}
-                  />
-
-                  <FieldInput
-                    label="Target / Cakupan Pengguna"
-                    value={form.target_cakupan_pengguna || ''}
-                    onChange={(value) => setField('target_cakupan_pengguna', value)}
-                  />
-
-                  <FieldSelect
-                    label="Service Owner"
-                    value={form.service_owner_id || ''}
-                    onChange={(value) => setField('service_owner_id', value)}
-                    options={userOptions.map((item) => ({
-                      value: String(item.id),
-                      label: item.nama,
-                    }))}
-                  />
-
-                  <FieldInput
-                    label="Kanal Layanan"
-                    value={form.kanal_layanan || ''}
-                    onChange={(value) => setField('kanal_layanan', value)}
-                    maxLength={150}
-                  />
-
-                  <FieldInput
-                    label="Tautan Layanan"
-                    value={form.tautan_layanan || ''}
-                    onChange={(value) => setField('tautan_layanan', value)}
-                    maxLength={255}
-                  />
-
-                  <FieldSelect
-                    label="Status"
-                    required
-                    value={form.status || 'Draft'}
-                    onChange={(value) => setField('status', value)}
-                    options={[
-                      { value: 'Draft', label: 'Draft' },
-                      { value: 'Aktif', label: 'Aktif' },
-                      { value: 'Tidak Aktif', label: 'Tidak Aktif' },
-                    ]}
-                  />
-
-                  <FieldTextarea
-                    label="Ruang Lingkup Layanan"
-                    value={form.ruang_lingkup_layanan || ''}
-                    onChange={(value) => setField('ruang_lingkup_layanan', value)}
-                    full
-                  />
-
-                  <FieldTextarea
-                    label="Stakeholder Terkait"
-                    value={form.stakeholder_terkait || ''}
-                    onChange={(value) => setField('stakeholder_terkait', value)}
-                    full
-                  />
+            <form onSubmit={handleSubmit} noValidate className="p-6"> 
+              {formErrors.length > 0 && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formErrors[0]}
                 </div>
               )}
 
-              {modalType === 'standar' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Katalog Layanan"
-                    required
-                    disabled={editingId !== null}
-                    value={form.katalog_layanan_id || ''}
-                    onChange={(value) => setField('katalog_layanan_id', value)}
-                    options={katalog.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan}`,
-                    }))}
-                  />
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {fields.map((field) => {
+                  const disabled =
+                    field.disabledOnEdit === true && editingId !== null;
 
-                  <FieldInput
-                    label="Versi"
-                    type="number"
-                    min="1"
-                    required
-                    disabled={editingId !== null}
-                    value={form.versi || '1'}
-                    onChange={(value) => setField('versi', value)}
-                  />
+                  const value =
+                    field.key === 'prioritas' &&
+                    modalType === 'indikator' &&
+                    form.objek === 'Layanan'
+                      ? 'Tidak Berlaku'
+                      : field.key === 'jenis_standar' &&
+                        modalType === 'indikator' &&
+                        form.objek === 'Insiden'
+                        ? 'OLA'
+                        : form[field.key] || '';
 
-                  <FieldInput
-                    label="Berlaku Mulai"
-                    type="date"
-                    required
-                    value={form.berlaku_mulai || ''}
-                    onChange={(value) => setField('berlaku_mulai', value)}
-                  />
+                  return (
+                    <div
+                      key={field.key}
+                      className={field.full ? 'md:col-span-2' : ''}
+                    >
+                      <label
+                        htmlFor={`mrp-${field.key}`}
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        {field.label}
+                        {field.required && (
+                          <span className="ml-1">*</span>
+                        )}
+                      </label>
 
-                  <FieldInput
-                    label="Berlaku Sampai"
-                    type="date"
-                    value={form.berlaku_sampai || ''}
-                    onChange={(value) => setField('berlaku_sampai', value)}
-                  />
+                      {field.type === 'select' ? (
+                        <select
+                          id={`mrp-${field.key}`}
+                          value={value}
+                          disabled={
+                            disabled ||
+                            (modalType === 'indikator' &&
+                              field.key === 'prioritas' &&
+                              form.objek === 'Layanan')
+                          }
+                          onChange={(event) =>
+                            setField(field.key, event.target.value)
+                          }
+                          className={inputClass}
+                        >
+                          <option value="">
+                            Pilih {field.label.toLowerCase()}
+                          </option>
 
-                  <FieldSelect
-                    label="Status"
-                    required
-                    value={form.status || 'Draft'}
-                    onChange={(value) => setField('status', value)}
-                    options={[
-                      { value: 'Draft', label: 'Draft' },
-                      { value: 'Aktif', label: 'Aktif' },
-                      { value: 'Berakhir', label: 'Berakhir' },
-                    ]}
-                  />
-
-                  <FieldTextarea
-                    label="Catatan"
-                    value={form.catatan || ''}
-                    onChange={(value) => setField('catatan', value)}
-                    full
-                  />
-                </div>
-              )}
-
-              {modalType === 'sla' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Standar Layanan"
-                    required
-                    disabled={editingId !== null}
-                    value={form.standar_layanan_id || ''}
-                    onChange={(value) => setField('standar_layanan_id', value)}
-                    options={standar.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan} - Versi ${item.versi}`,
-                    }))}
-                  />
-
-                  <FieldInput
-                    label="Jam Layanan"
-                    value={form.jam_layanan || ''}
-                    onChange={(value) => setField('jam_layanan', value)}
-                    placeholder="Contoh: Senin-Jumat 08.00-16.00"
-                  />
-
-                  <FieldInput
-                    label="Jam Service Desk"
-                    value={form.jam_service_desk || ''}
-                    onChange={(value) => setField('jam_service_desk', value)}
-                    placeholder="Contoh: 24x7"
-                  />
-
-                  <FieldInput
-                    label="Target Waktu Respon (menit)"
-                    type="number"
-                    min="0"
-                    value={form.target_waktu_respon_menit || ''}
-                    onChange={(value) => setField('target_waktu_respon_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Target Waktu Penyelesaian (menit)"
-                    type="number"
-                    min="0"
-                    value={form.target_waktu_penyelesaian_menit || ''}
-                    onChange={(value) => setField('target_waktu_penyelesaian_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Target Ketersediaan (%)"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={form.target_ketersediaan_persen || ''}
-                    onChange={(value) => setField('target_ketersediaan_persen', value)}
-                  />
-                </div>
-              )}
-
-              {modalType === 'ola' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Standar Layanan"
-                    required
-                    disabled={editingId !== null}
-                    value={form.standar_layanan_id || ''}
-                    onChange={(value) => setField('standar_layanan_id', value)}
-                    options={standar.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan} - Versi ${item.versi}`,
-                    }))}
-                  />
-
-                  <div />
-
-                  <FieldInput
-                    label="Target Kecepatan"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.target_kecepatan || ''}
-                    onChange={(value) => setField('target_kecepatan', value)}
-                  />
-
-                  <FieldInput
-                    label="Satuan Kecepatan"
-                    value={form.satuan_kecepatan || ''}
-                    onChange={(value) => setField('satuan_kecepatan', value)}
-                    placeholder="Contoh: Mbps"
-                  />
-
-                  <FieldInput
-                    label="Target Kapasitas"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.target_kapasitas || ''}
-                    onChange={(value) => setField('target_kapasitas', value)}
-                  />
-
-                  <FieldInput
-                    label="Satuan Kapasitas"
-                    value={form.satuan_kapasitas || ''}
-                    onChange={(value) => setField('satuan_kapasitas', value)}
-                    placeholder="Contoh: pengguna bersamaan"
-                  />
-
-                  <FieldInput
-                    label="Target Ketersediaan (%)"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={form.target_ketersediaan_persen || ''}
-                    onChange={(value) => setField('target_ketersediaan_persen', value)}
-                  />
-
-                  <FieldInput
-                    label="Target RTO (menit)"
-                    type="number"
-                    min="0"
-                    value={form.target_rto_menit || ''}
-                    onChange={(value) => setField('target_rto_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Target RPO (menit)"
-                    type="number"
-                    min="0"
-                    value={form.target_rpo_menit || ''}
-                    onChange={(value) => setField('target_rpo_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Target Waktu Respon (menit)"
-                    type="number"
-                    min="0"
-                    value={form.target_waktu_respon_menit || ''}
-                    onChange={(value) => setField('target_waktu_respon_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Target Waktu Penyelesaian (menit)"
-                    type="number"
-                    min="0"
-                    value={form.target_waktu_penyelesaian_menit || ''}
-                    onChange={(value) => setField('target_waktu_penyelesaian_menit', value)}
-                  />
-                </div>
-              )}
-
-              {modalType === 'indikator' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Standar Layanan"
-                    required
-                    disabled={editingId !== null}
-                    value={form.standar_layanan_id || ''}
-                    onChange={(value) => setField('standar_layanan_id', value)}
-                    options={standar.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan} - Versi ${item.versi}`,
-                    }))}
-                  />
-
-                  <FieldSelect
-                    label="Objek"
-                    required
-                    value={form.objek || 'Layanan'}
-                    onChange={(value) => {
-                      setForm((current) => ({
-                        ...current,
-                        objek: value,
-                        prioritas: value === 'Layanan' ? 'Tidak Berlaku' : 'Rendah',
-                        jenis_standar:
-                          value === 'Insiden' && current.jenis_standar === 'SLA'
-                            ? 'OLA'
-                            : current.jenis_standar || 'SLA',
-                      }));
-                    }}
-                    options={[
-                      { value: 'Layanan', label: 'Layanan' },
-                      { value: 'Kueri', label: 'Kueri' },
-                      { value: 'Insiden', label: 'Insiden' },
-                    ]}
-                  />
-
-                  <FieldSelect
-                    label="Jenis Standar"
-                    required
-                    value={form.jenis_standar || 'SLA'}
-                    onChange={(value) => setField('jenis_standar', value)}
-                    options={
-                      form.objek === 'Insiden'
-                        ? [{ value: 'OLA', label: 'OLA' }]
-                        : [
-                            { value: 'SLA', label: 'SLA' },
-                            { value: 'OLA', label: 'OLA' },
-                          ]
-                    }
-                  />
-
-                  <FieldSelect
-                    label="Prioritas"
-                    required
-                    disabled={form.objek === 'Layanan'}
-                    value={
-                      form.objek === 'Layanan'
-                        ? 'Tidak Berlaku'
-                        : form.prioritas || 'Rendah'
-                    }
-                    onChange={(value) => setField('prioritas', value)}
-                    options={
-                      form.objek === 'Layanan'
-                        ? [{ value: 'Tidak Berlaku', label: 'Tidak Berlaku' }]
-                        : [
-                            { value: 'Rendah', label: 'Rendah' },
-                            { value: 'Sedang', label: 'Sedang' },
-                            { value: 'Tinggi', label: 'Tinggi' },
-                          ]
-                    }
-                  />
-
-                  <FieldInput
-                    label="Nama Indikator"
-                    required
-                    value={form.nama_indikator || ''}
-                    onChange={(value) => setField('nama_indikator', value)}
-                    maxLength={150}
-                  />
-
-                  <FieldInput
-                    label="Target Nilai"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={form.target_nilai || ''}
-                    onChange={(value) => setField('target_nilai', value)}
-                  />
-
-                  <FieldInput
-                    label="Satuan"
-                    required
-                    value={form.satuan || ''}
-                    onChange={(value) => setField('satuan', value)}
-                    maxLength={50}
-                  />
-
-                  <FieldSelect
-                    label="Arah Target"
-                    required
-                    value={form.arah_target || 'Minimal'}
-                    onChange={(value) => setField('arah_target', value)}
-                    options={[
-                      { value: 'Minimal', label: 'Minimal' },
-                      { value: 'Maksimal', label: 'Maksimal' },
-                      { value: 'Tepat', label: 'Tepat' },
-                    ]}
-                  />
-                </div>
-              )}
-
-              {modalType === 'target' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Standar Layanan"
-                    required
-                    disabled={editingId !== null}
-                    value={form.standar_layanan_id || ''}
-                    onChange={(value) => setField('standar_layanan_id', value)}
-                    options={standar.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan} - Versi ${item.versi}`,
-                    }))}
-                  />
-
-                  <FieldSelect
-                    label="Jenis"
-                    required
-                    value={form.jenis || 'Kueri'}
-                    onChange={(value) => setField('jenis', value)}
-                    options={[
-                      { value: 'Kueri', label: 'Kueri' },
-                      { value: 'Insiden', label: 'Insiden' },
-                    ]}
-                  />
-
-                  <FieldSelect
-                    label="Prioritas"
-                    required
-                    value={form.prioritas || 'Rendah'}
-                    onChange={(value) => setField('prioritas', value)}
-                    options={[
-                      { value: 'Rendah', label: 'Rendah' },
-                      { value: 'Sedang', label: 'Sedang' },
-                      { value: 'Tinggi', label: 'Tinggi' },
-                    ]}
-                  />
-
-                  <FieldInput
-                    label="Jam Layanan SLA"
-                    value={form.sla_jam_layanan || ''}
-                    onChange={(value) => setField('sla_jam_layanan', value)}
-                  />
-
-                  <FieldInput
-                    label="Jam Service Desk SLA"
-                    value={form.sla_jam_service_desk || ''}
-                    onChange={(value) => setField('sla_jam_service_desk', value)}
-                  />
-
-                  <FieldInput
-                    label="Waktu Respon SLA (menit)"
-                    type="number"
-                    min="0"
-                    value={form.sla_waktu_respon_menit || ''}
-                    onChange={(value) => setField('sla_waktu_respon_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Waktu Penyelesaian SLA (menit)"
-                    type="number"
-                    min="0"
-                    value={form.sla_waktu_penyelesaian_menit || ''}
-                    onChange={(value) => setField('sla_waktu_penyelesaian_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Waktu Respon OLA (menit)"
-                    type="number"
-                    min="0"
-                    value={form.ola_waktu_respon_menit || ''}
-                    onChange={(value) => setField('ola_waktu_respon_menit', value)}
-                  />
-
-                  <FieldInput
-                    label="Waktu Penyelesaian OLA (menit)"
-                    type="number"
-                    min="0"
-                    value={form.ola_waktu_penyelesaian_menit || ''}
-                    onChange={(value) => setField('ola_waktu_penyelesaian_menit', value)}
-                  />
-                </div>
-              )}
-
-              {modalType === 'layanan-terkait' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Katalog Layanan"
-                    required
-                    disabled={editingId !== null}
-                    value={form.katalog_layanan_id || ''}
-                    onChange={(value) => setField('katalog_layanan_id', value)}
-                    options={katalog.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan}`,
-                    }))}
-                  />
-
-                  <FieldSelect
-                    label="Layanan Terkait"
-                    required
-                    value={form.layanan_terkait_id || ''}
-                    onChange={(value) => setField('layanan_terkait_id', value)}
-                    options={layananOptions.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan}`,
-                    }))}
-                  />
-
-                  <FieldTextarea
-                    label="Keterangan"
-                    value={form.keterangan || ''}
-                    onChange={(value) => setField('keterangan', value)}
-                    full
-                  />
-                </div>
-              )}
-
-              {modalType === 'rencana' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Layanan Digital"
-                    required
-                    value={form.layanan_id || ''}
-                    onChange={(value) => setField('layanan_id', value)}
-                    options={layananOptions.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.nama_layanan}`,
-                    }))}
-                  />
-
-                  <FieldSelect
-                    label="Pembuat Informasi"
-                    value={form.pembuat_informasi_id || ''}
-                    onChange={(value) => setField('pembuat_informasi_id', value)}
-                    options={userOptions.map((item) => ({
-                      value: String(item.id),
-                      label: item.nama,
-                    }))}
-                  />
-
-                  <FieldTextarea
-                    label="Informasi"
-                    required
-                    value={form.informasi || ''}
-                    onChange={(value) => setField('informasi', value)}
-                    full
-                  />
-
-                  <FieldInput
-                    label="Manajemen Terkait"
-                    value={form.manajemen_terkait || ''}
-                    onChange={(value) => setField('manajemen_terkait', value)}
-                    maxLength={100}
-                  />
-
-                  <FieldInput
-                    label="Target Audiens"
-                    required
-                    value={form.target_audiens || ''}
-                    onChange={(value) => setField('target_audiens', value)}
-                  />
-
-                  <FieldInput
-                    label="Periode Komunikasi"
-                    required
-                    value={form.periode_komunikasi || ''}
-                    onChange={(value) => setField('periode_komunikasi', value)}
-                    placeholder="Contoh: Setiap bulan"
-                    maxLength={100}
-                  />
-
-                  <FieldSelect
-                    label="Status"
-                    required
-                    value={form.status || 'Draft'}
-                    onChange={(value) => setField('status', value)}
-                    options={[
-                      { value: 'Draft', label: 'Draft' },
-                      { value: 'Aktif', label: 'Aktif' },
-                      { value: 'Selesai', label: 'Selesai' },
-                      { value: 'Dibatalkan', label: 'Dibatalkan' },
-                    ]}
-                  />
-                </div>
-              )}
-
-              {modalType === 'media' && (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <FieldSelect
-                    label="Rencana Komunikasi"
-                    required
-                    disabled={editingId !== null}
-                    value={form.rencana_komunikasi_id || ''}
-                    onChange={(value) => setField('rencana_komunikasi_id', value)}
-                    options={rencana.map((item) => ({
-                      value: String(item.id),
-                      label: `${item.kode_layanan} - ${item.informasi}`,
-                    }))}
-                  />
-
-                  <FieldInput
-                    label="Bentuk Media"
-                    required
-                    value={form.bentuk_media || ''}
-                    onChange={(value) => setField('bentuk_media', value)}
-                    placeholder="Contoh: Infografis"
-                    maxLength={100}
-                  />
-
-                  <FieldInput
-                    label="Kanal Komunikasi"
-                    required
-                    value={form.kanal_komunikasi || ''}
-                    onChange={(value) => setField('kanal_komunikasi', value)}
-                    placeholder="Contoh: Website Resmi"
-                    maxLength={100}
-                  />
-
-                  <FieldTextarea
-                    label="Keterangan"
-                    value={form.keterangan || ''}
-                    onChange={(value) => setField('keterangan', value)}
-                    full
-                  />
-                </div>
-              )}
+                          {(field.options || []).map((option) => (
+                            <option
+                              key={option.value}
+                              value={option.value}
+                            >
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : field.type === 'textarea' ? (
+                        <textarea
+                          id={`mrp-${field.key}`}
+                          rows={3}
+                          value={value}
+                          onChange={(event) =>
+                            setField(field.key, event.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      ) : (
+                        <input
+                          id={`mrp-${field.key}`}
+                          type={field.type || 'text'}
+                          value={value}
+                          disabled={disabled}
+                          placeholder={field.placeholder}
+                          maxLength={field.maxLength}
+                          min={field.min}
+                          max={field.max}
+                          step={field.step}
+                          onChange={(event) =>
+                            setField(field.key, event.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
 
               <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-5">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  disabled={saving}
+                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Batal
                 </button>
@@ -1534,7 +1875,11 @@ const PerencanaanRelasiPenggunaPage = () => {
                   disabled={saving}
                   className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {saving ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Simpan'}
+                  {saving
+                    ? 'Menyimpan...'
+                    : editingId !== null
+                      ? 'Simpan Perubahan'
+                      : 'Simpan'}
                 </button>
               </div>
             </form>
@@ -1544,541 +1889,5 @@ const PerencanaanRelasiPenggunaPage = () => {
     </div>
   );
 };
-
-const getSubmitConfig = (
-  type: ModalType,
-  editingId: number | null,
-  form: Record<string, string>
-) => {
-  const numberOrNull = (value?: string) =>
-    value === undefined || value === '' ? null : Number(value);
-
-  const textOrNull = (value?: string) =>
-    value === undefined || value.trim() === '' ? null : value.trim();
-
-  if (type === 'katalog') {
-    return {
-      endpoint: editingId
-        ? `/katalog-layanan/${editingId}`
-        : '/katalog-layanan',
-      payload: editingId
-        ? {
-            kategori_layanan: textOrNull(form.kategori_layanan),
-            tipe_layanan: textOrNull(form.tipe_layanan),
-            target_cakupan_pengguna: textOrNull(form.target_cakupan_pengguna),
-            service_owner_id: numberOrNull(form.service_owner_id),
-            kanal_layanan: textOrNull(form.kanal_layanan),
-            tautan_layanan: textOrNull(form.tautan_layanan),
-            ruang_lingkup_layanan: textOrNull(form.ruang_lingkup_layanan),
-            stakeholder_terkait: textOrNull(form.stakeholder_terkait),
-            status: form.status,
-          }
-        : {
-            layanan_id: Number(form.layanan_id),
-            kategori_layanan: textOrNull(form.kategori_layanan),
-            tipe_layanan: textOrNull(form.tipe_layanan),
-            target_cakupan_pengguna: textOrNull(form.target_cakupan_pengguna),
-            service_owner_id: numberOrNull(form.service_owner_id),
-            kanal_layanan: textOrNull(form.kanal_layanan),
-            tautan_layanan: textOrNull(form.tautan_layanan),
-            ruang_lingkup_layanan: textOrNull(form.ruang_lingkup_layanan),
-            stakeholder_terkait: textOrNull(form.stakeholder_terkait),
-            status: form.status || 'Draft',
-          },
-    };
-  }
-
-  if (type === 'standar') {
-    return {
-      endpoint: editingId
-        ? `/standar-layanan/${editingId}`
-        : '/standar-layanan',
-      payload: editingId
-        ? {
-            berlaku_mulai: form.berlaku_mulai,
-            berlaku_sampai: form.berlaku_sampai || null,
-            status: form.status,
-            catatan: textOrNull(form.catatan),
-          }
-        : {
-            katalog_layanan_id: Number(form.katalog_layanan_id),
-            versi: Number(form.versi),
-            berlaku_mulai: form.berlaku_mulai,
-            berlaku_sampai: form.berlaku_sampai || null,
-            status: form.status || 'Draft',
-            catatan: textOrNull(form.catatan),
-          },
-    };
-  }
-
-  if (type === 'sla') {
-    const payload = {
-      jam_layanan: textOrNull(form.jam_layanan),
-      jam_service_desk: textOrNull(form.jam_service_desk),
-      target_waktu_respon_menit: numberOrNull(form.target_waktu_respon_menit),
-      target_waktu_penyelesaian_menit: numberOrNull(
-        form.target_waktu_penyelesaian_menit
-      ),
-      target_ketersediaan_persen: numberOrNull(
-        form.target_ketersediaan_persen
-      ),
-    };
-
-    return {
-      endpoint: editingId ? `/sla-layanan/${editingId}` : '/sla-layanan',
-      payload: editingId
-        ? payload
-        : {
-            standar_layanan_id: Number(form.standar_layanan_id),
-            ...payload,
-          },
-    };
-  }
-
-  if (type === 'ola') {
-    const payload = {
-      target_kecepatan: numberOrNull(form.target_kecepatan),
-      satuan_kecepatan: textOrNull(form.satuan_kecepatan),
-      target_kapasitas: numberOrNull(form.target_kapasitas),
-      satuan_kapasitas: textOrNull(form.satuan_kapasitas),
-      target_ketersediaan_persen: numberOrNull(
-        form.target_ketersediaan_persen
-      ),
-      target_rto_menit: numberOrNull(form.target_rto_menit),
-      target_rpo_menit: numberOrNull(form.target_rpo_menit),
-      target_waktu_respon_menit: numberOrNull(
-        form.target_waktu_respon_menit
-      ),
-      target_waktu_penyelesaian_menit: numberOrNull(
-        form.target_waktu_penyelesaian_menit
-      ),
-    };
-
-    return {
-      endpoint: editingId ? `/ola-layanan/${editingId}` : '/ola-layanan',
-      payload: editingId
-        ? payload
-        : {
-            standar_layanan_id: Number(form.standar_layanan_id),
-            ...payload,
-          },
-    };
-  }
-
-  if (type === 'indikator') {
-    const objek = form.objek;
-    const prioritas =
-      objek === 'Layanan'
-        ? 'Tidak Berlaku'
-        : form.prioritas;
-
-    const payload = {
-      objek,
-      jenis_standar: form.jenis_standar,
-      prioritas,
-      nama_indikator: form.nama_indikator.trim(),
-      target_nilai: Number(form.target_nilai),
-      satuan: form.satuan.trim(),
-      arah_target: form.arah_target,
-    };
-
-    return {
-      endpoint: editingId
-        ? `/indikator-tambahan-standar/${editingId}`
-        : '/indikator-tambahan-standar',
-      payload: editingId
-        ? payload
-        : {
-            standar_layanan_id: Number(form.standar_layanan_id),
-            ...payload,
-          },
-    };
-  }
-
-  if (type === 'target') {
-    const payload = {
-      jenis: form.jenis,
-      prioritas: form.prioritas,
-      sla_jam_layanan: textOrNull(form.sla_jam_layanan),
-      sla_jam_service_desk: textOrNull(form.sla_jam_service_desk),
-      sla_waktu_respon_menit: numberOrNull(form.sla_waktu_respon_menit),
-      sla_waktu_penyelesaian_menit: numberOrNull(
-        form.sla_waktu_penyelesaian_menit
-      ),
-      ola_waktu_respon_menit: numberOrNull(form.ola_waktu_respon_menit),
-      ola_waktu_penyelesaian_menit: numberOrNull(
-        form.ola_waktu_penyelesaian_menit
-      ),
-    };
-
-    return {
-      endpoint: editingId
-        ? `/target-kueri-insiden/${editingId}`
-        : '/target-kueri-insiden',
-      payload: editingId
-        ? payload
-        : {
-            standar_layanan_id: Number(form.standar_layanan_id),
-            ...payload,
-          },
-    };
-  }
-
-  if (type === 'layanan-terkait') {
-    const payload = {
-      layanan_terkait_id: Number(form.layanan_terkait_id),
-      keterangan: textOrNull(form.keterangan),
-    };
-
-    return {
-      endpoint: editingId
-        ? `/katalog-layanan-terkait/${editingId}`
-        : '/katalog-layanan-terkait',
-      payload: editingId
-        ? payload
-        : {
-            katalog_layanan_id: Number(form.katalog_layanan_id),
-            ...payload,
-          },
-    };
-  }
-
-  if (type === 'rencana') {
-    return {
-      endpoint: editingId
-        ? `/rencana-komunikasi/${editingId}`
-        : '/rencana-komunikasi',
-      payload: {
-        layanan_id: Number(form.layanan_id),
-        informasi: form.informasi.trim(),
-        manajemen_terkait: textOrNull(form.manajemen_terkait),
-        pembuat_informasi_id: numberOrNull(form.pembuat_informasi_id),
-        target_audiens: form.target_audiens.trim(),
-        periode_komunikasi: form.periode_komunikasi.trim(),
-        status: form.status || 'Draft',
-      },
-    };
-  }
-
-  return {
-    endpoint: editingId
-      ? `/media-komunikasi/${editingId}`
-      : '/media-komunikasi',
-    payload: editingId
-      ? {
-          bentuk_media: form.bentuk_media.trim(),
-          kanal_komunikasi: form.kanal_komunikasi.trim(),
-          keterangan: textOrNull(form.keterangan),
-        }
-      : {
-          rencana_komunikasi_id: Number(form.rencana_komunikasi_id),
-          bentuk_media: form.bentuk_media.trim(),
-          kanal_komunikasi: form.kanal_komunikasi.trim(),
-          keterangan: textOrNull(form.keterangan),
-        },
-  };
-};
-
-const getDeleteEndpoint = (type: ModalType, id: number) => {
-  const endpoints: Record<ModalType, string> = {
-    katalog: `/katalog-layanan/${id}`,
-    standar: `/standar-layanan/${id}`,
-    sla: `/sla-layanan/${id}`,
-    ola: `/ola-layanan/${id}`,
-    indikator: `/indikator-tambahan-standar/${id}`,
-    target: `/target-kueri-insiden/${id}`,
-    'layanan-terkait': `/katalog-layanan-terkait/${id}`,
-    rencana: `/rencana-komunikasi/${id}`,
-    media: `/media-komunikasi/${id}`,
-  };
-
-  return endpoints[type];
-};
-
-const modalTitle = (type: ModalType) => {
-  const titles: Record<ModalType, string> = {
-    katalog: 'Katalog Layanan',
-    standar: 'Standar Layanan',
-    sla: 'SLA Layanan',
-    ola: 'OLA Layanan',
-    indikator: 'Indikator Tambahan',
-    target: 'Target Kueri / Insiden',
-    'layanan-terkait': 'Layanan Terkait',
-    rencana: 'Rencana Komunikasi',
-    media: 'Media Komunikasi',
-  };
-
-  return titles[type];
-};
-
-const valueString = (value: any) =>
-  value === null || value === undefined ? '' : String(value);
-
-const dateValue = (value: any) =>
-  value ? String(value).slice(0, 10) : '';
-
-const displayDate = (value: any) =>
-  value ? String(value).slice(0, 10) : '-';
-
-const minuteText = (value: any) =>
-  value === null || value === undefined ? '-' : `${value} menit`;
-
-const percentText = (value: any) =>
-  value === null || value === undefined ? '-' : `${value}%`;
-
-type SectionHeaderProps = {
-  title: string;
-  subtitle: string;
-  button: string;
-  onClick: () => void;
-  disabled?: boolean;
-};
-
-const SectionHeader = ({
-  title,
-  subtitle,
-  button,
-  onClick,
-  disabled = false,
-}: SectionHeaderProps) => (
-  <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-    <div>
-      <h3 className="font-semibold text-slate-800">
-        {title}
-      </h3>
-
-      <p className="mt-1 text-sm text-slate-500">
-        {subtitle}
-      </p>
-    </div>
-
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {button}
-    </button>
-  </div>
-);
-
-type SearchBoxProps = {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-};
-
-const SearchBox = ({
-  value,
-  onChange,
-  placeholder,
-}: SearchBoxProps) => (
-  <div className="border-b border-slate-200 p-5">
-    <input
-      type="text"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-    />
-  </div>
-);
-
-const Th = ({
-  children,
-  center = false,
-}: {
-  children: React.ReactNode;
-  center?: boolean;
-}) => (
-  <th
-    className={`border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase text-slate-600 ${
-      center ? 'text-center' : 'text-left'
-    }`}
-  >
-    {children}
-  </th>
-);
-
-const Td = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => (
-  <td className="px-4 py-3 text-sm text-slate-700">
-    {children}
-  </td>
-);
-
-const EmptyRow = ({
-  colSpan,
-  text,
-}: {
-  colSpan: number;
-  text: string;
-}) => (
-  <tr>
-    <td
-      colSpan={colSpan}
-      className="px-4 py-10 text-center text-sm text-slate-500"
-    >
-      {text}
-    </td>
-  </tr>
-);
-
-const ActionTd = ({
-  onEdit,
-  onDelete,
-}: {
-  onEdit: () => void;
-  onDelete: () => void;
-}) => (
-  <td className="px-4 py-3">
-    <div className="flex justify-center gap-2">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-      >
-        Edit
-      </button>
-
-      <button
-        type="button"
-        onClick={onDelete}
-        className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-      >
-        Hapus
-      </button>
-    </div>
-  </td>
-);
-
-type Option = {
-  value: string;
-  label: string;
-};
-
-type FieldSelectProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-  required?: boolean;
-  disabled?: boolean;
-};
-
-const FieldSelect = ({
-  label,
-  value,
-  onChange,
-  options,
-  required = false,
-  disabled = false,
-}: FieldSelectProps) => (
-  <div>
-    <label className="text-sm font-medium text-slate-700">
-      {label}
-    </label>
-
-    <select
-      required={required}
-      disabled={disabled}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 disabled:bg-slate-100 disabled:text-slate-500"
-    >
-      <option value="">
-        Pilih {label.toLowerCase()}
-      </option>
-
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  </div>
-);
-
-type FieldInputProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  required?: boolean;
-  disabled?: boolean;
-  placeholder?: string;
-  maxLength?: number;
-  min?: string;
-  max?: string;
-  step?: string;
-};
-
-const FieldInput = ({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required = false,
-  disabled = false,
-  placeholder,
-  maxLength,
-  min,
-  max,
-  step,
-}: FieldInputProps) => (
-  <div>
-    <label className="text-sm font-medium text-slate-700">
-      {label}
-    </label>
-
-    <input
-      type={type}
-      required={required}
-      disabled={disabled}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      min={min}
-      max={max}
-      step={step}
-      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 disabled:bg-slate-100 disabled:text-slate-500"
-    />
-  </div>
-);
-
-type FieldTextareaProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  full?: boolean;
-};
-
-const FieldTextarea = ({
-  label,
-  value,
-  onChange,
-  required = false,
-  full = false,
-}: FieldTextareaProps) => (
-  <div className={full ? 'md:col-span-2' : ''}>
-    <label className="text-sm font-medium text-slate-700">
-      {label}
-    </label>
-
-    <textarea
-      rows={4}
-      required={required}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-    />
-  </div>
-);
 
 export default PerencanaanRelasiPenggunaPage;

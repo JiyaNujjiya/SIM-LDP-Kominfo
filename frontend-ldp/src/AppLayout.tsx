@@ -13,6 +13,7 @@ import {
   ChevronRight,
   LogOut,
   UserCog,
+  FileDown,
 } from "lucide-react";
 
 const C = {
@@ -103,6 +104,12 @@ const menuItems: MenuItem[] = [
     label: "Manajemen Relasi Pengguna",
     Icon: UserRound,
     permission: "user_relation.view",
+  },
+  {
+    id: "laporan-ekspor",
+    label: "Laporan & Ekspor",
+    Icon: FileDown,
+    permission: "dashboard.view",
   },
 ];
 
@@ -211,10 +218,6 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
 
     if (path === "/admin/accounts") {
       return { parent: "Administrasi", current: "Kelola Akun" };
-    }
-
-    if (path === "/risiko/overview") {
-      return { parent: "Manajemen Risiko", current: "Overview" };
     }
 
     if (path === "/risiko/konteks") {
@@ -379,6 +382,10 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
       };
     }
 
+    if (path === "/laporan-ekspor") {
+      return { parent: "", current: "Laporan & Ekspor" };
+    }
+
     return { parent: "", current: "Dashboard" };
   };
 
@@ -498,7 +505,7 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
     }
 
     if (id === "risiko") {
-      navigate("/risiko/overview");
+      navigate("/risiko/konteks");
       return;
     }
 
@@ -520,6 +527,11 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
     if (id === "relasi-pengguna") {
       navigate("/relasi-pengguna/perencanaan");
     }
+
+    if (id === "laporan-ekspor") {
+      navigate("/laporan-ekspor");
+      return;
+    }
   };
 
   const collapsedActive = (id: string) => {
@@ -530,7 +542,7 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
     if (id === "pengetahuan") return pengetahuanActive;
     if (id === "bcp") return keberlangsunganActive;
     if (id === "relasi-pengguna") return relasiPenggunaActive;
-
+    if (id === "laporan-ekspor") {return isActive("/laporan-ekspor");}
     return false;
   };
 
@@ -572,10 +584,13 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
         fontFamily: "Inter, system-ui, sans-serif",
       }}
     >
+
       <aside
         style={{
           width: sidebarW,
-          minHeight: "100vh",
+          height: "100vh",
+          position: "sticky",
+          top: 0,
           background: C.sidebar,
           display: "flex",
           flexDirection: "column",
@@ -584,6 +599,7 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
           transition: "width .25s ease",
           flexShrink: 0,
           overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
         <div
@@ -596,20 +612,26 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
         >
           <div
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 6,
-              background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              background: "#FFFFFF",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#FFFFFF",
-              fontWeight: 800,
-              fontSize: 14,
+              overflow: "hidden",
               flexShrink: 0,
             }}
           >
-            S
+            <img
+              src="/logo_new.png"
+              alt="Logo SIM-LDP"
+              style={{
+                width: 34,
+                height: 34,
+                objectFit: "contain",
+              }}
+            />
           </div>
 
           {!collapsed && (
@@ -643,14 +665,17 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
           )}
         </div>
 
-        <nav
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-            flex: 1,
-          }}
-        >
+          <nav
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              overflowX: "hidden",
+            }}
+          >
           {menuItems
             .filter((item) => {
               if (item.adminOnly) return isAdmin;
@@ -695,7 +720,7 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
                       onClick={() => {
                         closeAllMenus();
                         setRiskOpen(true);
-                        navigate("/risiko/overview");
+                        navigate("/risiko/konteks");
                       }}
                       style={moduleButtonStyle(risikoActive)}
                     >
@@ -1410,7 +1435,7 @@ export default function AppLayout({ onLogout }: AppLayoutProps) {
                 color: C.subtitle,
               }}
             >
-              Kementerian Komunikasi dan Informatika
+              {user?.nama_instansi || "Instansi belum ditentukan"}
             </span>
           </div>
 

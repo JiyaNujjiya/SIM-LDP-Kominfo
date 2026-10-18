@@ -76,6 +76,15 @@ router.get(
   bcpController.getUserOptions
 );
 
+
+router.get(
+  '/user-options-form13',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getUserOptionsForm13
+);
+
+
 router.get(
   '/pegawai-options',
   authMiddleware,
@@ -536,6 +545,14 @@ router.delete(
 // =====================================================
 
 // GET semua BIA
+
+router.get(
+  '/bia-layanan-options',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getBiaLayananOptions
+);
+
 router.get(
   '/bia',
   authMiddleware,
@@ -551,6 +568,7 @@ router.get(
   bcpController.getBiaByLayananPrioritas
 );
 
+
 // GET detail BIA
 router.get(
   '/bia/:id',
@@ -558,6 +576,7 @@ router.get(
   requirePermission('continuity.view'),
   bcpController.getBiaById
 );
+
 
 // CREATE BIA
 router.post(
@@ -568,12 +587,15 @@ router.post(
 );
 
 // UPDATE BIA
+
 router.put(
   '/bia/:id',
   authMiddleware,
   requirePermission('continuity.update'),
+  bcpController.validateForm10Required('target'),
   bcpController.updateBia
 );
+
 
 // DELETE BIA
 router.delete(
@@ -606,6 +628,39 @@ router.get(
 // DAFTAR INSIDEN / GANGGUAN POTENSIAL
 // =====================================================
 
+
+
+
+router.use(
+  '/bia/:id/insiden',
+  authMiddleware,
+  bcpController.checkForm10Instansi('bia')
+);
+
+router.use(
+  '/bia/:id/ketergantungan',
+  authMiddleware,
+  bcpController.checkForm10Instansi('bia')
+);
+
+router.use(
+  '/insiden/:id',
+  authMiddleware,
+  bcpController.checkForm10Instansi('insiden')
+);
+
+router.use(
+  '/insiden-modul/:id',
+  authMiddleware,
+  bcpController.checkForm10Instansi('modul')
+);
+
+router.use(
+  '/ketergantungan/:id',
+  authMiddleware,
+  bcpController.checkForm10Instansi('ketergantungan')
+);
+
 router.get(
   '/module-options',
   authMiddleware,
@@ -624,6 +679,7 @@ router.post(
   '/bia/:id/insiden',
   authMiddleware,
   requirePermission('continuity.create'),
+  bcpController.validateForm10Required('insiden'),
   bcpController.createInsiden
 );
 
@@ -638,6 +694,7 @@ router.put(
   '/insiden/:id',
   authMiddleware,
   requirePermission('continuity.update'),
+  bcpController.validateForm10Required('insiden'),
   bcpController.updateInsiden
 );
 
@@ -647,6 +704,81 @@ router.delete(
   requirePermission('continuity.delete'),
   bcpController.deleteInsiden
 );
+
+router.get(
+  '/insiden/:id/modul',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getModulByInsiden
+);
+
+router.post(
+  '/insiden/:id/modul',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.validateForm10Required('modul'),
+  bcpController.createModulInsiden
+);
+
+router.get(
+  '/insiden-modul/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getInsidenModulById
+);
+
+router.put(
+  '/insiden-modul/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.validateForm10Required('modul'),
+  bcpController.updateModulInsiden
+);
+
+router.delete(
+  '/insiden-modul/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteModulInsiden
+);
+
+router.get(
+  '/bia/:id/ketergantungan',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getKetergantunganByBia
+);
+
+router.post(
+  '/bia/:id/ketergantungan',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.validateForm10Required('ketergantungan'),
+  bcpController.createKetergantungan
+);
+
+router.get(
+  '/ketergantungan/:id',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getKetergantunganById
+);
+
+router.put(
+  '/ketergantungan/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.validateForm10Required('ketergantungan'),
+  bcpController.updateKetergantungan
+);
+
+router.delete(
+  '/ketergantungan/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteKetergantungan
+);
+
 
 // =====================================================
 // PROSES 2 - FORM 10
@@ -733,6 +865,19 @@ router.delete(
 // STRATEGI / SKENARIO PEMULIHAN
 // =====================================================
 
+
+router.use(
+  '/strategi/:id',
+  authMiddleware,
+  bcpController.checkForm11Instansi('strategi')
+);
+
+router.use(
+  '/langkah-pemulihan/:id',
+  authMiddleware,
+  bcpController.checkForm11Instansi('langkah')
+);
+
 router.get(
   '/insiden/:id/strategi',
   authMiddleware,
@@ -744,6 +889,7 @@ router.post(
   '/insiden/:id/strategi',
   authMiddleware,
   requirePermission('continuity.create'),
+  bcpController.validateForm11Required('strategi'),
   bcpController.createStrategiPemulihan
 );
 
@@ -758,6 +904,7 @@ router.put(
   '/strategi/:id',
   authMiddleware,
   requirePermission('continuity.update'),
+  bcpController.validateForm11Required('strategi'),
   bcpController.updateStrategiPemulihan
 );
 
@@ -784,6 +931,7 @@ router.post(
   '/strategi/:id/langkah',
   authMiddleware,
   requirePermission('continuity.create'),
+  bcpController.validateForm11Required('langkah'),
   bcpController.createLangkahPemulihan
 );
 
@@ -798,6 +946,7 @@ router.put(
   '/langkah-pemulihan/:id',
   authMiddleware,
   requirePermission('continuity.update'),
+  bcpController.validateForm11Required('langkah'),
   bcpController.updateLangkahPemulihan
 );
 
@@ -813,6 +962,25 @@ router.delete(
 // UJI COBA KEBERLANGSUNGAN
 // =====================================================
 
+
+router.use(
+  '/insiden/:id/uji',
+  authMiddleware,
+  bcpController.checkForm12and13Instansi('insiden')
+);
+
+router.use(
+  '/uji/:id',
+  authMiddleware,
+  bcpController.checkForm12and13Instansi('uji')
+);
+
+router.use(
+  '/evaluasi/:id',
+  authMiddleware,
+  bcpController.checkForm12and13Instansi('evaluasi')
+);
+
 router.get(
   '/insiden/:id/uji',
   authMiddleware,
@@ -824,6 +992,7 @@ router.post(
   '/insiden/:id/uji',
   authMiddleware,
   requirePermission('continuity.create'),
+  bcpController.validateForm12and13('uji'),
   bcpController.createUji
 );
 
@@ -838,6 +1007,7 @@ router.put(
   '/uji/:id',
   authMiddleware,
   requirePermission('continuity.update'),
+  bcpController.validateForm12and13('uji'),
   bcpController.updateUji
 );
 
@@ -847,11 +1017,6 @@ router.delete(
   requirePermission('continuity.delete'),
   bcpController.deleteUji
 );
-
-// =====================================================
-// PROSES 4 - FORM 13
-// EVALUASI & PEMBELAJARAN
-// =====================================================
 
 router.get(
   '/uji/:id/evaluasi',
@@ -864,6 +1029,7 @@ router.post(
   '/uji/:id/evaluasi',
   authMiddleware,
   requirePermission('continuity.create'),
+  bcpController.validateForm12and13('evaluasi'),
   bcpController.createEvaluasi
 );
 
@@ -878,6 +1044,7 @@ router.put(
   '/evaluasi/:id',
   authMiddleware,
   requirePermission('continuity.update'),
+  bcpController.validateForm12and13('evaluasi'),
   bcpController.updateEvaluasi
 );
 
@@ -886,6 +1053,34 @@ router.delete(
   authMiddleware,
   requirePermission('continuity.delete'),
   bcpController.deleteEvaluasi
+);
+
+router.get(
+  '/struktur-tim',
+  authMiddleware,
+  requirePermission('continuity.view'),
+  bcpController.getAllStrukturTim
+);
+
+router.post(
+  '/struktur-tim',
+  authMiddleware,
+  requirePermission('continuity.create'),
+  bcpController.createStrukturTim
+);
+
+router.put(
+  '/struktur-tim/:id',
+  authMiddleware,
+  requirePermission('continuity.update'),
+  bcpController.updateStrukturTim
+);
+
+router.delete(
+  '/struktur-tim/:id',
+  authMiddleware,
+  requirePermission('continuity.delete'),
+  bcpController.deleteStrukturTim
 );
 
 module.exports = router;

@@ -129,8 +129,11 @@ export default function Login({onLoginSuccess,}: LoginProps) {
           {/* Logo */}
           <img
             src="/logo_new.png"
-            alt="Logo"
-            className="w-36 h-12 object-contain"
+            alt="Logo SIM-LDP"
+            style={{
+              width: "120px",
+              height: "120px",
+            }}
           />
 
           {/* Brand Titles */}

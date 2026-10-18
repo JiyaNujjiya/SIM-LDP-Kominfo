@@ -1,6 +1,59 @@
 const db = require('../config/db');
 
 
+const getMrpScope = async (req) => {
+  const userId = Number(req.user?.id);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    const error = new Error('Sesi pengguna tidak valid.');
+    error.status = 401;
+    throw error;
+  }
+
+  const [rows] = await db.query(
+    `
+      SELECT id, role, instansi_id
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (rows.length === 0) {
+    const error = new Error('Pengguna tidak ditemukan.');
+    error.status = 401;
+    throw error;
+  }
+
+  const user = rows[0];
+  const isAdmin = user.role === 'admin';
+
+  if (!isAdmin && !isPositiveInteger(user.instansi_id)) {
+    const error = new Error('Akun belum terhubung dengan instansi.');
+    error.status = 403;
+    throw error;
+  }
+
+  return {
+    userId,
+    instansiId: user.instansi_id === null
+      ? null
+      : Number(user.instansi_id),
+    isAdmin
+  };
+};
+
+const handleMrpError = (res, error, operation) => {
+  console.error(`${operation} error:`, error);
+
+  return res.status(error.status || 500).json({
+    message: error.status
+      ? error.message
+      : 'Terjadi kesalahan saat memproses data MRP.'
+  });
+};
+
 // =====================================================
 // HELPERS
 // =====================================================
@@ -107,29 +160,35 @@ exports.getLayananOptions = async (req, res) => {
   }
 };
 
+
 exports.getUserOptions = async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      SELECT
-        id,
-        nama,
-        email,
-        role
-      FROM users
-      ORDER BY nama ASC
-    `);
+    const scope = await getMrpScope(req);
 
-    return res.status(200).json({
-      data: rows
-    });
+    const params = [];
+    let where = '';
+
+    if (!scope.isAdmin) {
+      where = 'WHERE instansi_id = ?';
+      params.push(scope.instansiId);
+    }
+
+    const [rows] = await db.query(
+      `
+        SELECT id, nama, email, role, instansi_id
+        FROM users
+        ${where}
+        ORDER BY nama ASC
+      `,
+      params
+    );
+
+    return res.status(200).json({ data: rows });
   } catch (error) {
-    console.error('getUserOptions error:', error);
-
-    return res.status(500).json({
-      message: 'Terjadi kesalahan saat mengambil daftar pengguna.'
-    });
+    return handleMrpError(res, error, 'getUserOptions');
   }
 };
+
 
 // =====================================================
 // COMPATIBILITY / OVERVIEW HELPDESK
@@ -184,46 +243,32 @@ exports.getAllRelasiPengguna = async (req, res) => {
 // =====================================================
 
 const katalogLayananSelectQuery = `
-    SELECT
-        k.id,
-        k.layanan_id,
-        l.kode_layanan,
-        l.nama_layanan,
-        l.deskripsi AS deskripsi_layanan,
-        l.jenis_layanan,
-
-        k.kategori_layanan,
-        k.tipe_layanan,
-        k.target_cakupan_pengguna,
-
-        k.service_owner_id,
-        so.nama AS service_owner,
-
-        k.kanal_layanan,
-        k.tautan_layanan,
-        k.ruang_lingkup_layanan,
-        k.stakeholder_terkait,
-
-        k.status,
-
-        k.created_by,
-        cb.nama AS dibuat_oleh,
-
-        k.created_at,
-        k.updated_at
-
-    FROM mrp_katalog_layanan k
-
-    JOIN layanan_digital l
-        ON l.id = k.layanan_id
-
-    LEFT JOIN users so
-        ON so.id = k.service_owner_id
-
-    JOIN users cb
-        ON cb.id = k.created_by
+  SELECT
+    k.id,
+    k.layanan_id,
+    l.kode_layanan,
+    COALESCE(NULLIF(k.nama_layanan, ''), l.nama_layanan) AS nama_layanan,
+    l.deskripsi AS deskripsi_layanan,
+    l.jenis_layanan,
+    k.kategori_layanan,
+    k.tipe_layanan,
+    k.target_cakupan_pengguna,
+    k.service_owner_id,
+    so.nama AS service_owner,
+    k.kanal_layanan,
+    k.tautan_layanan,
+    k.ruang_lingkup_layanan,
+    k.stakeholder_terkait,
+    k.status,
+    k.created_by,
+    cb.nama AS dibuat_oleh,
+    k.created_at,
+    k.updated_at
+  FROM mrp_katalog_layanan k
+  LEFT JOIN layanan_digital l ON l.id = k.layanan_id
+  LEFT JOIN users so ON so.id = k.service_owner_id
+  JOIN users cb ON cb.id = k.created_by
 `;
-
 
 // =====================================================
 // VALIDASI KATALOG LAYANAN
@@ -234,7 +279,7 @@ const validateKatalogLayananInput = (
     isCreate = true
 ) => {
     const {
-        layanan_id,
+        nama_layanan,
         kategori_layanan,
         tipe_layanan,
         target_cakupan_pengguna,
@@ -249,14 +294,15 @@ const validateKatalogLayananInput = (
 
     // layanan_id
     if (
-        isCreate &&
-        !isPositiveInteger(layanan_id)
+      typeof nama_layanan !== 'string' ||
+      nama_layanan.trim() === ''
     ) {
-        return (
-            'layanan_id wajib berupa ID yang valid.'
-        );
+      return 'Nama layanan wajib diisi.';
     }
 
+    if (nama_layanan.trim().length > 200) {
+      return 'Nama layanan maksimal 200 karakter.';
+    }
 
     // kategori_layanan
     if (
@@ -415,33 +461,34 @@ const validateKatalogLayananInput = (
 // GET /api/relasi-pengguna/katalog-layanan
 // =====================================================
 
-exports.getAllKatalogLayanan = async (
-    req,
-    res
-) => {
-    try {
-        const [rows] = await db.query(`
-            ${katalogLayananSelectQuery}
 
-            ORDER BY k.id DESC
-        `);
+exports.getAllKatalogLayanan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
 
-        return res
-            .status(200)
-            .json(rows);
+    const params = [];
+    let where = '';
 
-    } catch (error) {
-        console.error(
-            'getAllKatalogLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil katalog layanan.'
-        });
+    if (!scope.isAdmin) {
+      where = 'WHERE k.instansi_id = ?';
+      params.push(scope.instansiId);
     }
+
+    const [rows] = await db.query(
+      `
+        ${katalogLayananSelectQuery}
+        ${where}
+        ORDER BY k.id DESC
+      `,
+      params
+    );
+
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllKatalogLayanan');
+  }
 };
+
 
 
 // =====================================================
@@ -449,107 +496,79 @@ exports.getAllKatalogLayanan = async (
 // GET /api/relasi-pengguna/katalog-layanan/:id
 // =====================================================
 
-exports.getKatalogLayananById = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
+
+exports.getKatalogLayananById = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID katalog layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID katalog layanan tidak valid.'
+      });
     }
 
-    try {
-        const [rows] = await db.query(
-            `
-            ${katalogLayananSelectQuery}
+    const [rows] = await db.query(
+      `
+        ${katalogLayananSelectQuery}
+        WHERE k.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-            WHERE k.id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Katalog layanan tidak ditemukan.'
-            });
-        }
-
-        return res
-            .status(200)
-            .json(rows[0]);
-
-    } catch (error) {
-        console.error(
-            'getKatalogLayananById error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil katalog layanan.'
-        });
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Katalog layanan tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json(rows[0]);
+  } catch (error) {
+    return handleMrpError(res, error, 'getKatalogLayananById');
+  }
 };
-
 
 // =====================================================
 // GET KATALOG BERDASARKAN LAYANAN
 // GET /api/relasi-pengguna/layanan/:id/katalog
 // =====================================================
 
-exports.getKatalogByLayanan = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
+
+exports.getKatalogByLayanan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID layanan tidak valid.'
+      });
     }
 
-    try {
-        const [rows] = await db.query(
-            `
-            ${katalogLayananSelectQuery}
+    const [rows] = await db.query(
+      `
+        ${katalogLayananSelectQuery}
+        WHERE k.layanan_id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-            WHERE k.layanan_id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Katalog untuk layanan tersebut tidak ditemukan.'
-            });
-        }
-
-        return res
-            .status(200)
-            .json(rows[0]);
-
-    } catch (error) {
-        console.error(
-            'getKatalogByLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil katalog layanan.'
-        });
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Katalog untuk layanan tersebut tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json(rows[0]);
+  } catch (error) {
+    return handleMrpError(res, error, 'getKatalogByLayanan');
+  }
 };
+
 
 
 // =====================================================
@@ -557,234 +576,121 @@ exports.getKatalogByLayanan = async (
 // POST /api/relasi-pengguna/katalog-layanan
 // =====================================================
 
-exports.createKatalogLayanan = async (
-    req,
-    res
-) => {
-    // created_by tidak boleh berasal dari frontend
-    if (
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'created_by'
+
+exports.createKatalogLayanan = async (req, res) => {
+  if (
+    Object.prototype.hasOwnProperty.call(req.body, 'created_by') ||
+    Object.prototype.hasOwnProperty.call(req.body, 'layanan_id') ||
+    Object.prototype.hasOwnProperty.call(req.body, 'instansi_id')
+  ) {
+    return res.status(400).json({
+      message: 'created_by, layanan_id, dan instansi_id tidak boleh dikirim dari frontend.'
+    });
+  }
+
+  const validationError = validateKatalogLayananInput(req.body, true);
+
+  if (validationError) {
+    return res.status(400).json({
+      message: validationError
+    });
+  }
+
+  const {
+    nama_layanan,
+    kategori_layanan,
+    tipe_layanan,
+    target_cakupan_pengguna,
+    service_owner_id,
+    kanal_layanan,
+    tautan_layanan,
+    ruang_lingkup_layanan,
+    stakeholder_terkait,
+    status
+  } = req.body;
+
+  const ownerId =
+    service_owner_id === undefined ||
+    service_owner_id === null ||
+    service_owner_id === ''
+      ? null
+      : Number(service_owner_id);
+
+  try {
+    const scope = await getMrpScope(req);
+
+    if (!isPositiveInteger(scope.instansiId)) {
+      return res.status(403).json({
+        message: 'Akun harus memiliki instansi untuk membuat katalog layanan.'
+      });
+    }
+
+    if (ownerId !== null) {
+      if (!isPositiveInteger(ownerId)) {
+        return res.status(400).json({
+          message: 'Service Owner tidak valid.'
+        });
+      }
+
+      const [owners] = await db.query(
+        `
+          SELECT id
+          FROM users
+          WHERE id = ? AND instansi_id = ?
+          LIMIT 1
+        `,
+        [ownerId, scope.instansiId]
+      );
+
+      if (owners.length === 0) {
+        return res.status(403).json({
+          message: 'Service Owner harus berasal dari instansi yang sama.'
+        });
+      }
+    }
+
+    const [result] = await db.query(
+      `
+        INSERT INTO mrp_katalog_layanan (
+          nama_layanan,
+          instansi_id,
+          layanan_id,
+          kategori_layanan,
+          tipe_layanan,
+          target_cakupan_pengguna,
+          service_owner_id,
+          kanal_layanan,
+          tautan_layanan,
+          ruang_lingkup_layanan,
+          stakeholder_terkait,
+          status,
+          created_by
         )
-    ) {
-        return res.status(400).json({
-            message:
-                'created_by tidak boleh dikirim dari request.'
-        });
-    }
+        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        nama_layanan.trim(),
+        scope.instansiId,
+        normalizeOptionalText(kategori_layanan),
+        normalizeOptionalText(tipe_layanan),
+        normalizeOptionalText(target_cakupan_pengguna),
+        ownerId,
+        normalizeOptionalText(kanal_layanan),
+        normalizeOptionalText(tautan_layanan),
+        normalizeOptionalText(ruang_lingkup_layanan),
+        normalizeOptionalText(stakeholder_terkait),
+        status || 'Draft',
+        scope.userId
+      ]
+    );
 
-
-    const validationError =
-        validateKatalogLayananInput(
-            req.body,
-            true
-        );
-
-    if (validationError) {
-        return res.status(400).json({
-            message: validationError
-        });
-    }
-
-
-    const {
-        layanan_id,
-        kategori_layanan,
-        tipe_layanan,
-        target_cakupan_pengguna,
-        service_owner_id,
-        kanal_layanan,
-        tautan_layanan,
-        ruang_lingkup_layanan,
-        stakeholder_terkait,
-        status
-    } = req.body;
-
-
-    const createdBy = req.user.id;
-
-
-    try {
-        // =============================================
-        // CEK LAYANAN
-        // =============================================
-
-        const [layanan] = await db.query(
-            `
-            SELECT id
-            FROM layanan_digital
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [layanan_id]
-        );
-
-        if (layanan.length === 0) {
-            return res.status(400).json({
-                message:
-                    'layanan_id tidak ditemukan.'
-            });
-        }
-
-
-        // =============================================
-        // CEK SERVICE OWNER
-        // =============================================
-
-        if (
-            service_owner_id !== undefined &&
-            service_owner_id !== null &&
-            service_owner_id !== ''
-        ) {
-            const [owner] = await db.query(
-                `
-                SELECT id
-                FROM users
-                WHERE id = ?
-                LIMIT 1
-                `,
-                [service_owner_id]
-            );
-
-            if (owner.length === 0) {
-                return res.status(400).json({
-                    message:
-                        'service_owner_id tidak ditemukan.'
-                });
-            }
-        }
-
-
-        // =============================================
-        // CEK DUPLIKAT KATALOG PER LAYANAN
-        // =============================================
-
-        const [existing] = await db.query(
-            `
-            SELECT id
-            FROM mrp_katalog_layanan
-            WHERE layanan_id = ?
-            LIMIT 1
-            `,
-            [layanan_id]
-        );
-
-        if (existing.length > 0) {
-            return res.status(409).json({
-                message:
-                    'Layanan tersebut sudah memiliki katalog layanan.'
-            });
-        }
-
-
-        // =============================================
-        // INSERT
-        // =============================================
-
-        const [result] = await db.query(
-            `
-            INSERT INTO mrp_katalog_layanan (
-                layanan_id,
-                kategori_layanan,
-                tipe_layanan,
-                target_cakupan_pengguna,
-                service_owner_id,
-                kanal_layanan,
-                tautan_layanan,
-                ruang_lingkup_layanan,
-                stakeholder_terkait,
-                status,
-                created_by
-            )
-            VALUES (
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?,
-                ?
-            )
-            `,
-            [
-                Number(layanan_id),
-
-                normalizeOptionalText(
-                    kategori_layanan
-                ),
-
-                normalizeOptionalText(
-                    tipe_layanan
-                ),
-
-                normalizeOptionalText(
-                    target_cakupan_pengguna
-                ),
-
-                (
-                    service_owner_id === undefined ||
-                    service_owner_id === null ||
-                    service_owner_id === ''
-                )
-                    ? null
-                    : Number(service_owner_id),
-
-                normalizeOptionalText(
-                    kanal_layanan
-                ),
-
-                normalizeOptionalText(
-                    tautan_layanan
-                ),
-
-                normalizeOptionalText(
-                    ruang_lingkup_layanan
-                ),
-
-                normalizeOptionalText(
-                    stakeholder_terkait
-                ),
-
-                status || 'Draft',
-
-                createdBy
-            ]
-        );
-
-
-        return res.status(201).json({
-            message:
-                'Katalog layanan berhasil dibuat.',
-            id: result.insertId
-        });
-
-    } catch (error) {
-        console.error(
-            'createKatalogLayanan error:',
-            error
-        );
-
-
-        if (
-            error.code === 'ER_DUP_ENTRY'
-        ) {
-            return res.status(409).json({
-                message:
-                    'Layanan tersebut sudah memiliki katalog layanan.'
-            });
-        }
-
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat membuat katalog layanan.'
-        });
-    }
+    return res.status(201).json({
+      message: 'Katalog layanan berhasil dibuat.',
+      id: result.insertId
+    });
+  } catch (error) {
+    return handleMrpError(res, error, 'createKatalogLayanan');
+  }
 };
 
 
@@ -793,211 +699,150 @@ exports.createKatalogLayanan = async (
 // PUT /api/relasi-pengguna/katalog-layanan/:id
 // =====================================================
 
-exports.updateKatalogLayanan = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
 
+exports.updateKatalogLayanan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID katalog layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID katalog layanan tidak valid.'
+      });
     }
 
-
-    // layanan_id dan created_by tidak boleh diubah
     if (
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'created_by'
-        ) ||
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'layanan_id'
-        )
+      Object.prototype.hasOwnProperty.call(req.body, 'created_by') ||
+      Object.prototype.hasOwnProperty.call(req.body, 'layanan_id') ||
+      Object.prototype.hasOwnProperty.call(req.body, 'instansi_id')
     ) {
-        return res.status(400).json({
-            message:
-                'layanan_id dan created_by tidak boleh diubah.'
-        });
+      return res.status(400).json({
+        message: 'created_by, layanan_id, dan instansi_id tidak boleh diubah.'
+      });
     }
 
-
-    const validationError =
-        validateKatalogLayananInput(
-            req.body,
-            false
-        );
+    const validationError = validateKatalogLayananInput(req.body, false);
 
     if (validationError) {
+      return res.status(400).json({
+        message: validationError
+      });
+    }
+
+    const [existingRows] = await db.query(
+      `
+        SELECT *
+        FROM mrp_katalog_layanan
+        WHERE id = ?
+          AND (? = 1 OR instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Katalog layanan tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
+
+    if (!isPositiveInteger(existing.instansi_id)) {
+      return res.status(409).json({
+        message: 'Katalog belum memiliki instansi pemilik.'
+      });
+    }
+
+    const serviceOwnerId =
+      req.body.service_owner_id === undefined
+        ? existing.service_owner_id
+        : req.body.service_owner_id === null ||
+          req.body.service_owner_id === ''
+          ? null
+          : Number(req.body.service_owner_id);
+
+    if (serviceOwnerId !== null) {
+      if (!isPositiveInteger(serviceOwnerId)) {
         return res.status(400).json({
-            message: validationError
+          message: 'Service Owner tidak valid.'
         });
+      }
+
+      const [owners] = await db.query(
+        `
+          SELECT id
+          FROM users
+          WHERE id = ?
+            AND instansi_id = ?
+          LIMIT 1
+        `,
+        [serviceOwnerId, existing.instansi_id]
+      );
+
+      if (owners.length === 0) {
+        return res.status(403).json({
+          message: 'Service Owner harus berasal dari instansi katalog.'
+        });
+      }
     }
 
+    const textValue = (field) =>
+      req.body[field] === undefined
+        ? existing[field]
+        : normalizeOptionalText(req.body[field]);
 
-    try {
-        // =============================================
-        // CEK EXISTING
-        // =============================================
+    const status =
+      req.body.status === undefined
+        ? existing.status
+        : req.body.status;
 
-        const [existingRows] = await db.query(
-            `
-            SELECT *
-            FROM mrp_katalog_layanan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
+    const [result] = await db.query(
+      `
+        UPDATE mrp_katalog_layanan
+        SET
+          nama_layanan = ?,
+          kategori_layanan = ?,
+          tipe_layanan = ?,
+          target_cakupan_pengguna = ?,
+          service_owner_id = ?,
+          kanal_layanan = ?,
+          tautan_layanan = ?,
+          ruang_lingkup_layanan = ?,
+          stakeholder_terkait = ?,
+          status = ?
+        WHERE id = ?
+          AND (? = 1 OR instansi_id = ?)
+      `,
+      [
+        req.body.nama_layanan.trim(),
+        textValue('kategori_layanan'),
+        textValue('tipe_layanan'),
+        textValue('target_cakupan_pengguna'),
+        serviceOwnerId,
+        textValue('kanal_layanan'),
+        textValue('tautan_layanan'),
+        textValue('ruang_lingkup_layanan'),
+        textValue('stakeholder_terkait'),
+        status,
+        id,
+        scope.isAdmin ? 1 : 0,
+        scope.instansiId
+      ]
+    );
 
-
-        if (existingRows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Katalog layanan tidak ditemukan.'
-            });
-        }
-
-
-        const existing =
-            existingRows[0];
-
-
-        // =============================================
-        // SERVICE OWNER
-        // =============================================
-
-        const serviceOwnerId =
-            req.body.service_owner_id !== undefined
-                ? (
-                    req.body.service_owner_id === null ||
-                    req.body.service_owner_id === ''
-                        ? null
-                        : Number(
-                            req.body.service_owner_id
-                        )
-                )
-                : existing.service_owner_id;
-
-
-        if (serviceOwnerId !== null) {
-            const [owner] = await db.query(
-                `
-                SELECT id
-                FROM users
-                WHERE id = ?
-                LIMIT 1
-                `,
-                [serviceOwnerId]
-            );
-
-
-            if (owner.length === 0) {
-                return res.status(400).json({
-                    message:
-                        'service_owner_id tidak ditemukan.'
-                });
-            }
-        }
-
-
-        // =============================================
-        // HELPER NILAI UPDATE
-        // =============================================
-
-        const value = (field) => {
-            if (
-                req.body[field] !== undefined
-            ) {
-                return normalizeOptionalText(
-                    req.body[field]
-                );
-            }
-
-            return existing[field];
-        };
-
-
-        // =============================================
-        // UPDATE
-        // =============================================
-
-        await db.query(
-            `
-            UPDATE mrp_katalog_layanan
-            SET
-                kategori_layanan = ?,
-                tipe_layanan = ?,
-                target_cakupan_pengguna = ?,
-                service_owner_id = ?,
-                kanal_layanan = ?,
-                tautan_layanan = ?,
-                ruang_lingkup_layanan = ?,
-                stakeholder_terkait = ?,
-                status = ?
-            WHERE id = ?
-            `,
-            [
-                value(
-                    'kategori_layanan'
-                ),
-
-                value(
-                    'tipe_layanan'
-                ),
-
-                value(
-                    'target_cakupan_pengguna'
-                ),
-
-                serviceOwnerId,
-
-                value(
-                    'kanal_layanan'
-                ),
-
-                value(
-                    'tautan_layanan'
-                ),
-
-                value(
-                    'ruang_lingkup_layanan'
-                ),
-
-                value(
-                    'stakeholder_terkait'
-                ),
-
-                req.body.status !== undefined
-                    ? req.body.status
-                    : existing.status,
-
-                id
-            ]
-        );
-
-
-        return res.status(200).json({
-            message:
-                'Katalog layanan berhasil diperbarui.'
-        });
-
-    } catch (error) {
-        console.error(
-            'updateKatalogLayanan error:',
-            error
-        );
-
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat memperbarui katalog layanan.'
-        });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Katalog layanan tidak ditemukan atau tidak dapat diakses.'
+      });
     }
+
+    return res.status(200).json({
+      message: 'Katalog layanan berhasil diperbarui.'
+    });
+  } catch (error) {
+    return handleMrpError(res, error, 'updateKatalogLayanan');
+  }
 };
 
 
@@ -1006,57 +851,50 @@ exports.updateKatalogLayanan = async (
 // DELETE /api/relasi-pengguna/katalog-layanan/:id
 // =====================================================
 
-exports.deleteKatalogLayanan = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
 
+exports.deleteKatalogLayanan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID katalog layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID katalog layanan tidak valid.'
+      });
     }
 
+    const [result] = await db.query(
+      `
+        DELETE FROM mrp_katalog_layanan
+        WHERE id = ?
+          AND (? = 1 OR instansi_id = ?)
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-    try {
-        const [result] = await db.query(
-            `
-            DELETE FROM mrp_katalog_layanan
-            WHERE id = ?
-            `,
-            [id]
-        );
-
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message:
-                    'Katalog layanan tidak ditemukan.'
-            });
-        }
-
-
-        return res.status(200).json({
-            message:
-                'Katalog layanan berhasil dihapus.'
-        });
-
-    } catch (error) {
-        console.error(
-            'deleteKatalogLayanan error:',
-            error
-        );
-
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat menghapus katalog layanan.'
-        });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Katalog layanan tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json({
+      message: 'Katalog layanan berhasil dihapus.'
+    });
+  } catch (error) {
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' ||
+      error.code === 'ER_ROW_IS_REFERENCED'
+    ) {
+      return res.status(409).json({
+        message: 'Katalog masih digunakan oleh data lain dan tidak dapat dihapus.'
+      });
+    }
+
+    return handleMrpError(res, error, 'deleteKatalogLayanan');
+  }
 };
+
 
 // =====================================================
 // MRP 1A - STANDAR LAYANAN
@@ -1078,14 +916,14 @@ const standarLayananSelectQuery = `
 
         k.layanan_id,
         l.kode_layanan,
-        l.nama_layanan
+        COALESCE(NULLIF(k.nama_layanan, ''), l.nama_layanan) AS nama_layanan
 
     FROM mrp_standar_layanan s
 
     JOIN mrp_katalog_layanan k
         ON k.id = s.katalog_layanan_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = k.layanan_id
 
     JOIN users u
@@ -1094,128 +932,118 @@ const standarLayananSelectQuery = `
 
 
 // GET /api/relasi-pengguna/standar-layanan
+
+
 exports.getAllStandarLayanan = async (req, res) => {
-    try {
-        const [rows] = await db.query(`
-            ${standarLayananSelectQuery}
-            ORDER BY
-                s.katalog_layanan_id ASC,
-                s.versi DESC
-        `);
+  try {
+    const scope = await getMrpScope(req);
 
-        return res.status(200).json(rows);
+    const params = [];
+    let where = '';
 
-    } catch (error) {
-        console.error(
-            'getAllStandarLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil standar layanan.'
-        });
+    if (!scope.isAdmin) {
+      where = 'WHERE k.instansi_id = ?';
+      params.push(scope.instansiId);
     }
+
+    const [rows] = await db.query(
+      `
+        ${standarLayananSelectQuery}
+        ${where}
+        ORDER BY s.katalog_layanan_id ASC, s.versi DESC
+      `,
+      params
+    );
+
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllStandarLayanan');
+  }
 };
 
-
 // GET /api/relasi-pengguna/standar-layanan/:id
+
+
 exports.getStandarLayananById = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID standar layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID standar layanan tidak valid.'
+      });
     }
 
-    try {
-        const [rows] = await db.query(
-            `
-            ${standarLayananSelectQuery}
-            WHERE s.id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
+    const [rows] = await db.query(
+      `
+        ${standarLayananSelectQuery}
+        WHERE s.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (rows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Standar layanan tidak ditemukan.'
-            });
-        }
-
-        return res.status(200).json(rows[0]);
-
-    } catch (error) {
-        console.error(
-            'getStandarLayananById error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil standar layanan.'
-        });
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'Standar layanan tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json(rows[0]);
+  } catch (error) {
+    return handleMrpError(res, error, 'getStandarLayananById');
+  }
 };
 
 
 // GET /api/relasi-pengguna/katalog-layanan/:id/standar
+
+
 exports.getStandarByKatalog = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID katalog layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID katalog layanan tidak valid.'
+      });
     }
 
-    try {
-        const [katalog] = await db.query(
-            `
-            SELECT id
-            FROM mrp_katalog_layanan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
+    const [katalog] = await db.query(
+      `
+        SELECT id
+        FROM mrp_katalog_layanan
+        WHERE id = ?
+          AND (? = 1 OR instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (katalog.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Katalog layanan tidak ditemukan.'
-            });
-        }
-
-        const [rows] = await db.query(
-            `
-            ${standarLayananSelectQuery}
-            WHERE s.katalog_layanan_id = ?
-            ORDER BY s.versi DESC
-            `,
-            [id]
-        );
-
-        return res.status(200).json(rows);
-
-    } catch (error) {
-        console.error(
-            'getStandarByKatalog error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil standar layanan.'
-        });
+    if (katalog.length === 0) {
+      return res.status(404).json({
+        message: 'Katalog layanan tidak ditemukan.'
+      });
     }
+
+    const [rows] = await db.query(
+      `
+        ${standarLayananSelectQuery}
+        WHERE s.katalog_layanan_id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        ORDER BY s.versi DESC
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getStandarByKatalog');
+  }
 };
-
 
 // POST /api/relasi-pengguna/standar-layanan
 exports.createStandarLayanan = async (req, res) => {
@@ -1310,21 +1138,28 @@ exports.createStandarLayanan = async (req, res) => {
     }
 
     try {
+        
+        const scope = await getMrpScope(req);
+
         const [katalog] = await db.query(
-            `
+          `
             SELECT id
             FROM mrp_katalog_layanan
             WHERE id = ?
+              AND (? = 1 OR instansi_id = ?)
             LIMIT 1
-            `,
-            [katalog_layanan_id]
+          `,
+          [
+            Number(katalog_layanan_id),
+            scope.isAdmin ? 1 : 0,
+            scope.instansiId
+          ]
         );
 
         if (katalog.length === 0) {
-            return res.status(400).json({
-                message:
-                    'katalog_layanan_id tidak ditemukan.'
-            });
+          return res.status(404).json({
+            message: 'Katalog layanan tidak ditemukan atau tidak dapat diakses.'
+          });
         }
 
         const [existing] = await db.query(
@@ -1407,252 +1242,212 @@ exports.createStandarLayanan = async (req, res) => {
 
 
 // PUT /api/relasi-pengguna/standar-layanan/:id
+
 exports.updateStandarLayanan = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID standar layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID standar layanan tidak valid.'
+      });
     }
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'created_by'
-        ) ||
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'katalog_layanan_id'
-        ) ||
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'versi'
-        )
+      ['created_by', 'katalog_layanan_id', 'versi', 'instansi_id'].some(
+        (field) => Object.prototype.hasOwnProperty.call(req.body, field)
+      )
     ) {
-        return res.status(400).json({
-            message:
-                'katalog_layanan_id, versi, dan created_by tidak boleh diubah.'
-        });
+      return res.status(400).json({
+        message: 'Katalog, versi, instansi, dan pembuat tidak boleh diubah.'
+      });
     }
 
     const {
-        berlaku_mulai,
-        berlaku_sampai,
-        status,
-        catatan
+      berlaku_mulai,
+      berlaku_sampai,
+      status,
+      catatan
     } = req.body;
 
     if (
-        berlaku_mulai !== undefined &&
-        !isValidDateString(berlaku_mulai)
+      berlaku_mulai !== undefined &&
+      !isValidDateString(berlaku_mulai)
     ) {
-        return res.status(400).json({
-            message:
-                'berlaku_mulai harus menggunakan format YYYY-MM-DD yang valid.'
-        });
+      return res.status(400).json({
+        message: 'Tanggal mulai tidak valid.'
+      });
     }
 
     if (
-        berlaku_sampai !== undefined &&
-        berlaku_sampai !== null &&
-        berlaku_sampai !== '' &&
-        !isValidDateString(berlaku_sampai)
+      berlaku_sampai !== undefined &&
+      berlaku_sampai !== null &&
+      berlaku_sampai !== '' &&
+      !isValidDateString(berlaku_sampai)
     ) {
-        return res.status(400).json({
-            message:
-                'berlaku_sampai harus menggunakan format YYYY-MM-DD yang valid.'
-        });
+      return res.status(400).json({
+        message: 'Tanggal selesai tidak valid.'
+      });
     }
 
     if (
-        status !== undefined &&
-        ![
-            'Draft',
-            'Aktif',
-            'Berakhir'
-        ].includes(status)
+      status !== undefined &&
+      !['Draft', 'Aktif', 'Berakhir'].includes(status)
     ) {
-        return res.status(400).json({
-            message:
-                'status harus Draft, Aktif, atau Berakhir.'
-        });
+      return res.status(400).json({
+        message: 'Status standar layanan tidak valid.'
+      });
     }
 
     if (
-        catatan !== undefined &&
-        catatan !== null &&
-        typeof catatan !== 'string'
+      catatan !== undefined &&
+      catatan !== null &&
+      typeof catatan !== 'string'
     ) {
-        return res.status(400).json({
-            message:
-                'catatan harus berupa teks.'
-        });
+      return res.status(400).json({
+        message: 'Catatan harus berupa teks.'
+      });
     }
 
-    try {
-        const [existingRows] = await db.query(
-            `
-            SELECT *
-            FROM mrp_standar_layanan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
+    const [existingRows] = await db.query(
+      `
+        SELECT s.*
+        FROM mrp_standar_layanan s
+        JOIN mrp_katalog_layanan k
+          ON k.id = s.katalog_layanan_id
+        WHERE s.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (existingRows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Standar layanan tidak ditemukan.'
-            });
-        }
-
-        const existing = existingRows[0];
-
-        const mulaiFinal =
-            berlaku_mulai !== undefined
-                ? berlaku_mulai
-                : existing.berlaku_mulai;
-
-        let selesaiFinal;
-
-        if (berlaku_sampai !== undefined) {
-            selesaiFinal =
-                berlaku_sampai === '' ||
-                berlaku_sampai === null
-                    ? null
-                    : berlaku_sampai;
-        } else {
-            selesaiFinal =
-                existing.berlaku_sampai;
-        }
-
-        const mulaiDate =
-            typeof mulaiFinal === 'string'
-                ? mulaiFinal.slice(0, 10)
-                : new Date(mulaiFinal)
-                    .toISOString()
-                    .slice(0, 10);
-
-        const selesaiDate =
-            selesaiFinal === null
-                ? null
-                : (
-                    typeof selesaiFinal === 'string'
-                        ? selesaiFinal.slice(0, 10)
-                        : new Date(selesaiFinal)
-                            .toISOString()
-                            .slice(0, 10)
-                );
-
-        if (
-            selesaiDate !== null &&
-            selesaiDate < mulaiDate
-        ) {
-            return res.status(400).json({
-                message:
-                    'berlaku_sampai tidak boleh lebih awal dari berlaku_mulai.'
-            });
-        }
-
-        await db.query(
-            `
-            UPDATE mrp_standar_layanan
-            SET
-                berlaku_mulai = ?,
-                berlaku_sampai = ?,
-                status = ?,
-                catatan = ?
-            WHERE id = ?
-            `,
-            [
-                mulaiDate,
-                selesaiDate,
-                status !== undefined
-                    ? status
-                    : existing.status,
-                catatan !== undefined
-                    ? normalizeOptionalText(catatan)
-                    : existing.catatan,
-                id
-            ]
-        );
-
-        return res.status(200).json({
-            message:
-                'Standar layanan berhasil diperbarui.'
-        });
-
-    } catch (error) {
-        console.error(
-            'updateStandarLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat memperbarui standar layanan.'
-        });
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Standar layanan tidak ditemukan.'
+      });
     }
+
+    const existing = existingRows[0];
+
+    const toDate = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+
+      if (typeof value === 'string') {
+        return value.slice(0, 10);
+      }
+
+      return new Date(value).toISOString().slice(0, 10);
+    };
+
+    const mulaiFinal =
+      berlaku_mulai === undefined
+        ? toDate(existing.berlaku_mulai)
+        : berlaku_mulai;
+
+    const selesaiFinal =
+      berlaku_sampai === undefined
+        ? toDate(existing.berlaku_sampai)
+        : toDate(berlaku_sampai);
+
+    if (selesaiFinal !== null && selesaiFinal < mulaiFinal) {
+      return res.status(400).json({
+        message: 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.'
+      });
+    }
+
+    const [result] = await db.query(
+      `
+        UPDATE mrp_standar_layanan s
+        JOIN mrp_katalog_layanan k
+          ON k.id = s.katalog_layanan_id
+        SET
+          s.berlaku_mulai = ?,
+          s.berlaku_sampai = ?,
+          s.status = ?,
+          s.catatan = ?
+        WHERE s.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+      `,
+      [
+        mulaiFinal,
+        selesaiFinal,
+        status === undefined ? existing.status : status,
+        catatan === undefined
+          ? existing.catatan
+          : normalizeOptionalText(catatan),
+        id,
+        scope.isAdmin ? 1 : 0,
+        scope.instansiId
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Standar layanan tidak ditemukan atau tidak dapat diakses.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Standar layanan berhasil diperbarui.'
+    });
+  } catch (error) {
+    return handleMrpError(res, error, 'updateStandarLayanan');
+  }
 };
 
 
 // DELETE /api/relasi-pengguna/standar-layanan/:id
+
 exports.deleteStandarLayanan = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID standar layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID standar layanan tidak valid.'
+      });
     }
 
-    try {
-        const [result] = await db.query(
-            `
-            DELETE FROM mrp_standar_layanan
-            WHERE id = ?
-            `,
-            [id]
-        );
+    const [result] = await db.query(
+      `
+        DELETE s
+        FROM mrp_standar_layanan s
+        JOIN mrp_katalog_layanan k
+          ON k.id = s.katalog_layanan_id
+        WHERE s.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message:
-                    'Standar layanan tidak ditemukan.'
-            });
-        }
-
-        return res.status(200).json({
-            message:
-                'Standar layanan berhasil dihapus.'
-        });
-
-    } catch (error) {
-        console.error(
-            'deleteStandarLayanan error:',
-            error
-        );
-
-        if (
-            error.code ===
-            'ER_ROW_IS_REFERENCED_2'
-        ) {
-            return res.status(409).json({
-                message:
-                    'Standar layanan masih digunakan oleh data lain dan tidak dapat dihapus.'
-            });
-        }
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat menghapus standar layanan.'
-        });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Standar layanan tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json({
+      message: 'Standar layanan berhasil dihapus.'
+    });
+  } catch (error) {
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' ||
+      error.code === 'ER_ROW_IS_REFERENCED'
+    ) {
+      return res.status(409).json({
+        message: 'Standar layanan masih digunakan oleh data lain.'
+      });
+    }
+
+    return handleMrpError(res, error, 'deleteStandarLayanan');
+  }
 };
+
 
 // =====================================================
 // MRP 1A - SLA LAYANAN
@@ -1676,7 +1471,7 @@ const slaLayananSelectQuery = `
 
         k.layanan_id,
         l.kode_layanan,
-        l.nama_layanan
+        COALESCE(NULLIF(k.nama_layanan, ''), l.nama_layanan) AS nama_layanan
 
     FROM mrp_sla_layanan sla
 
@@ -1686,7 +1481,7 @@ const slaLayananSelectQuery = `
     JOIN mrp_katalog_layanan k
         ON k.id = s.katalog_layanan_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = k.layanan_id
 `;
 
@@ -1804,26 +1599,24 @@ const validateSlaLayananInput = (
 // GET /api/relasi-pengguna/sla-layanan
 // =====================================================
 
+
 exports.getAllSlaLayanan = async (req, res) => {
-    try {
-        const [rows] = await db.query(`
-            ${slaLayananSelectQuery}
-            ORDER BY sla.id DESC
-        `);
+  try {
+    const scope = await getMrpScope(req);
 
-        return res.status(200).json(rows);
+    const [rows] = await db.query(
+      `
+        ${slaLayananSelectQuery}
+        WHERE (? = 1 OR k.instansi_id = ?)
+        ORDER BY sla.id DESC
+      `,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-    } catch (error) {
-        console.error(
-            'getAllSlaLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil SLA layanan.'
-        });
-    }
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllSlaLayanan');
+  }
 };
 
 
@@ -1832,46 +1625,38 @@ exports.getAllSlaLayanan = async (req, res) => {
 // GET /api/relasi-pengguna/sla-layanan/:id
 // =====================================================
 
+
 exports.getSlaLayananById = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID SLA layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID SLA tidak valid.'
+      });
     }
 
-    try {
-        const [rows] = await db.query(
-            `
-            ${slaLayananSelectQuery}
-            WHERE sla.id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
+    const [rows] = await db.query(
+      `
+        ${slaLayananSelectQuery}
+        WHERE sla.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (rows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'SLA layanan tidak ditemukan.'
-            });
-        }
-
-        return res.status(200).json(rows[0]);
-
-    } catch (error) {
-        console.error(
-            'getSlaLayananById error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil SLA layanan.'
-        });
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'SLA layanan tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json(rows[0]);
+  } catch (error) {
+    return handleMrpError(res, error, 'getSlaLayananById');
+  }
 };
 
 
@@ -1880,63 +1665,38 @@ exports.getSlaLayananById = async (req, res) => {
 // GET /api/relasi-pengguna/standar-layanan/:id/sla
 // =====================================================
 
+
 exports.getSlaByStandar = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID standar layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID standar layanan tidak valid.'
+      });
     }
 
-    try {
-        const [standar] = await db.query(
-            `
-            SELECT id
-            FROM mrp_standar_layanan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
+    const [rows] = await db.query(
+      `
+        ${slaLayananSelectQuery}
+        WHERE sla.standar_layanan_id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (standar.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Standar layanan tidak ditemukan.'
-            });
-        }
-
-        const [rows] = await db.query(
-            `
-            ${slaLayananSelectQuery}
-            WHERE sla.standar_layanan_id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'SLA untuk standar layanan tersebut belum tersedia.'
-            });
-        }
-
-        return res.status(200).json(rows[0]);
-
-    } catch (error) {
-        console.error(
-            'getSlaByStandar error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil SLA layanan.'
-        });
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: 'SLA untuk standar tersebut tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json(rows[0]);
+  } catch (error) {
+    return handleMrpError(res, error, 'getSlaByStandar');
+  }
 };
 
 
@@ -1971,23 +1731,30 @@ exports.createSlaLayanan = async (req, res) => {
 
     try {
         // CEK STANDAR
+        const scope = await getMrpScope(req);
+
         const [standar] = await db.query(
-            `
-            SELECT id
-            FROM mrp_standar_layanan
-            WHERE id = ?
+          `
+            SELECT s.id
+            FROM mrp_standar_layanan s
+            JOIN mrp_katalog_layanan k
+              ON k.id = s.katalog_layanan_id
+            WHERE s.id = ?
+              AND (? = 1 OR k.instansi_id = ?)
             LIMIT 1
-            `,
-            [standar_layanan_id]
+          `,
+          [
+            Number(standar_layanan_id),
+            scope.isAdmin ? 1 : 0,
+            scope.instansiId
+          ]
         );
 
         if (standar.length === 0) {
-            return res.status(400).json({
-                message:
-                    'standar_layanan_id tidak ditemukan.'
-            });
+          return res.status(404).json({
+            message: 'Standar layanan tidak ditemukan atau tidak dapat diakses.'
+          });
         }
-
 
         // SATU STANDAR = SATU SLA
         const [existing] = await db.query(
@@ -2096,152 +1863,119 @@ exports.createSlaLayanan = async (req, res) => {
 // PUT /api/relasi-pengguna/sla-layanan/:id
 // =====================================================
 
+
 exports.updateSlaLayanan = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID SLA layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID SLA layanan tidak valid.'
+      });
     }
-
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'standar_layanan_id'
-        )
+      Object.prototype.hasOwnProperty.call(req.body, 'standar_layanan_id')
     ) {
-        return res.status(400).json({
-            message:
-                'standar_layanan_id tidak boleh diubah.'
-        });
+      return res.status(400).json({
+        message: 'standar_layanan_id tidak boleh diubah.'
+      });
     }
 
-
-    const validationError =
-        validateSlaLayananInput(
-            req.body,
-            false
-        );
+    const validationError = validateSlaLayananInput(req.body, false);
 
     if (validationError) {
-        return res.status(400).json({
-            message: validationError
-        });
+      return res.status(400).json({
+        message: validationError
+      });
     }
 
+    const [existingRows] = await db.query(
+      `
+        SELECT sla.*
+        FROM mrp_sla_layanan sla
+        JOIN mrp_standar_layanan s
+          ON s.id = sla.standar_layanan_id
+        JOIN mrp_katalog_layanan k
+          ON k.id = s.katalog_layanan_id
+        WHERE sla.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        LIMIT 1
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-    try {
-        const [existingRows] = await db.query(
-            `
-            SELECT *
-            FROM mrp_sla_layanan
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
-
-        if (existingRows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'SLA layanan tidak ditemukan.'
-            });
-        }
-
-        const existing =
-            existingRows[0];
-
-
-        const textValue = (field) => {
-            if (
-                req.body[field] !== undefined
-            ) {
-                return normalizeOptionalText(
-                    req.body[field]
-                );
-            }
-
-            return existing[field];
-        };
-
-
-        const numberValue = (field) => {
-            if (
-                req.body[field] === undefined
-            ) {
-                return existing[field];
-            }
-
-            if (
-                req.body[field] === null ||
-                req.body[field] === ''
-            ) {
-                return null;
-            }
-
-            return Number(
-                req.body[field]
-            );
-        };
-
-
-        await db.query(
-            `
-            UPDATE mrp_sla_layanan
-            SET
-                jam_layanan = ?,
-                jam_service_desk = ?,
-                target_waktu_respon_menit = ?,
-                target_waktu_penyelesaian_menit = ?,
-                target_ketersediaan_persen = ?
-            WHERE id = ?
-            `,
-            [
-                textValue(
-                    'jam_layanan'
-                ),
-
-                textValue(
-                    'jam_service_desk'
-                ),
-
-                numberValue(
-                    'target_waktu_respon_menit'
-                ),
-
-                numberValue(
-                    'target_waktu_penyelesaian_menit'
-                ),
-
-                numberValue(
-                    'target_ketersediaan_persen'
-                ),
-
-                id
-            ]
-        );
-
-
-        return res.status(200).json({
-            message:
-                'SLA layanan berhasil diperbarui.'
-        });
-
-    } catch (error) {
-        console.error(
-            'updateSlaLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat memperbarui SLA layanan.'
-        });
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'SLA layanan tidak ditemukan.'
+      });
     }
+
+    const existing = existingRows[0];
+
+    const textValue = (field) =>
+      req.body[field] === undefined
+        ? existing[field]
+        : normalizeOptionalText(req.body[field]);
+
+    const numberValue = (field) => {
+      if (req.body[field] === undefined) {
+        return existing[field];
+      }
+
+      if (
+        req.body[field] === null ||
+        req.body[field] === ''
+      ) {
+        return null;
+      }
+
+      return Number(req.body[field]);
+    };
+
+    const [result] = await db.query(
+      `
+        UPDATE mrp_sla_layanan sla
+        JOIN mrp_standar_layanan s
+          ON s.id = sla.standar_layanan_id
+        JOIN mrp_katalog_layanan k
+          ON k.id = s.katalog_layanan_id
+        SET
+          sla.jam_layanan = ?,
+          sla.jam_service_desk = ?,
+          sla.target_waktu_respon_menit = ?,
+          sla.target_waktu_penyelesaian_menit = ?,
+          sla.target_ketersediaan_persen = ?
+        WHERE sla.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+      `,
+      [
+        textValue('jam_layanan'),
+        textValue('jam_service_desk'),
+        numberValue('target_waktu_respon_menit'),
+        numberValue('target_waktu_penyelesaian_menit'),
+        numberValue('target_ketersediaan_persen'),
+        id,
+        scope.isAdmin ? 1 : 0,
+        scope.instansiId
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'SLA layanan tidak ditemukan atau tidak dapat diakses.'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'SLA layanan berhasil diperbarui.'
+    });
+  } catch (error) {
+    return handleMrpError(res, error, 'updateSlaLayanan');
+  }
 };
+
 
 
 // =====================================================
@@ -2249,48 +1983,53 @@ exports.updateSlaLayanan = async (req, res) => {
 // DELETE /api/relasi-pengguna/sla-layanan/:id
 // =====================================================
 
+
 exports.deleteSlaLayanan = async (req, res) => {
-    const { id } = req.params;
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID SLA layanan tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID SLA layanan tidak valid.'
+      });
     }
 
-    try {
-        const [result] = await db.query(
-            `
-            DELETE FROM mrp_sla_layanan
-            WHERE id = ?
-            `,
-            [id]
-        );
+    const [result] = await db.query(
+      `
+        DELETE sla
+        FROM mrp_sla_layanan sla
+        JOIN mrp_standar_layanan s
+          ON s.id = sla.standar_layanan_id
+        JOIN mrp_katalog_layanan k
+          ON k.id = s.katalog_layanan_id
+        WHERE sla.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message:
-                    'SLA layanan tidak ditemukan.'
-            });
-        }
-
-        return res.status(200).json({
-            message:
-                'SLA layanan berhasil dihapus.'
-        });
-
-    } catch (error) {
-        console.error(
-            'deleteSlaLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat menghapus SLA layanan.'
-        });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'SLA layanan tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json({
+      message: 'SLA layanan berhasil dihapus.'
+    });
+  } catch (error) {
+    if (
+      error.code === 'ER_ROW_IS_REFERENCED_2' ||
+      error.code === 'ER_ROW_IS_REFERENCED'
+    ) {
+      return res.status(409).json({
+        message: 'SLA layanan masih digunakan oleh data lain.'
+      });
+    }
+
+    return handleMrpError(res, error, 'deleteSlaLayanan');
+  }
 };
 
 // =====================================================
@@ -2323,7 +2062,7 @@ const olaLayananSelectQuery = `
 
         k.layanan_id,
         l.kode_layanan,
-        l.nama_layanan
+        COALESCE(NULLIF(k.nama_layanan, ''), l.nama_layanan) AS nama_layanan
 
     FROM mrp_ola_layanan ola
 
@@ -2333,7 +2072,7 @@ const olaLayananSelectQuery = `
     JOIN mrp_katalog_layanan k
         ON k.id = s.katalog_layanan_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = k.layanan_id
 `;
 
@@ -2523,26 +2262,20 @@ const validateOlaLayananInput = (
 // =====================================================
 
 exports.getAllOlaLayanan = async (req, res) => {
-    try {
-        const [rows] = await db.query(`
-            ${olaLayananSelectQuery}
-
-            ORDER BY ola.id DESC
-        `);
-
-        return res.status(200).json(rows);
-
-    } catch (error) {
-        console.error(
-            'getAllOlaLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil OLA layanan.'
-        });
-    }
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `
+        ${olaLayananSelectQuery}
+        WHERE (? = 1 OR k.instansi_id = ?)
+        ORDER BY ola.id DESC
+      `,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllOlaLayanan');
+  }
 };
 
 
@@ -3092,7 +2825,7 @@ const indikatorTambahanSelectQuery = `
 
         k.layanan_id,
         l.kode_layanan,
-        l.nama_layanan
+        COALESCE(NULLIF(k.nama_layanan, ''), l.nama_layanan) AS nama_layanan
 
     FROM mrp_indikator_tambahan_standar i
 
@@ -3102,7 +2835,7 @@ const indikatorTambahanSelectQuery = `
     JOIN mrp_katalog_layanan k
         ON k.id = s.katalog_layanan_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = k.layanan_id
 `;
 
@@ -3263,30 +2996,21 @@ const validateIndikatorTambahan = (data) => {
 // GET /api/relasi-pengguna/indikator-tambahan-standar
 // =====================================================
 
-exports.getAllIndikatorTambahan = async (
-    req,
-    res
-) => {
-    try {
-        const [rows] = await db.query(`
-            ${indikatorTambahanSelectQuery}
-
-            ORDER BY i.id DESC
-        `);
-
-        return res.status(200).json(rows);
-
-    } catch (error) {
-        console.error(
-            'getAllIndikatorTambahan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil indikator tambahan standar.'
-        });
-    }
+exports.getAllIndikatorTambahan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `
+        ${indikatorTambahanSelectQuery}
+        WHERE (? = 1 OR k.instansi_id = ?)
+        ORDER BY i.id DESC
+      `,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllIndikatorTambahan');
+  }
 };
 
 
@@ -3859,7 +3583,7 @@ const targetKueriInsidenSelectQuery = `
 
         k.layanan_id,
         l.kode_layanan,
-        l.nama_layanan
+        COALESCE(NULLIF(k.nama_layanan, ''), l.nama_layanan) AS nama_layanan
 
     FROM mrp_target_kueri_insiden t
 
@@ -3869,7 +3593,7 @@ const targetKueriInsidenSelectQuery = `
     JOIN mrp_katalog_layanan k
         ON k.id = s.katalog_layanan_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = k.layanan_id
 `;
 
@@ -4013,38 +3737,21 @@ const validateTargetKueriInsiden = (
 // GET /api/relasi-pengguna/target-kueri-insiden
 // =====================================================
 
-exports.getAllTargetKueriInsiden = async (
-    req,
-    res
-) => {
-    try {
-        const [rows] = await db.query(`
-            ${targetKueriInsidenSelectQuery}
-
-            ORDER BY
-                t.standar_layanan_id ASC,
-                t.jenis ASC,
-                FIELD(
-                    t.prioritas,
-                    'Tinggi',
-                    'Sedang',
-                    'Rendah'
-                )
-        `);
-
-        return res.status(200).json(rows);
-
-    } catch (error) {
-        console.error(
-            'getAllTargetKueriInsiden error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil target kueri dan insiden.'
-        });
-    }
+exports.getAllTargetKueriInsiden = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `
+        ${targetKueriInsidenSelectQuery}
+        WHERE (? = 1 OR k.instansi_id = ?)
+        ORDER BY t.standar_layanan_id ASC, t.jenis ASC, FIELD(t.prioritas, 'Tinggi', 'Sedang', 'Rendah')
+      `,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllTargetKueriInsiden');
+  }
 };
 
 
@@ -4636,40 +4343,35 @@ exports.deleteTargetKueriInsiden = async (
 // MRP 1B - RENCANA KOMUNIKASI PENGGUNA
 // =====================================================
 
+
 const rencanaKomunikasiSelectQuery = `
-    SELECT
-        r.id,
-        r.layanan_id,
-
-        l.kode_layanan,
-        l.nama_layanan,
-
-        r.informasi,
-        r.manajemen_terkait,
-
-        r.pembuat_informasi_id,
-        pi.nama AS pembuat_informasi,
-
-        r.target_audiens,
-        r.periode_komunikasi,
-        r.status,
-
-        r.created_by,
-        cb.nama AS dibuat_oleh,
-
-        r.created_at,
-        r.updated_at
-
-    FROM mrp_rencana_komunikasi r
-
-    JOIN layanan_digital l
-        ON l.id = r.layanan_id
-
-    LEFT JOIN users pi
-        ON pi.id = r.pembuat_informasi_id
-
-    JOIN users cb
-        ON cb.id = r.created_by
+  SELECT
+    r.id,
+    r.layanan_id,
+    r.katalog_layanan_id,
+    k.nama_layanan,
+    ld.kode_layanan,
+    r.informasi,
+    r.manajemen_terkait,
+    r.pembuat_informasi_id,
+    pi.nama AS pembuat_informasi,
+    r.target_audiens,
+    r.periode_komunikasi,
+    r.status,
+    r.created_by,
+    cb.nama AS dibuat_oleh,
+    r.created_at,
+    r.updated_at,
+    k.instansi_id
+  FROM mrp_rencana_komunikasi r
+  JOIN mrp_katalog_layanan k
+    ON k.id = r.katalog_layanan_id
+  LEFT JOIN layanan_digital ld
+    ON ld.id = k.layanan_id
+  LEFT JOIN users pi
+    ON pi.id = r.pembuat_informasi_id
+  JOIN users cb
+    ON cb.id = r.created_by
 `;
 
 
@@ -4829,30 +4531,32 @@ const validateRencanaKomunikasi = (
 // GET /api/relasi-pengguna/rencana-komunikasi
 // =====================================================
 
-exports.getAllRencanaKomunikasi = async (
-    req,
-    res
-) => {
-    try {
-        const [rows] = await db.query(`
-            ${rencanaKomunikasiSelectQuery}
 
-            ORDER BY r.id DESC
-        `);
+exports.getAllRencanaKomunikasi = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
 
-        return res.status(200).json(rows);
+    const params = [];
+    let where = '';
 
-    } catch (error) {
-        console.error(
-            'getAllRencanaKomunikasi error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil rencana komunikasi.'
-        });
+    if (!scope.isAdmin) {
+      where = 'WHERE k.instansi_id = ?';
+      params.push(scope.instansiId);
     }
+
+    const [rows] = await db.query(
+      `
+        ${rencanaKomunikasiSelectQuery}
+        ${where}
+        ORDER BY r.id DESC
+      `,
+      params
+    );
+
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllRencanaKomunikasi');
+  }
 };
 
 
@@ -4913,62 +4617,26 @@ exports.getRencanaKomunikasiById = async (
 // GET /api/relasi-pengguna/layanan/:id/rencana-komunikasi
 // =====================================================
 
-exports.getRencanaKomunikasiByLayanan = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
-
-    if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID layanan tidak valid.'
-        });
+exports.getRencanaKomunikasiByLayanan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const layananId = Number(req.params.id);
+    if (!isPositiveInteger(layananId)) {
+      return res.status(400).json({ message: 'ID layanan tidak valid.' });
     }
-
-    try {
-        const [layanan] = await db.query(
-            `
-            SELECT id
-            FROM layanan_digital
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
-
-        if (layanan.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Layanan tidak ditemukan.'
-            });
-        }
-
-
-        const [rows] = await db.query(
-            `
-            ${rencanaKomunikasiSelectQuery}
-
-            WHERE r.layanan_id = ?
-
-            ORDER BY r.id DESC
-            `,
-            [id]
-        );
-
-        return res.status(200).json(rows);
-
-    } catch (error) {
-        console.error(
-            'getRencanaKomunikasiByLayanan error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil rencana komunikasi.'
-        });
-    }
+    const [rows] = await db.query(
+      `
+        ${rencanaKomunikasiSelectQuery}
+        WHERE k.layanan_id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+        ORDER BY r.id DESC
+      `,
+      [layananId, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getRencanaKomunikasiByLayanan');
+  }
 };
 
 
@@ -4977,495 +4645,415 @@ exports.getRencanaKomunikasiByLayanan = async (
 // POST /api/relasi-pengguna/rencana-komunikasi
 // =====================================================
 
-exports.createRencanaKomunikasi = async (
-    req,
-    res
-) => {
-    if (
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'created_by'
-        )
-    ) {
-        return res.status(400).json({
-            message:
-                'created_by tidak boleh dikirim dari request.'
-        });
-    }
 
-
-    const validationError =
-        validateRencanaKomunikasi(
-            req.body,
-            true
-        );
-
-    if (validationError) {
-        return res.status(400).json({
-            message: validationError
-        });
-    }
-
+exports.createRencanaKomunikasi = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
 
     const {
-        layanan_id,
-        informasi,
-        manajemen_terkait,
-        pembuat_informasi_id,
-        target_audiens,
-        periode_komunikasi,
-        status
+      katalog_layanan_id,
+      informasi,
+      manajemen_terkait,
+      pembuat_informasi_id,
+      target_audiens,
+      periode_komunikasi,
+      status
     } = req.body;
 
-
-    try {
-        // =============================================
-        // CEK LAYANAN
-        // =============================================
-
-        const [layanan] = await db.query(
-            `
-            SELECT id
-            FROM layanan_digital
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [layanan_id]
-        );
-
-        if (layanan.length === 0) {
-            return res.status(400).json({
-                message:
-                    'layanan_id tidak ditemukan.'
-            });
-        }
-
-
-        // =============================================
-        // CEK PEMBUAT INFORMASI
-        // =============================================
-
-        if (
-            pembuat_informasi_id !== undefined &&
-            pembuat_informasi_id !== null &&
-            pembuat_informasi_id !== ''
-        ) {
-            const [pembuat] = await db.query(
-                `
-                SELECT id
-                FROM users
-                WHERE id = ?
-                LIMIT 1
-                `,
-                [pembuat_informasi_id]
-            );
-
-            if (pembuat.length === 0) {
-                return res.status(400).json({
-                    message:
-                        'pembuat_informasi_id tidak ditemukan.'
-                });
-            }
-        }
-
-
-        // =============================================
-        // INSERT
-        // =============================================
-
-        const [result] = await db.query(
-            `
-            INSERT INTO mrp_rencana_komunikasi (
-                layanan_id,
-                informasi,
-                manajemen_terkait,
-                pembuat_informasi_id,
-                target_audiens,
-                periode_komunikasi,
-                status,
-                created_by
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `,
-            [
-                Number(layanan_id),
-
-                informasi.trim(),
-
-                normalizeOptionalText(
-                    manajemen_terkait
-                ),
-
-                (
-                    pembuat_informasi_id === undefined ||
-                    pembuat_informasi_id === null ||
-                    pembuat_informasi_id === ''
-                )
-                    ? null
-                    : Number(
-                        pembuat_informasi_id
-                    ),
-
-                target_audiens.trim(),
-
-                periode_komunikasi.trim(),
-
-                status || 'Draft',
-
-                req.user.id
-            ]
-        );
-
-
-        return res.status(201).json({
-            message:
-                'Rencana komunikasi berhasil dibuat.',
-            id: result.insertId
-        });
-
-    } catch (error) {
-        console.error(
-            'createRencanaKomunikasi error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat membuat rencana komunikasi.'
-        });
+    if (
+      'created_by' in req.body ||
+      'layanan_id' in req.body
+    ) {
+      return res.status(400).json({
+        message: 'created_by dan layanan_id tidak boleh dikirim.'
+      });
     }
-};
 
+    if (!isPositiveInteger(katalog_layanan_id)) {
+      return res.status(400).json({
+        message: 'Katalog layanan wajib dipilih.'
+      });
+    }
+
+    if (
+      typeof informasi !== 'string' ||
+      !informasi.trim() ||
+      typeof target_audiens !== 'string' ||
+      !target_audiens.trim() ||
+      typeof periode_komunikasi !== 'string' ||
+      !periode_komunikasi.trim()
+    ) {
+      return res.status(400).json({
+        message: 'Informasi, target audiens, dan periode komunikasi wajib diisi.'
+      });
+    }
+
+    if (
+      periode_komunikasi.trim().length > 100 ||
+      (manajemen_terkait != null &&
+        (typeof manajemen_terkait !== 'string' ||
+          manajemen_terkait.trim().length > 100))
+    ) {
+      return res.status(400).json({
+        message: 'Panjang data melebihi batas yang diizinkan.'
+      });
+    }
+
+    const allowedStatus = ['Draft', 'Aktif', 'Selesai', 'Dibatalkan'];
+
+    if (status !== undefined && !allowedStatus.includes(status)) {
+      return res.status(400).json({
+        message: 'Status rencana komunikasi tidak valid.'
+      });
+    }
+
+    const [katalog] = await db.query(
+      `
+        SELECT id, instansi_id
+        FROM mrp_katalog_layanan
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [Number(katalog_layanan_id)]
+    );
+
+    if (
+      katalog.length === 0 ||
+      katalog[0].instansi_id === null ||
+      (!scope.isAdmin &&
+        Number(katalog[0].instansi_id) !== scope.instansiId)
+    ) {
+      return res.status(403).json({
+        message: 'Katalog layanan tidak tersedia untuk instansi ini.'
+      });
+    }
+
+    const pembuatId =
+      pembuat_informasi_id == null || pembuat_informasi_id === ''
+        ? null
+        : Number(pembuat_informasi_id);
+
+    if (pembuatId !== null) {
+      if (!isPositiveInteger(pembuatId)) {
+        return res.status(400).json({
+          message: 'Pembuat informasi tidak valid.'
+        });
+      }
+
+      const [pembuat] = await db.query(
+        `
+          SELECT id
+          FROM users
+          WHERE id = ? AND instansi_id = ?
+          LIMIT 1
+        `,
+        [pembuatId, katalog[0].instansi_id]
+      );
+
+      if (pembuat.length === 0) {
+        return res.status(403).json({
+          message: 'Pembuat informasi harus berasal dari instansi katalog.'
+        });
+      }
+    }
+
+    const [result] = await db.query(
+      `
+        INSERT INTO mrp_rencana_komunikasi (
+          layanan_id,
+          katalog_layanan_id,
+          informasi,
+          manajemen_terkait,
+          pembuat_informasi_id,
+          target_audiens,
+          periode_komunikasi,
+          status,
+          created_by
+        )
+        VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        Number(katalog_layanan_id),
+        informasi.trim(),
+        normalizeOptionalText(manajemen_terkait),
+        pembuatId,
+        target_audiens.trim(),
+        periode_komunikasi.trim(),
+        status || 'Draft',
+        scope.userId
+      ]
+    );
+
+    return res.status(201).json({
+      message: 'Rencana komunikasi berhasil dibuat.',
+      id: result.insertId
+    });
+  } catch (error) {
+    return handleMrpError(res, error, 'createRencanaKomunikasi');
+  }
+};
 
 // =====================================================
 // UPDATE
 // PUT /api/relasi-pengguna/rencana-komunikasi/:id
 // =====================================================
 
-exports.updateRencanaKomunikasi = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
 
+exports.updateRencanaKomunikasi = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID rencana komunikasi tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID rencana komunikasi tidak valid.'
+      });
     }
 
+    if ('created_by' in req.body || 'layanan_id' in req.body) {
+      return res.status(400).json({
+        message: 'created_by dan layanan_id tidak boleh diubah.'
+      });
+    }
+
+    const [existingRows] = await db.query(
+      `
+        SELECT r.*, k.instansi_id
+        FROM mrp_rencana_komunikasi r
+        JOIN mrp_katalog_layanan k
+          ON k.id = r.katalog_layanan_id
+        WHERE r.id = ?
+        LIMIT 1
+      `,
+      [id]
+    );
+
+    if (existingRows.length === 0) {
+      return res.status(404).json({
+        message: 'Rencana komunikasi tidak ditemukan.'
+      });
+    }
+
+    const existing = existingRows[0];
 
     if (
-        Object.prototype.hasOwnProperty.call(
-            req.body,
-            'created_by'
-        )
+      !scope.isAdmin &&
+      Number(existing.instansi_id) !== scope.instansiId
     ) {
+      return res.status(403).json({
+        message: 'Tidak memiliki akses ke data ini.'
+      });
+    }
+
+    const katalogId = req.body.katalog_layanan_id === undefined
+      ? existing.katalog_layanan_id
+      : Number(req.body.katalog_layanan_id);
+
+    if (!isPositiveInteger(katalogId)) {
+      return res.status(400).json({
+        message: 'Katalog layanan tidak valid.'
+      });
+    }
+
+    const [katalog] = await db.query(
+      `
+        SELECT id, instansi_id
+        FROM mrp_katalog_layanan
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [katalogId]
+    );
+
+    if (
+      katalog.length === 0 ||
+      katalog[0].instansi_id === null ||
+      Number(katalog[0].instansi_id) !== Number(existing.instansi_id)
+    ) {
+      return res.status(403).json({
+        message: 'Katalog pengganti harus berasal dari instansi yang sama.'
+      });
+    }
+
+    const pembuatId = req.body.pembuat_informasi_id === undefined
+      ? existing.pembuat_informasi_id
+      : req.body.pembuat_informasi_id === null ||
+        req.body.pembuat_informasi_id === ''
+        ? null
+        : Number(req.body.pembuat_informasi_id);
+
+    if (pembuatId !== null) {
+      if (!isPositiveInteger(pembuatId)) {
         return res.status(400).json({
-            message:
-                'created_by tidak boleh diubah.'
+          message: 'Pembuat informasi tidak valid.'
         });
+      }
+
+      const [pembuat] = await db.query(
+        `
+          SELECT id
+          FROM users
+          WHERE id = ? AND instansi_id = ?
+          LIMIT 1
+        `,
+        [pembuatId, existing.instansi_id]
+      );
+
+      if (pembuat.length === 0) {
+        return res.status(403).json({
+          message: 'Pembuat informasi harus berasal dari instansi yang sama.'
+        });
+      }
     }
 
+    const textValue = (field) =>
+      req.body[field] === undefined
+        ? existing[field]
+        : req.body[field];
 
-    const validationError =
-        validateRencanaKomunikasi(
-            req.body,
-            false
-        );
+    const informasi = textValue('informasi');
+    const targetAudiens = textValue('target_audiens');
+    const periode = textValue('periode_komunikasi');
+    const manajemen = textValue('manajemen_terkait');
+    const status = textValue('status');
 
-    if (validationError) {
-        return res.status(400).json({
-            message: validationError
-        });
+    if (
+      typeof informasi !== 'string' ||
+      !informasi.trim() ||
+      typeof targetAudiens !== 'string' ||
+      !targetAudiens.trim() ||
+      typeof periode !== 'string' ||
+      !periode.trim()
+    ) {
+      return res.status(400).json({
+        message: 'Informasi, target audiens, dan periode komunikasi wajib diisi.'
+      });
     }
 
-
-    try {
-        const [existingRows] = await db.query(
-            `
-            SELECT *
-            FROM mrp_rencana_komunikasi
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [id]
-        );
-
-
-        if (existingRows.length === 0) {
-            return res.status(404).json({
-                message:
-                    'Rencana komunikasi tidak ditemukan.'
-            });
-        }
-
-
-        const existing =
-            existingRows[0];
-
-
-        // =============================================
-        // LAYANAN
-        // =============================================
-
-        const layananId =
-            req.body.layanan_id !== undefined
-                ? Number(req.body.layanan_id)
-                : existing.layanan_id;
-
-
-        if (!isPositiveInteger(layananId)) {
-            return res.status(400).json({
-                message:
-                    'layanan_id harus berupa ID yang valid.'
-            });
-        }
-
-
-        if (
-            req.body.layanan_id !== undefined
-        ) {
-            const [layanan] = await db.query(
-                `
-                SELECT id
-                FROM layanan_digital
-                WHERE id = ?
-                LIMIT 1
-                `,
-                [layananId]
-            );
-
-            if (layanan.length === 0) {
-                return res.status(400).json({
-                    message:
-                        'layanan_id tidak ditemukan.'
-                });
-            }
-        }
-
-
-        // =============================================
-        // PEMBUAT INFORMASI
-        // =============================================
-
-        let pembuatInformasiId;
-
-        if (
-            req.body.pembuat_informasi_id !==
-            undefined
-        ) {
-            if (
-                req.body.pembuat_informasi_id ===
-                    null ||
-                req.body.pembuat_informasi_id === ''
-            ) {
-                pembuatInformasiId = null;
-
-            } else {
-                pembuatInformasiId =
-                    Number(
-                        req.body
-                            .pembuat_informasi_id
-                    );
-            }
-
-        } else {
-            pembuatInformasiId =
-                existing.pembuat_informasi_id;
-        }
-
-
-        if (pembuatInformasiId !== null) {
-            const [pembuat] = await db.query(
-                `
-                SELECT id
-                FROM users
-                WHERE id = ?
-                LIMIT 1
-                `,
-                [pembuatInformasiId]
-            );
-
-            if (pembuat.length === 0) {
-                return res.status(400).json({
-                    message:
-                        'pembuat_informasi_id tidak ditemukan.'
-                });
-            }
-        }
-
-
-        const informasiFinal =
-            req.body.informasi !== undefined
-                ? req.body.informasi.trim()
-                : existing.informasi;
-
-
-        const targetAudiensFinal =
-            req.body.target_audiens !== undefined
-                ? req.body.target_audiens.trim()
-                : existing.target_audiens;
-
-
-        const periodeFinal =
-            req.body.periode_komunikasi !==
-            undefined
-                ? req.body
-                    .periode_komunikasi
-                    .trim()
-                : existing.periode_komunikasi;
-
-
-        const manajemenFinal =
-            req.body.manajemen_terkait !==
-            undefined
-                ? normalizeOptionalText(
-                    req.body.manajemen_terkait
-                )
-                : existing.manajemen_terkait;
-
-
-        const statusFinal =
-            req.body.status !== undefined
-                ? req.body.status
-                : existing.status;
-
-
-        await db.query(
-            `
-            UPDATE mrp_rencana_komunikasi
-            SET
-                layanan_id = ?,
-                informasi = ?,
-                manajemen_terkait = ?,
-                pembuat_informasi_id = ?,
-                target_audiens = ?,
-                periode_komunikasi = ?,
-                status = ?
-            WHERE id = ?
-            `,
-            [
-                layananId,
-                informasiFinal,
-                manajemenFinal,
-                pembuatInformasiId,
-                targetAudiensFinal,
-                periodeFinal,
-                statusFinal,
-                id
-            ]
-        );
-
-
-        return res.status(200).json({
-            message:
-                'Rencana komunikasi berhasil diperbarui.'
-        });
-
-    } catch (error) {
-        console.error(
-            'updateRencanaKomunikasi error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat memperbarui rencana komunikasi.'
-        });
+    if (
+      periode.trim().length > 100 ||
+      (manajemen != null &&
+        (typeof manajemen !== 'string' || manajemen.trim().length > 100)) ||
+      !['Draft', 'Aktif', 'Selesai', 'Dibatalkan'].includes(status)
+    ) {
+      return res.status(400).json({
+        message: 'Isi atau status rencana komunikasi tidak valid.'
+      });
     }
+
+    await db.query(
+      `
+        UPDATE mrp_rencana_komunikasi
+        SET
+          katalog_layanan_id = ?,
+          informasi = ?,
+          manajemen_terkait = ?,
+          pembuat_informasi_id = ?,
+          target_audiens = ?,
+          periode_komunikasi = ?,
+          status = ?
+        WHERE id = ?
+      `,
+      [
+        katalogId,
+        informasi.trim(),
+        normalizeOptionalText(manajemen),
+        pembuatId,
+        targetAudiens.trim(),
+        periode.trim(),
+        status,
+        id
+      ]
+    );
+
+    return res.status(200).json({
+      message: 'Rencana komunikasi berhasil diperbarui.'
+    });
+  } catch (error) {
+    return handleMrpError(res, error, 'updateRencanaKomunikasi');
+  }
 };
-
 
 // =====================================================
 // DELETE
 // DELETE /api/relasi-pengguna/rencana-komunikasi/:id
 // =====================================================
 
-exports.deleteRencanaKomunikasi = async (
-    req,
-    res
-) => {
-    const { id } = req.params;
 
+exports.deleteRencanaKomunikasi = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const id = Number(req.params.id);
 
     if (!isPositiveInteger(id)) {
-        return res.status(400).json({
-            message:
-                'ID rencana komunikasi tidak valid.'
-        });
+      return res.status(400).json({
+        message: 'ID rencana komunikasi tidak valid.'
+      });
     }
 
+    const [result] = await db.query(
+      `
+        DELETE r
+        FROM mrp_rencana_komunikasi r
+        JOIN mrp_katalog_layanan k
+          ON k.id = r.katalog_layanan_id
+        WHERE r.id = ?
+          AND (? = 1 OR k.instansi_id = ?)
+      `,
+      [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
 
-    try {
-        const [result] = await db.query(
-            `
-            DELETE FROM mrp_rencana_komunikasi
-            WHERE id = ?
-            `,
-            [id]
-        );
-
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message:
-                    'Rencana komunikasi tidak ditemukan.'
-            });
-        }
-
-
-        return res.status(200).json({
-            message:
-                'Rencana komunikasi berhasil dihapus.'
-        });
-
-    } catch (error) {
-        console.error(
-            'deleteRencanaKomunikasi error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat menghapus rencana komunikasi.'
-        });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        message: 'Rencana komunikasi tidak ditemukan.'
+      });
     }
+
+    return res.status(200).json({
+      message: 'Rencana komunikasi berhasil dihapus.'
+    });
+  } catch (error) {
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(409).json({
+        message: 'Rencana masih digunakan oleh media komunikasi.'
+      });
+    }
+
+    return handleMrpError(res, error, 'deleteRencanaKomunikasi');
+  }
 };
+
 
 // =====================================================
 // MRP 1B - MEDIA KOMUNIKASI
 // =====================================================
 
+
 const mediaKomunikasiSelectQuery = `
-    SELECT
-        m.id,
-        m.rencana_komunikasi_id,
-        m.bentuk_media,
-        m.kanal_komunikasi,
-        m.keterangan,
-        m.created_at,
-
-        r.layanan_id,
-        r.informasi,
-        r.target_audiens,
-        r.periode_komunikasi,
-        r.status AS status_rencana,
-
-        l.kode_layanan,
-        l.nama_layanan
-
-    FROM mrp_media_komunikasi m
-
-    JOIN mrp_rencana_komunikasi r
-        ON r.id = m.rencana_komunikasi_id
-
-    JOIN layanan_digital l
-        ON l.id = r.layanan_id
+  SELECT
+    m.id,
+    m.rencana_komunikasi_id,
+    m.bentuk_media,
+    m.kanal_komunikasi,
+    m.keterangan,
+    m.created_at,
+    r.layanan_id,
+    r.katalog_layanan_id,
+    r.informasi,
+    r.target_audiens,
+    r.periode_komunikasi,
+    r.status AS status_rencana,
+    k.nama_layanan,
+    ld.kode_layanan,
+    k.instansi_id
+  FROM mrp_media_komunikasi m
+  JOIN mrp_rencana_komunikasi r
+    ON r.id = m.rencana_komunikasi_id
+  JOIN mrp_katalog_layanan k
+    ON k.id = r.katalog_layanan_id
+  LEFT JOIN layanan_digital ld
+    ON ld.id = k.layanan_id
 `;
-
 
 // =====================================================
 // VALIDASI MEDIA KOMUNIKASI
@@ -5584,30 +5172,21 @@ const validateMediaKomunikasi = (
 // GET /api/relasi-pengguna/media-komunikasi
 // =====================================================
 
-exports.getAllMediaKomunikasi = async (
-    req,
-    res
-) => {
-    try {
-        const [rows] = await db.query(`
-            ${mediaKomunikasiSelectQuery}
-
-            ORDER BY m.id DESC
-        `);
-
-        return res.status(200).json(rows);
-
-    } catch (error) {
-        console.error(
-            'getAllMediaKomunikasi error:',
-            error
-        );
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil media komunikasi.'
-        });
-    }
+exports.getAllMediaKomunikasi = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `
+        ${mediaKomunikasiSelectQuery}
+        WHERE (? = 1 OR k.instansi_id = ?)
+        ORDER BY m.id DESC
+      `,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllMediaKomunikasi');
+  }
 };
 
 
@@ -6137,7 +5716,7 @@ const katalogLayananTerkaitSelectQuery = `
         k.layanan_id AS layanan_utama_id,
 
         lu.kode_layanan AS kode_layanan_utama,
-        lu.nama_layanan AS nama_layanan_utama,
+        COALESCE(NULLIF(k.nama_layanan, ''), lu.nama_layanan) AS nama_layanan_utama,
 
         lt.kode_layanan AS kode_layanan_terkait,
         lt.nama_layanan AS nama_layanan_terkait
@@ -6147,7 +5726,7 @@ const katalogLayananTerkaitSelectQuery = `
     JOIN mrp_katalog_layanan k
         ON k.id = kt.katalog_layanan_id
 
-    JOIN layanan_digital lu
+    LEFT JOIN layanan_digital lu
         ON lu.id = k.layanan_id
 
     JOIN layanan_digital lt
@@ -6234,34 +5813,21 @@ const validateKatalogLayananTerkait = (
 // GET /api/relasi-pengguna/katalog-layanan-terkait
 // =====================================================
 
-exports.getAllKatalogLayananTerkait = async (
-    req,
-    res
-) => {
-    try {
-        const [rows] = await db.query(`
-            ${katalogLayananTerkaitSelectQuery}
-
-            ORDER BY kt.id DESC
-        `);
-
-
-        return res.status(200).json(
-            rows
-        );
-
-    } catch (error) {
-        console.error(
-            'getAllKatalogLayananTerkait error:',
-            error
-        );
-
-
-        return res.status(500).json({
-            message:
-                'Terjadi kesalahan saat mengambil layanan terkait.'
-        });
-    }
+exports.getAllKatalogLayananTerkait = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `
+        ${katalogLayananTerkaitSelectQuery}
+        WHERE (? = 1 OR k.instansi_id = ?)
+        ORDER BY kt.id DESC
+      `,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    return handleMrpError(res, error, 'getAllKatalogLayananTerkait');
+  }
 };
 
 
@@ -6805,6 +6371,238 @@ exports.deleteKatalogLayananTerkait = async (
     }
 };
 
+
+const mrp01ScopeJoins = {
+  katalog: {
+    from: 'mrp_katalog_layanan k',
+    id: 'k.id'
+  },
+  standar: {
+    from: 'mrp_standar_layanan s JOIN mrp_katalog_layanan k ON k.id = s.katalog_layanan_id',
+    id: 's.id'
+  },
+  ola: {
+    from: 'mrp_ola_layanan ola JOIN mrp_standar_layanan s ON s.id = ola.standar_layanan_id JOIN mrp_katalog_layanan k ON k.id = s.katalog_layanan_id',
+    id: 'ola.id'
+  },
+  indikator: {
+    from: 'mrp_indikator_tambahan_standar i JOIN mrp_standar_layanan s ON s.id = i.standar_layanan_id JOIN mrp_katalog_layanan k ON k.id = s.katalog_layanan_id',
+    id: 'i.id'
+  },
+  target: {
+    from: 'mrp_target_kueri_insiden t JOIN mrp_standar_layanan s ON s.id = t.standar_layanan_id JOIN mrp_katalog_layanan k ON k.id = s.katalog_layanan_id',
+    id: 't.id'
+  },
+  rencana: {
+    from: 'mrp_rencana_komunikasi r JOIN mrp_katalog_layanan k ON k.id = r.katalog_layanan_id',
+    id: 'r.id'
+  },
+  media: {
+    from: 'mrp_media_komunikasi m JOIN mrp_rencana_komunikasi r ON r.id = m.rencana_komunikasi_id JOIN mrp_katalog_layanan k ON k.id = r.katalog_layanan_id',
+    id: 'm.id'
+  },
+  terkait: {
+    from: 'mrp_katalog_layanan_terkait kt JOIN mrp_katalog_layanan k ON k.id = kt.katalog_layanan_id',
+    id: 'kt.id'
+  }
+};
+
+const isMrp01Allowed = async (scope, resource, recordId) => {
+  const spec = mrp01ScopeJoins[resource];
+  if (!spec || !isPositiveInteger(recordId)) return false;
+
+  const [rows] = await db.query(
+    `
+      SELECT 1 AS allowed
+      FROM ${spec.from}
+      WHERE ${spec.id} = ?
+        AND (? = 1 OR k.instansi_id = ?)
+      LIMIT 1
+    `,
+    [Number(recordId), scope.isAdmin ? 1 : 0, scope.instansiId]
+  );
+  return rows.length > 0;
+};
+
+const secureMrp01Endpoint = (name, resource, idSource) => {
+  const originalHandler = exports[name];
+  if (typeof originalHandler !== 'function') {
+    throw new Error(`Handler MRP01 tidak ditemukan: ${name}`);
+  }
+  exports[name] = async (req, res) => {
+    try {
+      const scope = await getMrpScope(req);
+      const recordId = idSource === 'params'
+        ? req.params.id
+        : req.body[idSource];
+
+      if (!isPositiveInteger(recordId)) {
+        return res.status(400).json({ message: 'ID referensi MRP01 tidak valid.' });
+      }
+
+      if (!(await isMrp01Allowed(scope, resource, recordId))) {
+        return res.status(404).json({ message: 'Data tidak ditemukan atau tidak dapat diakses.' });
+      }
+      return await originalHandler(req, res);
+    } catch (error) {
+      return handleMrpError(res, error, name);
+    }
+  };
+};
+
+const mrp01ProtectedEndpoints = [
+  ['getOlaLayananById', 'ola', 'params'],
+  ['getOlaByStandar', 'standar', 'params'],
+  ['createOlaLayanan', 'standar', 'standar_layanan_id'],
+  ['updateOlaLayanan', 'ola', 'params'],
+  ['deleteOlaLayanan', 'ola', 'params'],
+  ['getIndikatorTambahanById', 'indikator', 'params'],
+  ['getIndikatorTambahanByStandar', 'standar', 'params'],
+  ['createIndikatorTambahan', 'standar', 'standar_layanan_id'],
+  ['updateIndikatorTambahan', 'indikator', 'params'],
+  ['deleteIndikatorTambahan', 'indikator', 'params'],
+  ['getTargetKueriInsidenById', 'target', 'params'],
+  ['getTargetKueriInsidenByStandar', 'standar', 'params'],
+  ['createTargetKueriInsiden', 'standar', 'standar_layanan_id'],
+  ['updateTargetKueriInsiden', 'target', 'params'],
+  ['deleteTargetKueriInsiden', 'target', 'params'],
+  ['getRencanaKomunikasiById', 'rencana', 'params'],
+  ['getMediaKomunikasiById', 'media', 'params'],
+  ['getMediaByRencanaKomunikasi', 'rencana', 'params'],
+  ['createMediaKomunikasi', 'rencana', 'rencana_komunikasi_id'],
+  ['updateMediaKomunikasi', 'media', 'params'],
+  ['deleteMediaKomunikasi', 'media', 'params'],
+  ['getKatalogLayananTerkaitById', 'terkait', 'params'],
+  ['getLayananTerkaitByKatalog', 'katalog', 'params'],
+  ['createKatalogLayananTerkait', 'katalog', 'katalog_layanan_id'],
+  ['updateKatalogLayananTerkait', 'terkait', 'params'],
+  ['deleteKatalogLayananTerkait', 'terkait', 'params']
+];
+
+for (const [name, resource, idSource] of mrp01ProtectedEndpoints) {
+  secureMrp01Endpoint(name, resource, idSource);
+}
+
+
+
+const resolveStandarDariKatalog = async (req) => {
+  const scope = await getMrpScope(req);
+  const katalogId = Number(req.body.katalog_layanan_id);
+
+  if (!isPositiveInteger(katalogId)) {
+    const error = new Error('Katalog Layanan wajib dipilih.');
+    error.status = 400;
+    throw error;
+  }
+
+  const [katalogRows] = await db.query(
+    `
+      SELECT id
+      FROM mrp_katalog_layanan
+      WHERE id = ?
+        AND (? = 1 OR instansi_id = ?)
+      LIMIT 1
+    `,
+    [katalogId, scope.isAdmin ? 1 : 0, scope.instansiId]
+  );
+
+  if (katalogRows.length === 0) {
+    const error = new Error(
+      'Katalog Layanan tidak ditemukan atau tidak dapat diakses.'
+    );
+    error.status = 404;
+    throw error;
+  }
+
+  const cariStandar = async () => {
+    const [rows] = await db.query(
+      `
+        SELECT id
+        FROM mrp_standar_layanan
+        WHERE katalog_layanan_id = ?
+        ORDER BY versi DESC, id DESC
+        LIMIT 1
+      `,
+      [katalogId]
+    );
+
+    return rows.length > 0 ? Number(rows[0].id) : null;
+  };
+
+  let standarId = await cariStandar();
+
+  if (standarId === null) {
+    try {
+      await db.query(
+        `
+          INSERT INTO mrp_standar_layanan (
+            katalog_layanan_id,
+            versi,
+            berlaku_mulai,
+            berlaku_sampai,
+            status,
+            catatan,
+            created_by
+          )
+          VALUES (?, 1, CURDATE(), NULL, 'Draft', NULL, ?)
+        `,
+        [katalogId, scope.userId]
+      );
+    } catch (error) {
+      if (error.code !== 'ER_DUP_ENTRY') {
+        throw error;
+      }
+    }
+
+    standarId = await cariStandar();
+  }
+
+  if (!isPositiveInteger(standarId)) {
+    const error = new Error('Gagal menyiapkan Standar Layanan.');
+    error.status = 500;
+    throw error;
+  }
+
+  return standarId;
+};
+
+const createDenganKatalog = (handlerName) => {
+  const originalHandler = exports[handlerName];
+
+  exports[handlerName] = async (req, res) => {
+    try {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          'standar_layanan_id'
+        )
+      ) {
+        return res.status(400).json({
+          message: 'Gunakan Katalog Layanan untuk memilih layanan.'
+        });
+      }
+
+      const standarId = await resolveStandarDariKatalog(req);
+
+      req.body = {
+        ...req.body,
+        standar_layanan_id: standarId
+      };
+
+      delete req.body.katalog_layanan_id;
+
+      return await originalHandler(req, res);
+    } catch (error) {
+      return handleMrpError(res, error, handlerName);
+    }
+  };
+};
+
+createDenganKatalog('createSlaLayanan');
+createDenganKatalog('createOlaLayanan');
+createDenganKatalog('createTargetKueriInsiden');
+
+
 // =====================================================
 // MRP 2 - PERMINTAAN LAYANAN / SERVICE REQUEST
 // =====================================================
@@ -6819,7 +6617,8 @@ const permintaanLayananSelectQuery = `
 
         p.layanan_id,
         l.kode_layanan,
-        l.nama_layanan,
+        COALESCE(k_mrp2.nama_layanan, l.nama_layanan) AS nama_layanan,
+        k_mrp2.id AS katalog_layanan_id,
 
         p.standar_layanan_id,
         s.versi AS versi_standar,
@@ -6846,11 +6645,14 @@ const permintaanLayananSelectQuery = `
     LEFT JOIN users u
         ON u.id = p.pengguna_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = p.layanan_id
 
     LEFT JOIN mrp_standar_layanan s
         ON s.id = p.standar_layanan_id
+
+    LEFT JOIN mrp_katalog_layanan k_mrp2
+        ON k_mrp2.id = s.katalog_layanan_id
 
     JOIN users cb
         ON cb.id = p.created_by
@@ -7870,7 +7672,7 @@ const tanggapanPermintaanSelectQuery = `
         p.kode_request,
         p.layanan_id,
         l.kode_layanan,
-        l.nama_layanan,
+        COALESCE(k_mrp2.nama_layanan, l.nama_layanan) AS nama_layanan,
         p.status AS status_permintaan,
 
         t.pic_id,
@@ -7892,8 +7694,11 @@ const tanggapanPermintaanSelectQuery = `
     JOIN mrp_permintaan_layanan p
         ON p.id = t.permintaan_layanan_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = p.layanan_id
+
+    LEFT JOIN mrp_standar_layanan s_mrp2 ON s_mrp2.id = p.standar_layanan_id
+    LEFT JOIN mrp_katalog_layanan k_mrp2 ON k_mrp2.id = s_mrp2.katalog_layanan_id
 
     JOIN users pic
         ON pic.id = t.pic_id
@@ -8442,8 +8247,9 @@ const kueriSelectQuery = `
         q.waktu_masuk,
 
         q.layanan_id,
-        l.kode_layanan,
-        l.nama_layanan,
+        q.katalog_layanan_id,
+        COALESCE(l.kode_layanan, CONCAT('KAT-', k.id)) AS kode_layanan,
+        COALESCE(k.nama_layanan, l.nama_layanan) AS nama_layanan,
 
         q.target_kueri_id,
         tk.prioritas AS prioritas_target,
@@ -8478,8 +8284,10 @@ const kueriSelectQuery = `
 
     FROM mrp_kueri q
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = q.layanan_id
+    LEFT JOIN mrp_katalog_layanan k
+        ON k.id = q.katalog_layanan_id
 
     LEFT JOIN mrp_target_kueri_insiden tk
         ON tk.id = q.target_kueri_id
@@ -9747,8 +9555,9 @@ const tanggapanKueriSelectQuery = `
         q.kode_kueri,
         q.judul,
         q.layanan_id,
-        l.kode_layanan,
-        l.nama_layanan,
+        q.katalog_layanan_id,
+        COALESCE(l.kode_layanan, CONCAT('KAT-', k.id)) AS kode_layanan,
+        COALESCE(k.nama_layanan, l.nama_layanan) AS nama_layanan,
         q.status AS status_kueri,
 
         t.pic_id,
@@ -9772,8 +9581,10 @@ const tanggapanKueriSelectQuery = `
     JOIN mrp_kueri q
         ON q.id = t.kueri_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = q.layanan_id
+    LEFT JOIN mrp_katalog_layanan k
+        ON k.id = q.katalog_layanan_id
 
     JOIN users pic
         ON pic.id = t.pic_id
@@ -10337,8 +10148,9 @@ const insidenSelectQuery = `
         i.waktu_terdeteksi,
 
         i.layanan_id,
-        l.kode_layanan,
-        l.nama_layanan,
+        i.katalog_layanan_id,
+        COALESCE(l.kode_layanan, CONCAT('KAT-', k.id)) AS kode_layanan,
+        COALESCE(k.nama_layanan, l.nama_layanan) AS nama_layanan,
 
         i.target_insiden_id,
         ti.prioritas AS prioritas_target,
@@ -10372,8 +10184,10 @@ const insidenSelectQuery = `
     LEFT JOIN users pelapor
         ON pelapor.id = i.pelapor_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = i.layanan_id
+    LEFT JOIN mrp_katalog_layanan k
+        ON k.id = i.katalog_layanan_id
 
     LEFT JOIN mrp_target_kueri_insiden ti
         ON ti.id = i.target_insiden_id
@@ -11753,8 +11567,9 @@ const penangananInsidenSelectQuery = `
 
         i.kode_insiden,
         i.layanan_id,
-        l.kode_layanan,
-        l.nama_layanan,
+        i.katalog_layanan_id,
+        COALESCE(l.kode_layanan, CONCAT('KAT-', k.id)) AS kode_layanan,
+        COALESCE(k.nama_layanan, l.nama_layanan) AS nama_layanan,
         i.prioritas,
         i.status AS status_insiden,
 
@@ -11777,8 +11592,10 @@ const penangananInsidenSelectQuery = `
     JOIN mrp_insiden i
         ON i.id = p.insiden_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = i.layanan_id
+    LEFT JOIN mrp_katalog_layanan k
+        ON k.id = i.katalog_layanan_id
 
     JOIN users pic
         ON pic.id = p.pic_id
@@ -13426,8 +13243,9 @@ const masalahInsidenSelectQuery = `
         i.apakah_berulang,
 
         i.layanan_id,
-        l.kode_layanan,
-        l.nama_layanan,
+        i.katalog_layanan_id,
+        COALESCE(l.kode_layanan, CONCAT('KAT-', k.id)) AS kode_layanan,
+        COALESCE(k.nama_layanan, l.nama_layanan) AS nama_layanan,
 
         mi.keterangan,
         mi.created_at
@@ -13440,8 +13258,10 @@ const masalahInsidenSelectQuery = `
     JOIN mrp_insiden i
         ON i.id = mi.insiden_id
 
-    JOIN layanan_digital l
+    LEFT JOIN layanan_digital l
         ON l.id = i.layanan_id
+    LEFT JOIN mrp_katalog_layanan k
+        ON k.id = i.katalog_layanan_id
 `;
 
 
@@ -15671,47 +15491,42 @@ exports.deleteEvaluasi = async (
 // MRP 4 BAGIAN 1 - EVALUASI LAYANAN
 // =====================================================
 
+
 const evaluasiLayananSelectQuery = `
     SELECT
         el.id,
-
         el.evaluasi_id,
         e.kode_evaluasi,
         e.instansi_id,
-
         el.standar_layanan_id,
         sl.versi AS versi_standar,
         sl.status AS status_standar,
-
         kl.id AS katalog_layanan_id,
-
-        ld.id AS layanan_id,
-        ld.kode_layanan,
-        ld.nama_layanan,
-
+        kl.layanan_id,
+        COALESCE(
+            ld.kode_layanan,
+            CONCAT('KAT-', kl.id)
+        ) AS kode_layanan,
+        COALESCE(
+            NULLIF(kl.nama_layanan, ''),
+            ld.nama_layanan
+        ) AS nama_layanan,
         el.cakupan_layanan_snapshot,
         el.kesenjangan,
         el.lesson_learned,
         el.kesimpulan,
-
         el.created_at,
         el.updated_at
-
     FROM mrp_evaluasi_layanan el
-
     JOIN mrp_evaluasi e
         ON e.id = el.evaluasi_id
-
     JOIN mrp_standar_layanan sl
         ON sl.id = el.standar_layanan_id
-
     JOIN mrp_katalog_layanan kl
         ON kl.id = sl.katalog_layanan_id
-
-    JOIN layanan_digital ld
+    LEFT JOIN layanan_digital ld
         ON ld.id = kl.layanan_id
 `;
-
 
 // =====================================================
 // VALIDASI EVALUASI LAYANAN
@@ -16043,30 +15858,22 @@ exports.createEvaluasiLayanan = async (
         // CEK STANDAR + LAYANAN + INSTANSI
         // =============================================
 
+        
         const [standar] = await db.query(
             `
             SELECT
                 sl.id,
                 kl.ruang_lingkup_layanan,
                 kl.target_cakupan_pengguna,
-                ld.instansi_id AS layanan_instansi_id
-
+                kl.instansi_id AS layanan_instansi_id
             FROM mrp_standar_layanan sl
-
             JOIN mrp_katalog_layanan kl
-                ON kl.id =
-                    sl.katalog_layanan_id
-
-            JOIN layanan_digital ld
-                ON ld.id =
-                    kl.layanan_id
-
+                ON kl.id = sl.katalog_layanan_id
             WHERE sl.id = ?
             LIMIT 1
             `,
             [standar_layanan_id]
         );
-
 
         if (standar.length === 0) {
             return res.status(400).json({
@@ -17607,9 +17414,9 @@ const evaluasiKueriInsidenSelectQuery = `
         tki.ola_waktu_respon_menit,
         tki.ola_waktu_penyelesaian_menit,
 
-        ld.id AS layanan_id,
-        ld.kode_layanan,
-        ld.nama_layanan,
+        kl.layanan_id,
+        COALESCE(ld.kode_layanan, CONCAT('KAT-', kl.id)) AS kode_layanan,
+        COALESCE(NULLIF(kl.nama_layanan, ''), ld.nama_layanan) AS nama_layanan,
 
         eki.target_waktu_respon_menit,
         eki.rata_rata_waktu_respon_menit,
@@ -17639,7 +17446,7 @@ const evaluasiKueriInsidenSelectQuery = `
     JOIN mrp_katalog_layanan kl
         ON kl.id = sl.katalog_layanan_id
 
-    JOIN layanan_digital ld
+    LEFT JOIN layanan_digital ld
         ON ld.id = kl.layanan_id
 `;
 
@@ -17993,41 +17800,28 @@ exports.createEvaluasiKueriInsiden = async (
         // CEK TARGET + STANDAR + LAYANAN
         // =============================================
 
+        
         const [target] = await db.query(
             `
             SELECT
                 tki.id,
                 tki.jenis,
                 tki.prioritas,
-
                 tki.sla_waktu_respon_menit,
                 tki.sla_waktu_penyelesaian_menit,
-
                 tki.ola_waktu_respon_menit,
                 tki.ola_waktu_penyelesaian_menit,
-
-                ld.instansi_id AS layanan_instansi_id
-
+                kl.instansi_id AS layanan_instansi_id
             FROM mrp_target_kueri_insiden tki
-
             JOIN mrp_standar_layanan sl
-                ON sl.id =
-                    tki.standar_layanan_id
-
+                ON sl.id = tki.standar_layanan_id
             JOIN mrp_katalog_layanan kl
-                ON kl.id =
-                    sl.katalog_layanan_id
-
-            JOIN layanan_digital ld
-                ON ld.id =
-                    kl.layanan_id
-
+                ON kl.id = sl.katalog_layanan_id
             WHERE tki.id = ?
             LIMIT 1
             `,
             [target_kueri_insiden_id]
         );
-
 
         if (target.length === 0) {
             return res.status(400).json({
@@ -19617,7 +19411,7 @@ const evaluasiPermintaanSelectQuery = `
         pl.status AS status_permintaan,
 
         ld.kode_layanan,
-        ld.nama_layanan,
+        COALESCE(k_mrp2.nama_layanan, ld.nama_layanan) AS nama_layanan,
 
         ep.target_waktu_respon_menit,
         ep.realisasi_waktu_respon_menit,
@@ -19643,8 +19437,10 @@ const evaluasiPermintaanSelectQuery = `
     JOIN mrp_permintaan_layanan pl
         ON pl.id = ep.permintaan_layanan_id
 
-    JOIN layanan_digital ld
+    LEFT JOIN layanan_digital ld
         ON ld.id = pl.layanan_id
+    LEFT JOIN mrp_standar_layanan s_mrp2 ON s_mrp2.id = pl.standar_layanan_id
+    LEFT JOIN mrp_katalog_layanan k_mrp2 ON k_mrp2.id = s_mrp2.katalog_layanan_id
 
     JOIN users u
         ON u.id = ep.dievaluasi_oleh
@@ -22774,3 +22570,432 @@ exports.deleteRencanaPerbaikan = async (
         });
     }
 };
+
+
+const mrp02ScopeWhere = `
+  FROM mrp_permintaan_layanan p
+  JOIN mrp_standar_layanan s ON s.id = p.standar_layanan_id
+  JOIN mrp_katalog_layanan k ON k.id = s.katalog_layanan_id
+`;
+
+const mrp02OwnedRequest = async (scope, id) => {
+  if (!isPositiveInteger(id)) return false;
+  const [rows] = await db.query(
+    `SELECT p.id ${mrp02ScopeWhere} WHERE p.id = ? AND (? = 1 OR k.instansi_id = ?) LIMIT 1`,
+    [Number(id), scope.isAdmin ? 1 : 0, scope.instansiId]
+  );
+  return rows.length > 0;
+};
+
+const mrp02ResolveKatalog = async (scope, katalogId) => {
+  if (!isPositiveInteger(katalogId)) {
+    const error = new Error('Katalog Layanan wajib dipilih.'); error.status = 400; throw error;
+  }
+  const [rows] = await db.query(
+    `SELECT k.id, k.layanan_id, s.id AS standar_id
+     FROM mrp_katalog_layanan k
+     LEFT JOIN mrp_standar_layanan s ON s.id = (
+       SELECT s2.id FROM mrp_standar_layanan s2
+       WHERE s2.katalog_layanan_id = k.id ORDER BY s2.versi DESC, s2.id DESC LIMIT 1
+     )
+     WHERE k.id = ? AND (? = 1 OR k.instansi_id = ?) LIMIT 1`,
+    [Number(katalogId), scope.isAdmin ? 1 : 0, scope.instansiId]
+  );
+  if (!rows.length) { const error = new Error('Katalog Layanan tidak ditemukan.'); error.status = 404; throw error; }
+  if (!rows[0].standar_id) {
+    const error = new Error('Katalog belum memiliki standar layanan. Simpan SLA/OLA dari MRP01 terlebih dahulu.');
+    error.status = 400; throw error;
+  }
+  return rows[0];
+};
+
+exports.getAllPermintaanLayanan = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `${permintaanLayananSelectQuery}
+       WHERE (? = 1 OR k_mrp2.instansi_id = ?)
+       ORDER BY p.waktu_masuk DESC, p.id DESC`,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.json(rows);
+  } catch (error) { return handleMrpError(res, error, 'getAllPermintaanLayanan'); }
+};
+
+exports.getPermintaanLayananById = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `${permintaanLayananSelectQuery} WHERE p.id = ? AND (? = 1 OR k_mrp2.instansi_id = ?) LIMIT 1`,
+      [Number(req.params.id), scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    if (!rows.length) return res.status(404).json({message:'Permintaan tidak ditemukan.'});
+    return res.json(rows[0]);
+  } catch(error) {return handleMrpError(res,error,'getPermintaanLayananById');}
+};
+
+const mrp02ValidateRequest = (body) => {
+  for (const [key,label] of [['kode_request','Kode Request'],['waktu_masuk','Waktu Masuk'],['kanal_masuk','Kanal Masuk'],['deskripsi_permintaan','Deskripsi Permintaan']]) {
+    if (typeof body[key] !== 'string' || !body[key].trim()) {
+      const error = new Error(`${label} wajib diisi.`);error.status=400;throw error;
+    }
+  }
+  if (!['Rendah','Sedang','Tinggi'].includes(body.urgensi)) {
+    const error=new Error('Urgensi wajib dipilih.');error.status=400;throw error;
+  }
+  if (body.email_pelapor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email_pelapor)) {
+    const error=new Error('Email Pelapor tidak valid.');error.status=400;throw error;
+  }
+};
+
+const mrp02SaveRequest = async (req,res,isUpdate) => {
+  try {
+    const scope=await getMrpScope(req);
+    const body=req.body;
+    const recordId=Number(req.params.id);
+    if (isUpdate && !(await mrp02OwnedRequest(scope,recordId))) return res.status(404).json({message:'Permintaan tidak ditemukan.'});
+    if (['created_by','instansi_id','layanan_id'].some(key => Object.prototype.hasOwnProperty.call(body,key))) return res.status(400).json({message:'Referensi layanan tidak boleh dikirim langsung.'});
+    mrp02ValidateRequest(body);
+    const katalog=await mrp02ResolveKatalog(scope,body.katalog_layanan_id);
+    const userId=body.pengguna_id == null || body.pengguna_id === '' ? null:Number(body.pengguna_id);
+    if (userId !== null) {
+      if (!isPositiveInteger(userId)) return res.status(400).json({message:'Pengguna/Pelapor tidak valid.'});
+      const [users]=await db.query('SELECT id FROM users WHERE id=? AND instansi_id=(SELECT instansi_id FROM mrp_katalog_layanan WHERE id=?) LIMIT 1',[userId,katalog.id]);
+      if (!users.length) return res.status(403).json({message:'Pengguna/Pelapor harus berasal dari instansi yang sama.'});
+    }
+    const [cols]=await db.query(`SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mrp_permintaan_layanan' AND COLUMN_NAME='layanan_id' LIMIT 1`);
+    if (katalog.layanan_id == null && cols[0]?.IS_NULLABLE === 'NO') return res.status(409).json({message:'Kolom layanan_id MRP02 masih wajib merujuk layanan_digital. Perlu penyesuaian nullable agar katalog manual dapat disimpan tanpa ID palsu.'});
+    const params=[body.kode_request.trim(),userId,katalog.layanan_id == null?null:Number(katalog.layanan_id),Number(katalog.standar_id),body.waktu_masuk.trim(),normalizeOptionalText(body.cakupan_layanan_terkait),normalizeOptionalText(body.email_pelapor),normalizeOptionalText(body.nomor_hp_pelapor),body.kanal_masuk.trim(),normalizeOptionalText(body.url_persyaratan_bukti),body.deskripsi_permintaan.trim(),body.urgensi];
+    if (isUpdate) {
+      const [result]=await db.query(`UPDATE mrp_permintaan_layanan SET kode_request=?,pengguna_id=?,layanan_id=?,standar_layanan_id=?,waktu_masuk=?,cakupan_layanan_terkait=?,email_pelapor=?,nomor_hp_pelapor=?,kanal_masuk=?,url_persyaratan_bukti=?,deskripsi_permintaan=?,urgensi=? WHERE id=?`,[...params,recordId]);
+      return res.status(result.affectedRows?200:404).json({message:result.affectedRows?'Permintaan layanan berhasil diperbarui.':'Permintaan tidak ditemukan.'});
+    }
+    const [result]=await db.query(`INSERT INTO mrp_permintaan_layanan (kode_request,pengguna_id,layanan_id,standar_layanan_id,waktu_masuk,cakupan_layanan_terkait,email_pelapor,nomor_hp_pelapor,kanal_masuk,url_persyaratan_bukti,deskripsi_permintaan,urgensi,status,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[...params,'Diajukan',scope.userId]);
+    return res.status(201).json({message:'Permintaan layanan berhasil dibuat.',id:result.insertId});
+  } catch(error) {
+    if (error.code==='ER_DUP_ENTRY') return res.status(409).json({message:'Kode Request sudah digunakan.'});
+    return handleMrpError(res,error,'mrp02SaveRequest');
+  }
+};
+exports.createPermintaanLayanan=(req,res)=>mrp02SaveRequest(req,res,false);
+exports.updatePermintaanLayanan=(req,res)=>mrp02SaveRequest(req,res,true);
+
+const mrp02WrapOwned = (name,source) => {
+  const original=exports[name];
+  if (typeof original!=='function') return;
+  exports[name]=async(req,res)=>{
+    try {
+      const scope=await getMrpScope(req);
+      let requestId;
+      if (source==='params') requestId=Number(req.params.id);
+      if (source==='body') requestId=Number(req.body.permintaan_layanan_id);
+      if (source==='tanggapan') {
+        const [r]=await db.query('SELECT permintaan_layanan_id FROM mrp_tanggapan_permintaan WHERE id=? LIMIT 1',[req.params.id]);
+        requestId=r[0]?.permintaan_layanan_id;
+      }
+      if (source==='evaluasi') {
+        const [r]=await db.query('SELECT permintaan_layanan_id FROM mrp_evaluasi_permintaan WHERE id=? LIMIT 1',[req.params.id]);
+        requestId=r[0]?.permintaan_layanan_id;
+      }
+      if (!(await mrp02OwnedRequest(scope,requestId))) return res.status(404).json({message:'Data tidak ditemukan atau tidak dapat diakses.'});
+      return original(req,res);
+    } catch(error) {return handleMrpError(res,error,name);}
+  };
+};
+
+mrp02WrapOwned('deletePermintaanLayanan','params');
+for (const name of ['createTanggapanPermintaan','createEvaluasiPermintaan']) mrp02WrapOwned(name,'body');
+for (const name of ['getTanggapanPermintaanById']) mrp02WrapOwned(name,'tanggapan');
+for (const name of ['getEvaluasiPermintaanById','updateEvaluasiPermintaan','deleteEvaluasiPermintaan']) mrp02WrapOwned(name,'evaluasi');
+
+exports.getAllTanggapanPermintaan=async(req,res)=>{
+  try {const scope=await getMrpScope(req);
+    const [rows]=await db.query(`${tanggapanPermintaanSelectQuery} JOIN mrp_standar_layanan smrp ON smrp.id=p.standar_layanan_id JOIN mrp_katalog_layanan kmrp ON kmrp.id=smrp.katalog_layanan_id WHERE (?=1 OR kmrp.instansi_id=?) ORDER BY t.id DESC`,[scope.isAdmin?1:0,scope.instansiId]);
+    return res.json(rows);
+  } catch(error){return handleMrpError(res,error,'getAllTanggapanPermintaan');}
+};
+exports.getAllEvaluasiPermintaan=async(req,res)=>{
+  try {const scope=await getMrpScope(req);
+    const [rows]=await db.query(`${evaluasiPermintaanSelectQuery} JOIN mrp_standar_layanan smrp ON smrp.id=pl.standar_layanan_id JOIN mrp_katalog_layanan kmrp ON kmrp.id=smrp.katalog_layanan_id WHERE (?=1 OR kmrp.instansi_id=?) ORDER BY ep.id DESC`,[scope.isAdmin?1:0,scope.instansiId]);
+    return res.json(rows);
+  } catch(error){return handleMrpError(res,error,'getAllEvaluasiPermintaan');}
+};
+
+
+
+const mrp03CatalogForScope = async (scope, id) => {
+  const [rows] = await db.query(
+    `SELECT id, layanan_id FROM mrp_katalog_layanan WHERE id = ? AND (? = 1 OR instansi_id = ?) LIMIT 1`,
+    [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+  );
+  return rows[0] || null;
+};
+
+const mrp03CheckRef = async (scope, table, id) => {
+  if (!isPositiveInteger(id)) return null;
+  const allowed = {mrp_kueri: 'q', mrp_insiden: 'q', mrp_masalah: 'q'};
+  if (!allowed[table]) return null;
+  const [rows] = await db.query(
+    `SELECT q.id FROM ${table} q JOIN users u ON u.id = q.created_by WHERE q.id = ? AND (? = 1 OR u.instansi_id = ?) LIMIT 1`,
+    [id, scope.isAdmin ? 1 : 0, scope.instansiId]
+  );
+  return rows[0] || null;
+};
+
+const mrp03Target = async (scope, id, katalogId, jenis, prioritas) => {
+  if (id === null || id === undefined || id === '') return true;
+  const [rows] = await db.query(
+    `SELECT t.id FROM mrp_target_kueri_insiden t JOIN mrp_standar_layanan s ON s.id=t.standar_layanan_id JOIN mrp_katalog_layanan k ON k.id=s.katalog_layanan_id WHERE t.id=? AND k.id=? AND t.jenis=? AND (? = 1 OR k.instansi_id=?) AND (? IS NULL OR t.prioritas=?) LIMIT 1`,
+    [id, katalogId, jenis, scope.isAdmin ? 1 : 0, scope.instansiId, prioritas, prioritas]
+  );
+  return rows.length > 0;
+};
+
+exports.getMrp03KatalogOptions = async (req, res) => {
+  try {
+    const scope = await getMrpScope(req);
+    const [rows] = await db.query(
+      `SELECT id, COALESCE(NULLIF(nama_layanan, ''), CONCAT('Katalog ',id)) AS nama_layanan, CONCAT('KAT-',id) AS kode_layanan FROM mrp_katalog_layanan WHERE (?=1 OR instansi_id=?) ORDER BY nama_layanan`,
+      [scope.isAdmin ? 1 : 0, scope.instansiId]
+    );
+    return res.json({data: rows});
+  } catch (error) {return handleMrpError(res,error,'getMrp03KatalogOptions');}
+};
+
+const mrp03Config = {
+  kueri: {
+    table: 'mrp_kueri', alias: 'q', select: () => kueriSelectQuery,
+    date: 'waktu_masuk', code: 'kode_kueri', target: 'target_kueri_id', kind: 'Kueri',
+    required: ['kode_kueri','waktu_masuk','kanal_masuk','judul','jenis','deskripsi','urgensi'],
+    columns: ['kode_kueri','waktu_masuk','cakupan_layanan_terkait','pengguna_id','email_pelapor','nomor_hp_pelapor','kanal_masuk','judul','jenis','deskripsi','bukti_tambahan','url_bukti','urgensi','status'],
+    optional: ['cakupan_layanan_terkait','pengguna_id','email_pelapor','nomor_hp_pelapor','bukti_tambahan','url_bukti']
+  },
+  insiden: {
+    table: 'mrp_insiden', alias: 'i', select: () => insidenSelectQuery,
+    date: 'waktu_terdeteksi', code: 'kode_insiden', target: 'target_insiden_id', kind: 'Insiden',
+    required: ['kode_insiden','waktu_terdeteksi','kanal_masuk','deskripsi_insiden','prioritas'],
+    columns: ['kode_insiden','kueri_asal_id','kanal_masuk','pelapor_id','waktu_terdeteksi','deskripsi_insiden','prioritas','diagnosa_awal','target_waktu_selesai','status','apakah_berulang'],
+    optional: ['kueri_asal_id','pelapor_id','diagnosa_awal','target_waktu_selesai']
+  }
+};
+
+const mrp03List = (kind) => async (req,res) => {
+  try {
+    const scope=await getMrpScope(req), c=mrp03Config[kind];
+    const [rows]=await db.query(
+      `${c.select()} WHERE (?=1 OR ${kind==='kueri'?'cb':'pembuat'}.instansi_id=?) ORDER BY ${c.alias}.${c.date} DESC, ${c.alias}.id DESC`,
+      [scope.isAdmin?1:0,scope.instansiId]
+    );
+    return res.json(rows);
+  } catch(error) {return handleMrpError(res,error,`getAll${kind}`);}
+};
+
+const mrp03Detail = (kind) => async(req,res) => {
+  try {
+    const scope=await getMrpScope(req),c=mrp03Config[kind];
+    const [rows]=await db.query(`${c.select()} WHERE ${c.alias}.id=? AND (?=1 OR ${kind==='kueri'?'cb':'pembuat'}.instansi_id=?) LIMIT 1`,[req.params.id,scope.isAdmin?1:0,scope.instansiId]);
+    return rows.length ? res.json(rows[0]) : res.status(404).json({message:'Data tidak ditemukan.'});
+  } catch(error){return handleMrpError(res,error,`get${kind}ById`);}
+};
+
+const mrp03Save = (kind, update=false) => async(req,res) => {
+  try {
+    const scope=await getMrpScope(req),c=mrp03Config[kind], body=req.body;
+    if ('created_by' in body || 'instansi_id' in body) return res.status(400).json({message:'Data pembuat dan instansi tidak boleh diubah.'});
+    let existing=null;
+    if (update) {
+      if (!(await mrp03CheckRef(scope,c.table,req.params.id))) return res.status(404).json({message:'Data tidak ditemukan pada instansi ini.'});
+      const [rows]=await db.query(`SELECT * FROM ${c.table} WHERE id=? LIMIT 1`,[req.params.id]);
+      existing=rows[0];
+    }
+    const merged={...existing,...body};
+    for(const field of c.required){
+      if (merged[field]===null || merged[field]===undefined || String(merged[field]).trim()==='') return res.status(400).json({message:`${field.replaceAll('_',' ')} wajib diisi.`});
+    }
+    const catalogId=Number(merged.katalog_layanan_id);
+    if (!isPositiveInteger(catalogId)) return res.status(400).json({message:'Katalog Layanan wajib dipilih.'});
+    const catalog=await mrp03CatalogForScope(scope,catalogId);
+    if (!catalog) return res.status(400).json({message:'Katalog layanan tidak ditemukan pada instansi ini.'});
+    const priority=kind==='insiden'?merged.prioritas:null;
+    if (!(await mrp03Target(scope,merged[c.target],catalogId,c.kind,priority))) return res.status(400).json({message:'Target SLA/OLA tidak sesuai dengan katalog dan prioritas.'});
+    if(kind==='insiden' && merged.kueri_asal_id){
+      if(!(await mrp03CheckRef(scope,'mrp_kueri',merged.kueri_asal_id))) return res.status(400).json({message:'Kueri asal tidak ditemukan pada instansi ini.'});
+      const [origin]=await db.query('SELECT katalog_layanan_id FROM mrp_kueri WHERE id=?',[merged.kueri_asal_id]);
+      if(Number(origin[0]?.katalog_layanan_id)!==catalogId) return res.status(400).json({message:'Kueri asal harus menggunakan katalog yang sama.'});
+    }
+    const userKey=kind==='kueri'?'pengguna_id':'pelapor_id';
+    if(merged[userKey]){
+      const [people]=await db.query('SELECT id FROM users WHERE id=? AND (?=1 OR instansi_id=?)',[merged[userKey],scope.isAdmin?1:0,scope.instansiId]);
+      if(!people.length) return res.status(400).json({message:'Pengguna / Pelapor tidak ditemukan pada instansi ini.'});
+    }
+    const columns=[...c.columns,'layanan_id','katalog_layanan_id',c.target];
+    const values=columns.map(field=>{
+      if(field==='layanan_id') return catalog.layanan_id ?? null;
+      if(field==='katalog_layanan_id') return catalogId;
+      if(field===c.target) return merged[field] ? Number(merged[field]) : null;
+      const value=merged[field];
+      return c.optional.includes(field) && (value===undefined || value===null || value==='') ? null : value;
+    });
+    if(update){
+      await db.query(`UPDATE ${c.table} SET ${columns.map(f=>`${f}=?`).join(', ')} WHERE id=?`,[...values,req.params.id]);
+      return res.json({message:'Data berhasil diperbarui.'});
+    }
+    await db.query(`INSERT INTO ${c.table} (${columns.join(',')},created_by) VALUES (${columns.map(()=>'?').join(',')},?)`,[...values,scope.userId]);
+    return res.status(201).json({message:'Data berhasil disimpan.'});
+  }catch(error){return handleMrpError(res,error,`save${kind}`);}
+};
+
+const mrp03Delete = (kind) => async(req,res) => {
+  try{
+    const scope=await getMrpScope(req),c=mrp03Config[kind];
+    if(!(await mrp03CheckRef(scope,c.table,req.params.id))) return res.status(404).json({message:'Data tidak ditemukan pada instansi ini.'});
+    await db.query(`DELETE FROM ${c.table} WHERE id=?`,[req.params.id]);
+    return res.json({message:'Data berhasil dihapus.'});
+  }catch(error){return handleMrpError(res,error,`delete${kind}`);}
+};
+
+exports.getAllKueri=mrp03List('kueri');
+exports.getKueriById=mrp03Detail('kueri');
+exports.createKueri=mrp03Save('kueri');
+exports.updateKueri=mrp03Save('kueri',true);
+exports.deleteKueri=mrp03Delete('kueri');
+exports.getAllInsiden=mrp03List('insiden');
+exports.getInsidenById=mrp03Detail('insiden');
+exports.createInsiden=mrp03Save('insiden');
+exports.updateInsiden=mrp03Save('insiden',true);
+exports.deleteInsiden=mrp03Delete('insiden');
+
+const mrp03ScopedRead = (query, joins, filter, order) => async (req,res) => {
+  try {
+    const scope=await getMrpScope(req);
+    const [rows]=await db.query(`${query} ${joins} WHERE (?=1 OR ${filter}.instansi_id=?) ORDER BY ${order}`,[scope.isAdmin?1:0,scope.instansiId]);
+    return res.json(rows);
+  } catch(error){return handleMrpError(res,error,'mrp03ScopedRead');}
+};
+
+exports.getAllTanggapanKueri=mrp03ScopedRead(tanggapanKueriSelectQuery,'JOIN users mrp03_owner ON mrp03_owner.id=q.created_by','mrp03_owner','t.waktu_update DESC,t.id DESC');
+exports.getAllPenangananInsiden=mrp03ScopedRead(penangananInsidenSelectQuery,'JOIN users mrp03_owner ON mrp03_owner.id=i.created_by','mrp03_owner','p.waktu_tindakan DESC,p.id DESC');
+exports.getAllMasalah=mrp03ScopedRead(masalahSelectQuery,'','u','m.id DESC');
+exports.getAllMasalahInsiden=mrp03ScopedRead(masalahInsidenSelectQuery,'JOIN users mrp03_owner ON mrp03_owner.id=m.created_by JOIN users mrp03_inc_owner ON mrp03_inc_owner.id=i.created_by','mrp03_owner','mi.id DESC');
+
+const mrp03Guard = (handler, refs, related=false) => async (req,res) => {
+  try {
+    const scope=await getMrpScope(req);
+    for (const [table, field] of refs) {
+      const value=field==='id' ? req.params.id : req.body[field];
+      if(!value) return res.status(400).json({message:`${field} wajib dipilih.`});
+      if(!(await mrp03CheckRef(scope,table,value))) return res.status(403).json({message:'Data tidak ditemukan pada instansi ini.'});
+    }
+    if(related && req.body.pic_id){
+      const [people]=await db.query('SELECT id FROM users WHERE id=? AND (?=1 OR instansi_id=?)',[req.body.pic_id,scope.isAdmin?1:0,scope.instansiId]);
+      if(!people.length) return res.status(403).json({message:'PIC harus dari instansi yang sama.'});
+    }
+    return handler(req,res);
+  }catch(error){return handleMrpError(res,error,'mrp03Guard');}
+};
+
+exports.createTanggapanKueri=mrp03Guard(exports.createTanggapanKueri,[['mrp_kueri','kueri_id']],true);
+exports.createPenangananInsiden=mrp03Guard(exports.createPenangananInsiden,[['mrp_insiden','insiden_id']],true);
+exports.createMasalahInsiden=mrp03Guard(exports.createMasalahInsiden,[['mrp_masalah','masalah_id'],['mrp_insiden','insiden_id']]);
+exports.updateMasalahInsiden=mrp03Guard(exports.updateMasalahInsiden,[['mrp_masalah','masalah_id'],['mrp_insiden','insiden_id']]);
+exports.deleteMasalah=mrp03Guard(exports.deleteMasalah,[['mrp_masalah','id']]);
+exports.updateMasalah=mrp03Guard(exports.updateMasalah,[['mrp_masalah','id']]);
+
+
+const mrp04Owner = async (scope, evaluasiId) => {
+  if (!isPositiveInteger(evaluasiId)) return false;
+  const [rows] = await db.query('SELECT id FROM mrp_evaluasi WHERE id=? AND (?=1 OR instansi_id=?) LIMIT 1',[Number(evaluasiId),scope.isAdmin?1:0,scope.instansiId]);
+  return rows.length > 0;
+};
+const mrp04Table = {
+  evaluasi:'mrp_evaluasi',
+  layanan:'mrp_evaluasi_layanan',
+  kueri:'mrp_evaluasi_kueri_insiden',
+  rencana:'mrp_rencana_perbaikan'
+};
+const mrp04RefOwner = async (scope,type,id) => {
+  if (!isPositiveInteger(id)) return false;
+  if(type==='evaluasi') return mrp04Owner(scope,id);
+  const [rows]=await db.query(`SELECT e.id FROM ${mrp04Table[type]} x JOIN mrp_evaluasi e ON e.id=x.evaluasi_id WHERE x.id=? AND (?=1 OR e.instansi_id=?) LIMIT 1`,[Number(id),scope.isAdmin?1:0,scope.instansiId]);
+  return rows.length>0;
+};
+const mrp04Guard = (handler, type, creation=false) => async(req,res) => {
+  try {
+    const scope=await getMrpScope(req);
+    if(!scope.isAdmin && req.body.instansi_id !== undefined && Number(req.body.instansi_id)!==scope.instansiId) return res.status(403).json({message:'Hanya dapat memilih instansi akun sendiri.'});
+    if(creation && type!=='evaluasi' && !(await mrp04Owner(scope,req.body.evaluasi_id))) return res.status(403).json({message:'Evaluasi tidak tersedia pada instansi ini.'});
+    if(!creation && !(await mrp04RefOwner(scope,type,req.params.id))) return res.status(404).json({message:'Data evaluasi tidak ditemukan pada instansi ini.'});
+    if(type==='layanan' && creation){
+      const [rows]=await db.query('SELECT s.id FROM mrp_standar_layanan s JOIN mrp_katalog_layanan k ON k.id=s.katalog_layanan_id JOIN mrp_evaluasi e ON e.instansi_id=k.instansi_id WHERE s.id=? AND e.id=? LIMIT 1',[req.body.standar_layanan_id,req.body.evaluasi_id]);
+      if(!rows.length) return res.status(403).json({message:'Standar layanan tidak sesuai dengan instansi evaluasi.'});
+    }
+    if(type==='kueri' && creation){
+      const [rows]=await db.query('SELECT t.id FROM mrp_target_kueri_insiden t JOIN mrp_standar_layanan s ON s.id=t.standar_layanan_id JOIN mrp_katalog_layanan k ON k.id=s.katalog_layanan_id JOIN mrp_evaluasi e ON e.instansi_id=k.instansi_id WHERE t.id=? AND e.id=? LIMIT 1',[req.body.target_kueri_insiden_id,req.body.evaluasi_id]);
+      if(!rows.length) return res.status(403).json({message:'Target kueri/insiden tidak sesuai dengan instansi evaluasi.'});
+    }
+    if(type==='rencana' && creation){
+      for(const [field,table] of [['evaluasi_layanan_id','mrp_evaluasi_layanan'],['evaluasi_kueri_insiden_id','mrp_evaluasi_kueri_insiden']]){
+        if(req.body[field]){const [rows]=await db.query(`SELECT id FROM ${table} WHERE id=? AND evaluasi_id=? LIMIT 1`,[req.body[field],req.body.evaluasi_id]);if(!rows.length)return res.status(403).json({message:'Sumber evaluasi tidak sesuai.'});}
+      }
+    }
+    if(type==='rencana' && req.body.pic_id && !scope.isAdmin){
+      const [rows]=await db.query('SELECT id FROM users WHERE id=? AND instansi_id=? LIMIT 1',[req.body.pic_id,scope.instansiId]);
+      if(!rows.length)return res.status(403).json({message:'PIC harus berasal dari instansi yang sama.'});
+    }
+    return handler(req,res);
+  }catch(err){return handleMrpError(res,err,'mrp04Guard');}
+};
+const mrp04ScopedList = (handler, type) => async(req,res) => {
+  try {
+    const scope=await getMrpScope(req);
+    if(scope.isAdmin)return handler(req,res);
+    const [allowed]=await db.query('SELECT id FROM mrp_evaluasi WHERE instansi_id=?',[scope.instansiId]);
+    const ids=new Set(allowed.map(row=>Number(row.id)));
+    const oldJson=res.json.bind(res);
+    res.json=(payload)=>{
+      res.json=oldJson;
+      if(Array.isArray(payload)) payload=payload.filter(item=>ids.has(Number(type==='evaluasi'?item.id:item.evaluasi_id)));
+      return oldJson(payload);
+    };
+    return await handler(req,res);
+  }catch(err){return handleMrpError(res,err,'mrp04ScopedList');}
+};
+
+const createEvaluasiAsli = exports.createEvaluasi;
+
+exports.createEvaluasi = mrp04Guard(async (req, res) => {
+  const scope = await getMrpScope(req);
+
+  if (!isPositiveInteger(scope.instansiId)) {
+    return res.status(403).json({
+      message: 'Akun belum memiliki instansi untuk membuat evaluasi.'
+    });
+  }
+
+  req.body = {
+    ...req.body,
+    instansi_id: scope.instansiId
+  };
+
+  return createEvaluasiAsli(req, res);
+}, 'evaluasi', true);
+
+
+exports.updateEvaluasi=mrp04Guard(exports.updateEvaluasi,'evaluasi',false);
+exports.deleteEvaluasi=mrp04Guard(exports.deleteEvaluasi,'evaluasi',false);
+exports.getEvaluasiById=mrp04Guard(exports.getEvaluasiById,'evaluasi',false);
+exports.createEvaluasiLayanan=mrp04Guard(exports.createEvaluasiLayanan,'layanan',true);
+exports.updateEvaluasiLayanan=mrp04Guard(exports.updateEvaluasiLayanan,'layanan',false);
+exports.deleteEvaluasiLayanan=mrp04Guard(exports.deleteEvaluasiLayanan,'layanan',false);
+exports.getEvaluasiLayananById=mrp04Guard(exports.getEvaluasiLayananById,'layanan',false);
+exports.createEvaluasiKueriInsiden=mrp04Guard(exports.createEvaluasiKueriInsiden,'kueri',true);
+exports.updateEvaluasiKueriInsiden=mrp04Guard(exports.updateEvaluasiKueriInsiden,'kueri',false);
+exports.deleteEvaluasiKueriInsiden=mrp04Guard(exports.deleteEvaluasiKueriInsiden,'kueri',false);
+exports.getEvaluasiKueriInsidenById=mrp04Guard(exports.getEvaluasiKueriInsidenById,'kueri',false);
+exports.createRencanaPerbaikan=mrp04Guard(exports.createRencanaPerbaikan,'rencana',true);
+exports.updateRencanaPerbaikan=mrp04Guard(exports.updateRencanaPerbaikan,'rencana',false);
+exports.deleteRencanaPerbaikan=mrp04Guard(exports.deleteRencanaPerbaikan,'rencana',false);
+exports.getAllEvaluasi=mrp04ScopedList(exports.getAllEvaluasi,'evaluasi');
+exports.getAllEvaluasiLayanan=mrp04ScopedList(exports.getAllEvaluasiLayanan,'layanan');
+exports.getAllEvaluasiKueriInsiden=mrp04ScopedList(exports.getAllEvaluasiKueriInsiden,'kueri');
+exports.getAllRencanaPerbaikan=mrp04ScopedList(exports.getAllRencanaPerbaikan,'rencana');

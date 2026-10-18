@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 interface RisikoItem {
   id: number;
 
-  konteks_id?: number | null;
   konteks_nama_upr?: string | null;
   konteks_tahun?: number | string | null;
 
@@ -12,8 +11,6 @@ interface RisikoItem {
   sasaran_upr?: string | null;
   indikator_kinerja?: string | null;
 
-  layanan_id?: number | null;
-  layanan_prioritas_id?: number | null;
   pemilik_layanan?: string | null;
 
   kode_risiko?: string | null;
@@ -48,11 +45,9 @@ interface RisikoItem {
   membutuhkan_perubahan?: boolean | number | null;
   status_risiko?: 'Draft' | 'Diajukan' | 'Disetujui' | 'Ditolak' | null;
   
-  ippd_terkait?: {
-  id: number;
-  kode_instansi: string;
-  nama_instansi: string;
-}[];
+  nama_layanan_pendukung?: string | null;
+  nama_layanan_prioritas?: string | null;
+  ippd_terkait_text?: string | null;
 }
 
 const processSteps = [
@@ -94,10 +89,7 @@ export default function RisikoPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [konteksOptions, setKonteksOptions] = useState<any[]>([]);
-
   const [formData, setFormData] = useState({
-    konteks_id: '',
     sasaran_pembangunan_nasional: '',
     sasaran_upr: '',
     indikator_kinerja: '',
@@ -116,8 +108,9 @@ export default function RisikoPage() {
     penanggung_jawab_id: '',
     level_kemungkinan_residual: '1',
     level_dampak_residual: '1',
-    layanan_id: '',
-    layanan_prioritas_id: '',
+    nama_layanan_pendukung: '',
+    nama_layanan_prioritas: '',
+    ippd_terkait_text: '',
     pemilik_layanan: '',
     strategis_operasional: '',
     lintas_sektor: false,
@@ -136,39 +129,17 @@ export default function RisikoPage() {
   
   const [penanggungJawabOptions, setpenanggungJawabOptions] = useState<
   {
-    id: number,
-    nama: string,
-    upr_instansi?: string | null,
-    nama_role?: string | null,
+      id: number;
+      nama: string;
+      upr_instansi?: string | null;
+      nama_instansi?: string | null;
+      nama_unit?: string | null;
+      jabatan?: string | null;
+      nama_role?: string | null;
+
   }[]
   >([]);
 
-  const [layananOptions, setLayananOptions] = useState<
-    {
-      id: number,
-      kode_layanan: string,
-      nama_layanan: string,
-    }[]
-  >([]);
-
-  const [layananPrioritasOptions, setLayananPrioritasOptions] = useState <
-      {
-        id: number,
-        kode_prioritas: string,
-        nama_layanan: string;
-      }[]
-  >([]); 
-  
-  const [ippdOptions, setIppdOptions] = useState<
-      {
-        id: number;
-        kode_instansi: string;
-        nama_instansi: string;
-        jenis_instansi?: string | null;
-      }[]
-  >([]);
-
-  const [selectedIppdIds, setSelectedIppdIds] = useState<number[]>([]);
   const [selectedRisiko, setSelectedRisiko] = useState<RisikoItem | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -234,68 +205,6 @@ export default function RisikoPage() {
         console.error('Error fetching risiko:', err);
         setLoading(false);
       });
-  }, []);
-
-  useEffect (() => {
-    const token = sessionStorage.getItem('token');
-
-    fetch('http://localhost:5000/api/risiko/layanan-prioritas-options', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorData = await res.json();
-
-          throw new Error(
-            errorData.message ||
-              errorData.error ||
-              'Gagal mengambil daftar layanan prioritas'
-          );
-        }
-
-        return res.json();
-      })
-      .then((data) => {
-        setLayananPrioritasOptions(data);
-      })
-      .catch((err) => {
-        console.error('Error fetching layanan prioritas:', err);
-      });
-  }, []);
-
-  useEffect(() => {
-    const token = sessionStorage.getItem('token');
-
-    fetch('http://localhost:5000/api/risiko/ippd-options', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-type': 'application/json',
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorData = await res.json();
-
-          throw new Error(
-            errorData.message || 
-              errorData.error ||
-              'Gagal mengambil daftar IPPD'
-          );
-        }
-        
-        return res.json();
-      })
-      .then((data) => {
-        setIppdOptions(data);
-      })
-      .catch((err) => {
-        console.error('Error fetching IPPD:', err)
-      })
   }, []);
 
   const handleDetail = async (id: number) => {
@@ -371,10 +280,6 @@ export default function RisikoPage() {
       setEditingId(id);
 
       setFormData({
-        konteks_id:
-          result.konteks_id !== null && result.konteks_id !== undefined
-            ? String(result.konteks_id)
-            : '',
         sasaran_pembangunan_nasional:
           result.sasaran_pembangunan_nasional || '',
         sasaran_upr: result.sasaran_upr || '',
@@ -405,12 +310,14 @@ export default function RisikoPage() {
         level_dampak_residual: String(
           result.level_dampak_residual ?? 1
         ),
-        layanan_id: result.layanan_id
-          ? String(result.layanan_id)
-          : '',
-        layanan_prioritas_id: result.layanan_prioritas_id
-          ? String(result.layanan_prioritas_id)
-          : '',
+        nama_layanan_pendukung:
+          result.nama_layanan_pendukung || '',
+
+        nama_layanan_prioritas:
+          result.nama_layanan_prioritas || '',
+
+        ippd_terkait_text:
+          result.ippd_terkait_text || '',
         pemilik_layanan: result.pemilik_layanan || '',
         strategis_operasional:
           result.strategis_operasional || '',
@@ -419,14 +326,6 @@ export default function RisikoPage() {
           result.membutuhkan_perubahan
         ),
     });
-
-    setSelectedIppdIds(
-      Array.isArray(result.ippd_terkait)
-        ? result.ippd_terkait.map(
-            (item: { id: number }) => item.id
-          )
-        : []
-    );
 
     setCurrentStep(1);
     setShowForm(true);
@@ -520,11 +419,6 @@ export default function RisikoPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            konteks_id:
-              formData.konteks_id === ''
-                ? null
-                : Number(formData.konteks_id),
-
             // a. identifikasi risiko
             sasaran_pembangunan_nasional: formData.sasaran_pembangunan_nasional,
             sasaran_upr: formData.sasaran_upr,
@@ -552,13 +446,13 @@ export default function RisikoPage() {
             level_dampak_residual: Number(formData.level_dampak_residual),
 
             // e. kolom tambahan
-            layanan_id: formData.layanan_id ? Number(formData.layanan_id) : null,
-            layanan_prioritas_id: formData.layanan_prioritas_id ? Number(formData.layanan_prioritas_id) : null,
+            nama_layanan_pendukung: formData.nama_layanan_pendukung,
+            nama_layanan_prioritas: formData.nama_layanan_prioritas,
             pemilik_layanan: formData.pemilik_layanan,
             strategis_operasional: formData.strategis_operasional,
             lintas_sektor: formData.lintas_sektor,
             membutuhkan_perubahan: formData.membutuhkan_perubahan,
-            ippd_ids: selectedIppdIds,
+            ippd_terkait_text: formData.ippd_terkait_text,
           }),
         }
       );
@@ -577,7 +471,6 @@ export default function RisikoPage() {
 
       // Reset form HANYA jika penyimpanan berhasil
       setFormData({
-        konteks_id: '',
         sasaran_pembangunan_nasional: '',
         sasaran_upr: '',
         indikator_kinerja: '',
@@ -596,15 +489,15 @@ export default function RisikoPage() {
         penanggung_jawab_id: '',
         level_kemungkinan_residual: '1',
         level_dampak_residual: '1',
-        layanan_id: '',
-        layanan_prioritas_id: '',
+        nama_layanan_pendukung: '',
+        nama_layanan_prioritas: '',
         pemilik_layanan: '',
+        ippd_terkait_text: '',
         strategis_operasional: '',
         lintas_sektor: false,
         membutuhkan_perubahan: false, 
       });
 
-      setSelectedIppdIds([]);
       setCurrentStep(1);
       setShowForm(false);
       setEditingId(null);
@@ -642,70 +535,6 @@ export default function RisikoPage() {
       setSaving(false);
     }
   };
-
-  const fetchKonteksOptions = async () => {
-    try {
-      const token = sessionStorage.getItem('token');
-
-      const response = await fetch(
-        'http://localhost:5000/api/risiko/konteks',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-      
-      console.log("DATA KONTEKS:", data);
-
-      if (!response.ok) {
-        throw new Error(
-          data.error || data.message || 'Gagal mengambil konteks.'
-        );
-      }
-
-      setKonteksOptions(data);
-    } catch (error) {
-      console.error('ERROR GET KONTEKS OPTIONS:', error);
-    }
-  };
-
-  useEffect(() => {
-    const token = sessionStorage.getItem('token');
-
-    fetch('http://localhost:5000/api/risiko/layanan-options', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorData = await res.json();
-
-          throw new Error(
-            errorData.message ||
-              errorData.error ||
-              'Gagal mengambil daftar layanan'
-          );
-        }
-
-        return res.json();
-      })
-      .then((data) => {
-        setLayananOptions(data);
-      })
-      .catch((err) => {
-        console.log('Error fetching layanan:', err)
-      });
-  }, []);
-
-  useEffect(() => {
-    fetchKonteksOptions();
-  }, []);
 
   const [search, setSearch] = useState('');
   const [kategoriFilter, setKategoriFilter] = useState('Semua');
@@ -946,38 +775,6 @@ return (
                 </h4>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Konteks Risiko
-                    </label>
-
-                    <select
-                      name="konteks_id"
-                      value={formData.konteks_id}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          konteks_id: e.target.value,
-                        }))
-                      }
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-                      required
-                    >
-                      <option value="">
-                        Pilih Konteks Risiko
-                      </option>
-
-                      {konteksOptions.map((item) => (
-                        <option
-                          key={item.id}
-                          value={item.id}
-                        >
-                          {item.nama_upr} - {item.tahun_pelaksanaan}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">
                       Sasaran Pembangunan Nasional
@@ -1331,7 +1128,7 @@ return (
                   {penanggungJawabOptions.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.nama}
-                      {item.nama_role ? ` - ${item.nama_role}` : ''}
+                      {item.jabatan ? ` - ${item.jabatan}` : ''}
                     </option>
                   ))}
                 </select>
@@ -1412,26 +1209,18 @@ return (
                   Layanan Pendukung
                 </label>
 
-                <select
-                  value={formData.layanan_id}
+                <input
+                  type="text"
+                  value={formData.nama_layanan_pendukung}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      layanan_id: e.target.value,
+                      nama_layanan_pendukung: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-                >
-                  <option value="">
-                    Pilih layanan pendukung
-                  </option>
-
-                  {layananOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.kode_layanan} - {item.nama_layanan}
-                    </option>
-                  ))}
-                </select>
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  placeholder="Masukkan layanan pendukung"
+                />
               </div>
 
               <div>
@@ -1439,26 +1228,18 @@ return (
                   Layanan Prioritas
                 </label>
 
-                <select
-                  value={formData.layanan_prioritas_id}
+                <input
+                  type="text"
+                  value={formData.nama_layanan_prioritas}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      layanan_prioritas_id: e.target.value,
+                      nama_layanan_prioritas: e.target.value,
                     })
                   }
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-                >
-                  <option value="">
-                    Pilih layanan prioritas
-                  </option>
-
-                  {layananPrioritasOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.kode_prioritas} - {item.nama_layanan}
-                    </option>
-                  ))}
-                </select>
+                  className="h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  placeholder="Masukkan layanan prioritas"
+                />
               </div>
 
               <div>
@@ -1551,45 +1332,18 @@ return (
                   IPPD Terkait
                 </label>
 
-                <div className="rounded-lg border border-slate-300 px-3 py-3">
-                  {ippdOptions.length > 0 ? (
-                    <div className="space-y-2">
-                      {ippdOptions.map((item) => (
-                        <label
-                          key={item.id}
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedIppdIds.includes(item.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedIppdIds([
-                                  ...selectedIppdIds,
-                                  item.id,
-                                ]);
-                              } else {
-                                setSelectedIppdIds(
-                                  selectedIppdIds.filter(
-                                    (id) => id !== item.id
-                                  )
-                                );
-                              }
-                            }}
-                          />
-
-                          <span className="text-sm text-slate-700">
-                            {item.kode_instansi} - {item.nama_instansi}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-slate-500">
-                      Tidak ada data IPPD aktif
-                    </span>
-                  )}
-                </div>
+                <textarea
+                  value={formData.ippd_terkait_text}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      ippd_terkait_text: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  placeholder="Masukkan IPPD terkait"
+                />
               </div>
             </div>
           )}
@@ -1665,19 +1419,6 @@ return (
             </h4>
 
             <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
-              <div>
-                <p className="mb-1 text-xs font-medium text-slate-500">
-                  Konteks Risiko
-                </p>
-                <p className="text-sm text-slate-800">
-                  {selectedRisiko.konteks_nama_upr
-                    ? `${selectedRisiko.konteks_nama_upr} - ${
-                        selectedRisiko.konteks_tahun ?? '-'
-                      }`
-                    : '-'}
-                </p>
-              </div>
-
               <div>
                 <p className="mb-1 text-xs font-medium text-slate-500">
                   Kode Risiko
@@ -1901,10 +1642,7 @@ return (
                   Layanan Pendukung
                 </p>
                 <p className="text-sm text-slate-800">
-                  {selectedRisiko.kode_layanan &&
-                  selectedRisiko.nama_layanan
-                    ? `${selectedRisiko.kode_layanan} - ${selectedRisiko.nama_layanan}`
-                    : '-'}
+                  {selectedRisiko.nama_layanan_pendukung || '-'}
                 </p>
               </div>
 
@@ -1913,7 +1651,7 @@ return (
                   Layanan Prioritas
                 </p>
                 <p className="text-sm text-slate-800">
-                  {selectedRisiko.kode_prioritas || '-'}
+                  {selectedRisiko.nama_layanan_prioritas || '-'}
                 </p>
               </div>
 
@@ -1958,23 +1696,9 @@ return (
                   IPPD Terkait
                 </p>
 
-                {selectedRisiko.ippd_terkait &&
-                selectedRisiko.ippd_terkait.length > 0 ? (
-                  <div className="space-y-1">
-                    {selectedRisiko.ippd_terkait.map((item) => (
-                      <p
-                        key={item.id}
-                        className="text-sm text-slate-800"
-                      >
-                        {item.kode_instansi} - {item.nama_instansi}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-800">
-                    -
-                  </p>
-                )}
+                <p className="text-sm text-slate-800">
+                  {selectedRisiko.ippd_terkait_text || '-'}
+                </p>
               </div>
             </div>
           </section>
@@ -2005,7 +1729,6 @@ return (
                 setSelectedRisiko(null);
 
                 setFormData({
-                  konteks_id: '',
                   sasaran_pembangunan_nasional: '',
                   sasaran_upr: '',
                   indikator_kinerja: '',
@@ -2024,15 +1747,15 @@ return (
                   penanggung_jawab_id: '',
                   level_kemungkinan_residual: '1',
                   level_dampak_residual: '1',
-                  layanan_id: '',
-                  layanan_prioritas_id: '',
+                  nama_layanan_pendukung: '',
+                  nama_layanan_prioritas: '',
+                  ippd_terkait_text: '',
                   pemilik_layanan: '',
                   strategis_operasional: '',
                   lintas_sektor: false,
                   membutuhkan_perubahan: false,
                 });
 
-                setSelectedIppdIds([]);
                 setShowForm(true);
               }}
               className="shrink-0 rounded-md bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
@@ -2072,36 +1795,6 @@ return (
 
           <div>
             <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
-              Status Risiko
-            </label>
-
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value)
-              }
-              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
-            >
-              <option value="Semua">
-                Semua Status
-              </option>
-              <option value="Draft">
-                Draft
-              </option>
-              <option value="Diajukan">
-                Diajukan
-              </option>
-              <option value="Disetujui">
-                Disetujui
-              </option>
-              <option value="Ditolak">
-                Ditolak
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
               Pencarian
             </label>
 
@@ -2118,176 +1811,137 @@ return (
         </div>
 
         {loading ? (
-          <div className="py-10 text-center text-sm text-slate-500">
-            Memuat data risiko...
+          <div className="p-5">
+            <div className="py-10 text-center text-sm text-slate-500">
+              Memuat data risiko...
+            </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1450px] border-collapse text-left">
-              <thead className="bg-slate-50">
-                <tr className="border-b border-slate-200">
-                  <th className="px-4 py-3 text-center">
-                    No
-                  </th>
+          <div className="p-5">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                    <th className="px-4 py-3 font-semibold">
+                      No
+                    </th>
 
-                  <th className="w-[120px] px-4 py-3 text-center">
-                    Kode Risiko
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      Kode Risiko
+                    </th>
 
-                  <th className="w-[300px] px-4 py-3 text-center">
-                    Peristiwa Risiko
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      Peristiwa Risiko
+                    </th>
 
-                  <th className="w-[150px] px-4 py-3 text-center">
-                    Kategori Risiko
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      Kategori Risiko
+                    </th>
 
-                  <th className="px-4 py-3 text-center">
-                    Besaran Risiko
-                  </th>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Besaran Risiko
+                    </th>
 
-                  <th className="px-4 py-3 text-center">
-                    Prioritas
-                  </th>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Prioritas
+                    </th>
 
-                  <th className="px-4 py-3 text-center">
-                    Status Risiko
-                  </th>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Aksi
+                    </th>
+                  </tr>
+                </thead>
 
-                  <th className="w-[150px] px-4 py-3 text-center">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+                <tbody>
+                  {filteredRisiko.length > 0 ? (
+                    filteredRisiko.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className="border-b border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="px-4 py-3 text-slate-600">
+                          {index + 1}
+                        </td>
 
-              <tbody className="text-sm text-slate-700">
-                {filteredRisiko.length > 0 ? (
-                  filteredRisiko.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 text-center">
-                        {index + 1}
-                      </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {item.kode_risiko || '-'}
+                        </td>
 
-                      <td className="px-4 py-3 font-semibold text-slate-900">
-                        {item.kode_risiko || '-'}
-                      </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {item.peristiwa_risiko || '-'}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        {item.peristiwa_risiko || '-'}
-                      </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {item.kategori_risiko || '-'}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        {item.kategori_risiko || '-'}
-                      </td>
+                        <td className="px-4 py-3 text-center font-semibold text-slate-800">
+                          {item.besaran_risiko ?? '-'}
+                        </td>
 
-                      <td className="px-4 py-3 text-center font-semibold text-slate-900">
-                        {item.besaran_risiko ?? '-'}
-                      </td>
+                        <td className="px-4 py-3 text-center">
+                          {item.prioritas_risiko ? (
+                            <span
+                              className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getPrioritasClass(
+                                item.prioritas_risiko
+                              )}`}
+                            >
+                              {item.prioritas_risiko}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">
+                              -
+                            </span>
+                          )}
+                        </td>
 
-                      <td className="px-4 py-3 text-center">
-                        {item.prioritas_risiko ? (
-                          <span
-                            className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getPrioritasClass(
-                              item.prioritas_risiko
-                            )}`}
-                          >
-                            {item.prioritas_risiko}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">
-                            -
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-medium ${getStatusClass(
-                            item.status_risiko || 'Draft'
-                          )}`}
-                        >
-                          {item.status_risiko || 'Draft'}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleDetail(item.id)}
-                            disabled={loadingDetail}
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
-                          >
-                            Detail
-                          </button>
-
-                          <div className="relative">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-2">
                             <button
                               type="button"
-                              onClick={() =>
-                                setOpenActionId((prev) =>
-                                  prev === item.id ? null : item.id
-                                )
-                              }
-                              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                              onClick={() => handleDetail(item.id)}
+                              disabled={loadingDetail}
+                              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                             >
-                              Lainnya
-                              <span className="text-[10px] text-slate-500">▼</span>
+                              Detail
                             </button>
 
-                            {openActionId === item.id && (
-                              <div className="absolute right-0 z-30 mt-2 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                                {canUpdate && item.status_risiko === "Draft" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenActionId(null);
-                                      handleEdit(item.id);
-                                    }}
-                                    className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-                                  >
-                                    Edit
-                                  </button>
-                                )}
+                            {canUpdate && item.status_risiko === 'Draft' && (
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(item.id)}
+                                className="rounded-md border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                              >
+                                Edit
+                              </button>
+                            )}
 
-                                {canDelete && item.status_risiko === "Draft" && (
-                                  <>
-                                    <div className="my-1 border-t border-slate-100" />
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenActionId(null);
-                                        handleDelete(item.id);
-                                      }}
-                                      className="block w-full px-4 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
-                                    >
-                                      Hapus
-                                    </button>
-                                  </>
-                                )}
-                              </div>
+                            {canDelete && item.status_risiko === 'Draft' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(item.id)}
+                                className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                              >
+                                Hapus
+                              </button>
                             )}
                           </div>
-                        </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-10 text-center text-sm text-slate-500"
+                      >
+                        Tidak ada data risiko yang sesuai.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-8 text-center text-sm text-slate-400"
-                    >
-                      Tidak ada data risiko yang sesuai.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

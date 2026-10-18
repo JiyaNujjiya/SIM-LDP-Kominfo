@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 
 type RuangLingkupItem = {
   id: number;
-  layanan_prioritas_id: number;
-  kode_prioritas: string;
+  layanan_prioritas_id: number | null;
+  mkb_layanan_prioritas_id?: number | null;
+  kode_prioritas: string | null;
   alasan_prioritas: string | null;
   membutuhkan_mkb: number | boolean | null;
   pic_id: number | null;
@@ -31,31 +32,6 @@ type RuangLingkupItem = {
   dibuat_oleh: string | null;
   created_at: string;
   updated_at: string;
-};
-
-type LayananPrioritasOption = {
-  id: number;
-  kode_prioritas: string;
-  nama_layanan: string;
-};
-
-type LayananPrioritasDetail = {
-  id: number;
-  kode_prioritas: string;
-  alasan_prioritas: string | null;
-  membutuhkan_mkb: number | boolean | null;
-  pic_id: number | null;
-  target_penyusunan: string | null;
-  status_layanan_prioritas: string | null;
-  layanan_id: number;
-  kode_layanan: string;
-  nama_layanan: string;
-  deskripsi_layanan: string | null;
-  jenis_layanan: string | null;
-  instansi_id: number;
-  kode_instansi: string;
-  nama_instansi: string;
-  jenis_instansi: string | null;
 };
 
 type PegawaiOption = {
@@ -144,7 +120,8 @@ type TimOperasionalForm = {
 
 type RencanaKomunikasiItem = {
   id: number;
-  layanan_prioritas_id: number;
+  layanan_prioritas_id: number | null;
+  mkb_layanan_prioritas_id: number;
   informasi_disampaikan: string;
   kategori_komunikasi: string;
   pengirim: string;
@@ -154,9 +131,9 @@ type RencanaKomunikasiItem = {
   aktivitas: string | null;
   tujuan: string | null;
   kode_prioritas: string;
-  layanan_id: number;
   kode_layanan: string;
   nama_layanan: string;
+  jenis_layanan: string | null;
   instansi_id: number;
   kode_instansi: string;
   nama_instansi: string;
@@ -167,7 +144,7 @@ type RencanaKomunikasiItem = {
 };
 
 type RencanaKomunikasiForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   informasi_disampaikan: string;
   kategori_komunikasi: string;
   pengirim: string;
@@ -179,7 +156,7 @@ type RencanaKomunikasiForm = {
 };
 
 const emptyRencanaKomunikasiForm: RencanaKomunikasiForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   informasi_disampaikan: '',
   kategori_komunikasi: '',
   pengirim: '',
@@ -278,7 +255,8 @@ type TimPemulihanLayananForm = {
 
 type SumberDayaManusiaItem = {
   id: number;
-  layanan_prioritas_id: number;
+  mkb_layanan_prioritas_id: number;
+  nama_instansi: string;
   kebutuhan_personel: string;
   jumlah_minimum: number | null;
   kompetensi: string | null;
@@ -291,7 +269,7 @@ type SumberDayaManusiaItem = {
 };
 
 type SumberDayaManusiaForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   kebutuhan_personel: string;
   jumlah_minimum: string;
   kompetensi: string;
@@ -301,7 +279,7 @@ type SumberDayaManusiaForm = {
 };
 
 const emptySumberDayaManusiaForm: SumberDayaManusiaForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   kebutuhan_personel: '',
   jumlah_minimum: '',
   kompetensi: '',
@@ -312,7 +290,8 @@ const emptySumberDayaManusiaForm: SumberDayaManusiaForm = {
 
 type FasilitasOperasionalItem = {
   id: number;
-  layanan_prioritas_id: number;
+  mkb_layanan_prioritas_id: number;
+  nama_instansi: string;
   nama_fasilitas: string;
   jenis_fasilitas: string | null;
   jumlah_minimum: number | null;
@@ -326,7 +305,7 @@ type FasilitasOperasionalItem = {
 };
 
 type FasilitasOperasionalForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   nama_fasilitas: string;
   jenis_fasilitas: string;
   jumlah_minimum: string;
@@ -337,7 +316,7 @@ type FasilitasOperasionalForm = {
 };
 
 const emptyFasilitasOperasionalForm: FasilitasOperasionalForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   nama_fasilitas: '',
   jenis_fasilitas: '',
   jumlah_minimum: '',
@@ -349,7 +328,8 @@ const emptyFasilitasOperasionalForm: FasilitasOperasionalForm = {
 
 type SumberDayaTikItem = {
   id: number;
-  layanan_prioritas_id: number;
+  mkb_layanan_prioritas_id: number;
+  nama_instansi: string;
   jenis_sumber_daya: string;
   nama_sumber_daya: string;
   jumlah_minimum: number | null;
@@ -363,7 +343,7 @@ type SumberDayaTikItem = {
 };
 
 type SumberDayaTikForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   jenis_sumber_daya: string;
   nama_sumber_daya: string;
   jumlah_minimum: string;
@@ -374,7 +354,7 @@ type SumberDayaTikForm = {
 };
 
 const emptySumberDayaTikForm: SumberDayaTikForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   jenis_sumber_daya: '',
   nama_sumber_daya: '',
   jumlah_minimum: '',
@@ -386,7 +366,8 @@ const emptySumberDayaTikForm: SumberDayaTikForm = {
 
 type AksesSistemTikItem = {
   id: number;
-  layanan_prioritas_id: number;
+  mkb_layanan_prioritas_id: number;
+  nama_instansi: string;
   nama_sistem: string;
   jenis_sistem: string | null;
   jenis_akses: string;
@@ -400,7 +381,7 @@ type AksesSistemTikItem = {
 };
 
 type AksesSistemTikForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   nama_sistem: string;
   jenis_sistem: string;
   jenis_akses: string;
@@ -411,7 +392,7 @@ type AksesSistemTikForm = {
 };
 
 const emptyAksesSistemTikForm: AksesSistemTikForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   nama_sistem: '',
   jenis_sistem: '',
   jenis_akses: '',
@@ -423,7 +404,8 @@ const emptyAksesSistemTikForm: AksesSistemTikForm = {
 
 type SumberDayaEksternalTikItem = {
   id: number;
-  layanan_prioritas_id: number;
+  mkb_layanan_prioritas_id: number;
+  nama_instansi: string;
   nama_vendor_mitra: string;
   jenis_sumber_daya: string;
   deskripsi_sumber_daya: string | null;
@@ -437,7 +419,7 @@ type SumberDayaEksternalTikItem = {
 };
 
 type SumberDayaEksternalTikForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   nama_vendor_mitra: string;
   jenis_sumber_daya: string;
   deskripsi_sumber_daya: string;
@@ -448,7 +430,7 @@ type SumberDayaEksternalTikForm = {
 };
 
 const emptySumberDayaEksternalTikForm: SumberDayaEksternalTikForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   nama_vendor_mitra: '',
   jenis_sumber_daya: '',
   deskripsi_sumber_daya: '',
@@ -460,7 +442,8 @@ const emptySumberDayaEksternalTikForm: SumberDayaEksternalTikForm = {
 
 type DaftarKontakItem = {
   id: number;
-  layanan_prioritas_id: number;
+  layanan_prioritas_id: number | null;
+  mkb_layanan_prioritas_id: number;
   nama: string;
   jabatan: string | null;
   organisasi: string | null;
@@ -468,9 +451,9 @@ type DaftarKontakItem = {
   telepon: string | null;
   email: string | null;
   kode_prioritas: string;
-  layanan_id: number;
   kode_layanan: string;
   nama_layanan: string;
+  jenis_layanan: string | null;
   instansi_id: number;
   kode_instansi: string;
   nama_instansi: string;
@@ -481,7 +464,7 @@ type DaftarKontakItem = {
 };
 
 type DaftarKontakForm = {
-  layanan_prioritas_id: string;
+  mkb_layanan_prioritas_id: string;
   nama: string;
   jabatan: string;
   organisasi: string;
@@ -491,7 +474,7 @@ type DaftarKontakForm = {
 };
 
 const emptyDaftarKontakForm: DaftarKontakForm = {
-  layanan_prioritas_id: '',
+  mkb_layanan_prioritas_id: '',
   nama: '',
   jabatan: '',
   organisasi: '',
@@ -499,6 +482,7 @@ const emptyDaftarKontakForm: DaftarKontakForm = {
   telepon: '',
   email: '',
 };
+
 
 const emptyTimPemulihanLayananForm: TimPemulihanLayananForm = {
   layanan_prioritas_id: '',
@@ -516,8 +500,55 @@ const emptyTimTanggapInsidenForm: TimTanggapInsidenForm = {
   urutan: '',
 };
 
+type StrukturTimMkbItem = {
+  id: number;
+  mkb_layanan_prioritas_id: number;
+  jenis_tim: string;
+  nama_pegawai: string;
+  nip: string | null;
+  jabatan: string;
+  unit_kerja: string;
+  peran_tim: string;
+  tanggung_jawab: string;
+  kode_layanan: string;
+  nama_layanan: string;
+  nama_instansi: string;
+};
+
+type StrukturTimMkbForm = {
+  mkb_layanan_prioritas_id: string;
+  jenis_tim: string;
+  nama_pegawai: string;
+  nip: string;
+  jabatan: string;
+  unit_kerja: string;
+  peran_tim: string;
+  tanggung_jawab: string;
+};
+
+const emptyStrukturTimMkbForm: StrukturTimMkbForm = {
+  mkb_layanan_prioritas_id: '',
+  jenis_tim: '',
+  nama_pegawai: '',
+  nip: '',
+  jabatan: '',
+  unit_kerja: '',
+  peran_tim: '',
+  tanggung_jawab: ''
+};
+
+const jenisTimMkbOptions = [
+  'Tim Manajemen Keberlangsungan',
+  'Tim Tanggap Insiden',
+  'Tim Pemulihan Layanan Digital',
+  'Tim Operasional'
+];
+
 type FormState = {
   layanan_prioritas_id: string;
+  nama_layanan_prioritas: string;
+  kode_layanan_mkb: string;
+  jenis_layanan_mkb: string;
   scope_layanan: string;
   kategori_layanan: string;
   pengguna_utama: string;
@@ -530,6 +561,9 @@ type FormState = {
 
 const emptyForm: FormState = {
   layanan_prioritas_id: '',
+  nama_layanan_prioritas: '',
+  kode_layanan_mkb: '',
+  jenis_layanan_mkb: '',
   scope_layanan: '',
   kategori_layanan: '',
   pengguna_utama: '',
@@ -566,12 +600,23 @@ const processSteps = [
 const PenetapanKonteksKeberlangsunganPage = () => {
   const navigate = useNavigate();
 
+  const savedUser = sessionStorage.getItem('user');
+  const user = savedUser ? JSON.parse(savedUser) : null;
+  const permissions: string[] = user?.permissions || [];
+
+  const canCreate = permissions.includes('continuity.create');
+  const canUpdate = permissions.includes('continuity.update');
+  const canDelete = permissions.includes('continuity.delete');
+  const canManage = canCreate || canUpdate || canDelete;
+
   const [data, setData] = useState<RuangLingkupItem[]>([]);
-  const [layananOptions, setLayananOptions] = useState<LayananPrioritasOption[]>([]);
-
-  const [layananDetail, setLayananDetail] = useState<LayananPrioritasDetail | null>(null);
-  const [loadingLayananDetail, setLoadingLayananDetail] = useState(false);
-
+  const [strukturTimMkb, setStrukturTimMkb] = useState<StrukturTimMkbItem[]>([]);
+  const [strukturTimMkbForm, setStrukturTimMkbForm] = useState<StrukturTimMkbForm>(emptyStrukturTimMkbForm);
+  const [editingStrukturTimMkbId, setEditingStrukturTimMkbId] = useState<number | null>(null);
+  const [showStrukturTimMkbForm, setShowStrukturTimMkbForm] = useState(false);
+  const [savingStrukturTimMkb, setSavingStrukturTimMkb] = useState(false);
+  const [strukturTimMkbError, setStrukturTimMkbError] = useState('');
+  const [selectedStrukturTimMkb, setSelectedStrukturTimMkb] = useState<StrukturTimMkbItem | null>(null);
   const [formData, setFormData] = useState<FormState>(emptyForm);
 
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -586,6 +631,7 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [ruangLingkupFormError, setRuangLingkupFormError] = useState('');
 
   const [timManajemen, setTimManajemen] = useState<TimManajemenItem[]>([]);
   const [pegawaiOptions, setPegawaiOptions] = useState<PegawaiOption[]>([]);
@@ -637,6 +683,12 @@ const PenetapanKonteksKeberlangsunganPage = () => {
   const [showKomunikasiForm, setShowKomunikasiForm] =
     useState(false);
 
+  const [komunikasiFormError, setKomunikasiFormError] = 
+    useState('');
+  
+  const [selectedKomunikasi, setSelectedKomunikasi] =
+    useState<RencanaKomunikasiItem | null>(null);
+
   const [savingKomunikasi, setSavingKomunikasi] =
     useState(false);
 
@@ -656,6 +708,11 @@ const PenetapanKonteksKeberlangsunganPage = () => {
 
   const [savingKontak, setSavingKontak] =
     useState(false);
+
+  const [kontakFormError, setKontakFormError] = 
+    useState('');
+  const [selectedKontak, setSelectedKontak] =
+    useState<DaftarKontakItem | null>(null);
 
   const [sumberDayaManusia, setSumberDayaManusia] =
     useState<SumberDayaManusiaItem[]>([]);
@@ -742,6 +799,9 @@ const PenetapanKonteksKeberlangsunganPage = () => {
   const [savingEksternalTik, setSavingEksternalTik] =
     useState(false);
 
+  const [form8Error, setForm8Error] = useState('');
+  const [form8Detail, setForm8Detail] = useState<{ title: string; fields: [string, string | number | null | undefined][] } | null>(null);
+
   const fetchRuangLingkup = async () => {
     try {
       setLoading(true);
@@ -781,91 +841,6 @@ const PenetapanKonteksKeberlangsunganPage = () => {
       );
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchLayananOptions = async () => {
-    try {
-      const token = sessionStorage.getItem('token');
-
-      const response = await fetch(
-        'http://localhost:5000/api/risiko/layanan-prioritas-options',
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-          result.error ||
-          'Gagal mengambil daftar layanan prioritas.'
-        );
-      }
-
-      setLayananOptions(
-        Array.isArray(result)
-          ? result
-          : []
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal mengambil daftar layanan prioritas.'
-      );
-    }
-  };
-
-  const fetchLayananPrioritasDetail = async (
-    layananPrioritasId: string
-  ) => {
-    if (!layananPrioritasId) {
-      setLayananDetail(null);
-      return;
-    }
-
-    try {
-      setLoadingLayananDetail(true);
-      setError('');
-
-      const token = sessionStorage.getItem('token');
-
-      const response = await fetch(
-        `http://localhost:5000/api/bcp/layanan-prioritas/${layananPrioritasId}/detail`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-          'Gagal mengambil detail layanan prioritas.'
-        );
-      }
-
-      setLayananDetail(result.data);
-    } catch (err) {
-      setLayananDetail(null);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Gagal mengambil detail layanan prioritas.'
-      );
-    } finally {
-      setLoadingLayananDetail(false);
     }
   };
 
@@ -1315,9 +1290,8 @@ const fetchFasilitasOperasional = async () => {
 
   useEffect(() => {
     fetchRuangLingkup();
-    fetchLayananOptions();
+    fetchStrukturTimMkb();
     fetchTimManajemen();
-    fetchPegawaiOptions();
     fetchTimTanggapInsiden();
     fetchTimPemulihanLayanan();
     fetchTimOperasional();
@@ -1328,26 +1302,11 @@ const fetchFasilitasOperasional = async () => {
     fetchSumberDayaTik();
     fetchAksesSistemTik();
     fetchSumberDayaEksternalTik();
+
+    if (canManage) {
+      fetchPegawaiOptions();
+    }
   }, []);
-
-  const availableLayananOptions = useMemo(() => {
-    const usedIds = new Set(
-      data
-        .filter((item) => item.id !== editingId)
-        .map((item) =>
-          Number(item.layanan_prioritas_id)
-        )
-    );
-
-    return layananOptions.filter(
-      (option) =>
-        !usedIds.has(Number(option.id))
-    );
-  }, [
-    data,
-    layananOptions,
-    editingId,
-  ]);
 
   const filteredData = useMemo(() => {
     const keyword =
@@ -1375,15 +1334,14 @@ const fetchFasilitasOperasional = async () => {
 
   const resetForm = () => {
     setFormData(emptyForm);
-    setLayananDetail(null);
     setEditingId(null);
     setShowForm(false);
   };
 
   const handleTambah = () => {
     setEditingId(null);
+    setRuangLingkupFormError('');
     setFormData(emptyForm);
-    setLayananDetail(null);
     setMessage('');
     setError('');
     setShowForm(true);
@@ -1393,12 +1351,13 @@ const fetchFasilitasOperasional = async () => {
     item: RuangLingkupItem
   ) => {
     setEditingId(item.id);
+    setRuangLingkupFormError('');
 
     setFormData({
-      layanan_prioritas_id:
-        String(
-          item.layanan_prioritas_id
-        ),
+      layanan_prioritas_id: String(item.layanan_prioritas_id || ''),
+      nama_layanan_prioritas: item.nama_layanan || '',
+      kode_layanan_mkb: item.kode_prioritas || '',
+      jenis_layanan_mkb: item.jenis_layanan || '',
       scope_layanan:
         item.scope_layanan || '',
       kategori_layanan:
@@ -1431,7 +1390,6 @@ const fetchFasilitasOperasional = async () => {
     setError('');
     setShowForm(true);
 
-    fetchLayananPrioritasDetail(String(item.layanan_prioritas_id));
   };
 
   const handleDetail = (
@@ -1441,19 +1399,72 @@ const fetchFasilitasOperasional = async () => {
     setShowDetail(true);
   };
 
-  const handleSubmit = async (
-    event: FormEvent
-  ) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setRuangLingkupFormError('');
 
-    if (
-      !editingId &&
-      !formData.layanan_prioritas_id
-    ) {
-      setError(
-        'Layanan prioritas wajib dipilih.'
-      );
+    if (!formData.kode_layanan_mkb.trim()) {
+      setRuangLingkupFormError('ID Layanan Prioritas wajib diisi.');
       return;
+    }
+
+    if (!/^[A-Za-z0-9_-]+$/.test(formData.kode_layanan_mkb.trim())) {
+      setRuangLingkupFormError('ID Layanan hanya boleh menggunakan huruf, angka, - dan _.');
+      return;
+    }
+
+    if (!formData.jenis_layanan_mkb.trim()) {
+      setRuangLingkupFormError('Jenis Layanan wajib diisi.');
+      return;
+    }
+
+    if (!formData.nama_layanan_prioritas.trim()) {
+      setRuangLingkupFormError('Layanan Prioritas wajib diisi.');
+      return;
+    }
+
+    if (!formData.scope_layanan.trim()) {
+      setRuangLingkupFormError('Scope / Ruang Lingkup Layanan wajib diisi.');
+      return;
+    }
+
+    if (!formData.kategori_layanan.trim()) {
+      setRuangLingkupFormError('Kategori Layanan wajib diisi.');
+      return;
+    }
+
+    if (!formData.pengguna_utama.trim()) {
+      setRuangLingkupFormError('Pengguna Utama wajib diisi.');
+      return;
+    }
+
+    if (formData.jumlah_pengguna.trim() === '') {
+      setRuangLingkupFormError('Jumlah Pengguna wajib diisi.');
+      return;
+    }
+
+    const jumlahPengguna = Number(formData.jumlah_pengguna);
+
+    if (!Number.isInteger(jumlahPengguna) || jumlahPengguna < 0) {
+      setRuangLingkupFormError('Jumlah Pengguna harus berupa bilangan bulat positif atau nol.');
+      return;
+    }
+
+    if (!formData.target_ola.trim()) {
+      setRuangLingkupFormError('Target OLA wajib diisi.');
+      return;
+    }
+
+    if (formData.terkait_ekosistem === '1') {
+      if (!formData.ekosistem_pemerintah_digital.trim()) {
+        setRuangLingkupFormError('Ekosistem Pemerintah Digital wajib diisi.');
+        return;
+      }
+
+      if (!formData.deskripsi_ekosistem.trim()) {
+        setRuangLingkupFormError('Deskripsi Ekosistem wajib diisi.');
+        return;
+      }
     }
 
     try {
@@ -1461,92 +1472,61 @@ const fetchFasilitasOperasional = async () => {
       setMessage('');
       setError('');
 
-      const token =
-        sessionStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
-      const payload: Record<
-        string,
-        string | number | boolean | null
-      > = {
-        scope_layanan:
-          formData.scope_layanan.trim() ||
-          null,
-        kategori_layanan:
-          formData.kategori_layanan.trim() ||
-          null,
-        pengguna_utama:
-          formData.pengguna_utama.trim() ||
-          null,
-        jumlah_pengguna:
-          formData.jumlah_pengguna === ''
-            ? null
-            : Number(
-              formData.jumlah_pengguna
-            ),
-        target_ola:
-          formData.target_ola.trim() ||
-          null,
-        terkait_ekosistem:
-          formData.terkait_ekosistem ===
-          '1',
+      const payload: Record<string, string | number | boolean | null> = {
+        nama_layanan_prioritas: formData.nama_layanan_prioritas.trim(),
+        kode_layanan: formData.kode_layanan_mkb.trim().toUpperCase(),
+        jenis_layanan: formData.jenis_layanan_mkb.trim(),
+        instansi_id: user?.instansi_id ? Number(user.instansi_id) : null,
+        scope_layanan: formData.scope_layanan.trim(),
+        kategori_layanan: formData.kategori_layanan.trim(),
+        pengguna_utama: formData.pengguna_utama.trim(),
+        jumlah_pengguna: jumlahPengguna,
+        target_ola: formData.target_ola.trim(),
+        terkait_ekosistem: formData.terkait_ekosistem === '1',
         ekosistem_pemerintah_digital:
-          formData.terkait_ekosistem ===
-            '1'
-            ? formData
-              .ekosistem_pemerintah_digital
-              .trim() || null
+          formData.terkait_ekosistem === '1'
+            ? formData.ekosistem_pemerintah_digital.trim()
             : null,
         deskripsi_ekosistem:
-          formData.terkait_ekosistem ===
-            '1'
-            ? formData.deskripsi_ekosistem.trim() ||
-            null
+          formData.terkait_ekosistem === '1'
+            ? formData.deskripsi_ekosistem.trim()
             : null,
       };
 
-      if (!editingId) {
-        payload.layanan_prioritas_id =
-          Number(
-            formData.layanan_prioritas_id
-          );
-      }
 
       const response = await fetch(
         editingId
           ? `http://localhost:5000/api/bcp/ruang-lingkup/${editingId}`
           : 'http://localhost:5000/api/bcp/ruang-lingkup',
         {
-          method: editingId
-            ? 'PUT'
-            : 'POST',
+          method: editingId ? 'PUT' : 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type':
-              'application/json',
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
         }
       );
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          result.message ||
-          'Gagal menyimpan data ruang lingkup.'
+          result.message || 'Gagal menyimpan data ruang lingkup.'
         );
       }
 
       setMessage(
-        result.message ||
-        'Data ruang lingkup berhasil disimpan.'
+        result.message || 'Data ruang lingkup berhasil disimpan.'
       );
 
+      setRuangLingkupFormError('');
       resetForm();
       await fetchRuangLingkup();
     } catch (err) {
-      setError(
+      setRuangLingkupFormError(
         err instanceof Error
           ? err.message
           : 'Terjadi kesalahan saat menyimpan data.'
@@ -1614,6 +1594,159 @@ const fetchFasilitasOperasional = async () => {
 
   const labelClass =
     'text-sm font-medium text-slate-700';
+
+  const fetchStrukturTimMkb = async () => {
+  try {
+    const token = sessionStorage.getItem('token');
+
+    const response = await fetch(
+      'http://localhost:5000/api/bcp/struktur-tim',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Gagal mengambil struktur tim.');
+    }
+
+    setStrukturTimMkb(Array.isArray(result.data) ? result.data : []);
+  } catch (err) {
+    setError(
+      err instanceof Error ? err.message : 'Gagal mengambil struktur tim.'
+    );
+  }
+};
+
+  const handleTambahStrukturTimMkb = () => {
+    setEditingStrukturTimMkbId(null);
+    setStrukturTimMkbForm(emptyStrukturTimMkbForm);
+    setStrukturTimMkbError('');
+    setShowStrukturTimMkbForm(true);
+  };
+
+  const handleEditStrukturTimMkb = (item: StrukturTimMkbItem) => {
+    setEditingStrukturTimMkbId(item.id);
+    setStrukturTimMkbError('');
+    setStrukturTimMkbForm({
+      mkb_layanan_prioritas_id: String(item.mkb_layanan_prioritas_id),
+      jenis_tim: item.jenis_tim,
+      nama_pegawai: item.nama_pegawai,
+      nip: item.nip || '',
+      jabatan: item.jabatan,
+      unit_kerja: item.unit_kerja,
+      peran_tim: item.peran_tim,
+      tanggung_jawab: item.tanggung_jawab
+    });
+    setShowStrukturTimMkbForm(true);
+  };
+
+  const handleSubmitStrukturTimMkb = async (event: FormEvent) => {
+    event.preventDefault();
+    setStrukturTimMkbError('');
+
+    if (
+      !strukturTimMkbForm.mkb_layanan_prioritas_id ||
+      !strukturTimMkbForm.jenis_tim ||
+      !strukturTimMkbForm.nama_pegawai.trim() ||
+      !strukturTimMkbForm.jabatan.trim() ||
+      !strukturTimMkbForm.unit_kerja.trim() ||
+      !strukturTimMkbForm.peran_tim.trim() ||
+      !strukturTimMkbForm.tanggung_jawab.trim()
+    ) {
+      setStrukturTimMkbError('Semua kolom bertanda * wajib diisi.');
+      return;
+    }
+
+    try {
+      setSavingStrukturTimMkb(true);
+
+      const token = sessionStorage.getItem('token');
+      const payload = {
+        mkb_layanan_prioritas_id: Number(
+          strukturTimMkbForm.mkb_layanan_prioritas_id
+        ),
+        jenis_tim: strukturTimMkbForm.jenis_tim,
+        nama_pegawai: strukturTimMkbForm.nama_pegawai.trim(),
+        nip: strukturTimMkbForm.nip.trim() || null,
+        jabatan: strukturTimMkbForm.jabatan.trim(),
+        unit_kerja: strukturTimMkbForm.unit_kerja.trim(),
+        peran_tim: strukturTimMkbForm.peran_tim.trim(),
+        tanggung_jawab: strukturTimMkbForm.tanggung_jawab.trim()
+      };
+
+      const response = await fetch(
+        editingStrukturTimMkbId
+          ? `http://localhost:5000/api/bcp/struktur-tim/${editingStrukturTimMkbId}`
+          : 'http://localhost:5000/api/bcp/struktur-tim',
+        {
+          method: editingStrukturTimMkbId ? 'PUT' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Gagal menyimpan anggota tim.');
+      }
+
+      setShowStrukturTimMkbForm(false);
+      setEditingStrukturTimMkbId(null);
+      setStrukturTimMkbForm(emptyStrukturTimMkbForm);
+      setMessage(result.message || 'Anggota tim berhasil disimpan.');
+      await fetchStrukturTimMkb();
+    } catch (err) {
+      setStrukturTimMkbError(
+        err instanceof Error ? err.message : 'Gagal menyimpan anggota tim.'
+      );
+    } finally {
+      setSavingStrukturTimMkb(false);
+    }
+  };
+
+  const handleDeleteStrukturTimMkb = async (item: StrukturTimMkbItem) => {
+    if (!window.confirm(`Hapus ${item.nama_pegawai} dari struktur tim?`)) {
+      return;
+    }
+
+    try {
+      const token = sessionStorage.getItem('token');
+
+      const response = await fetch(
+        `http://localhost:5000/api/bcp/struktur-tim/${item.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Gagal menghapus anggota tim.');
+      }
+
+      setMessage(result.message || 'Anggota tim berhasil dihapus.');
+      await fetchStrukturTimMkb();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Gagal menghapus anggota tim.'
+      );
+    }
+  };
 
   const handleTambahTim = () => {
     setEditingTimId(null);
@@ -2386,6 +2519,7 @@ const handleDeleteOperasional = async (
 
   const handleTambahKomunikasi = () => {
   setEditingKomunikasiId(null);
+  setKomunikasiFormError('');
   setKomunikasiForm(
     emptyRencanaKomunikasiForm
   );
@@ -2394,129 +2528,113 @@ const handleDeleteOperasional = async (
   setShowKomunikasiForm(true);
 };
 
-const handleEditKomunikasi = (
-  item: RencanaKomunikasiItem
-) => {
-  setEditingKomunikasiId(item.id);
+  const handleEditKomunikasi = (item: RencanaKomunikasiItem) => {
+    setEditingKomunikasiId(item.id);
+    setKomunikasiFormError('');
 
-  setKomunikasiForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
-    ),
-    informasi_disampaikan:
-      item.informasi_disampaikan,
-    kategori_komunikasi:
-      item.kategori_komunikasi,
-    pengirim: item.pengirim,
-    penerima: item.penerima,
-    media_komunikasi:
-      item.media_komunikasi,
-    waktu_frekuensi:
-      item.waktu_frekuensi || '',
-    aktivitas:
-      item.aktivitas || '',
-    tujuan:
-      item.tujuan || '',
-  });
+    setKomunikasiForm({
+      mkb_layanan_prioritas_id: String(item.mkb_layanan_prioritas_id),
+      informasi_disampaikan: item.informasi_disampaikan,
+      kategori_komunikasi: item.kategori_komunikasi,
+      pengirim: item.pengirim,
+      penerima: item.penerima,
+      media_komunikasi: item.media_komunikasi,
+      waktu_frekuensi: item.waktu_frekuensi || '',
+      aktivitas: item.aktivitas || '',
+      tujuan: item.tujuan || '',
+    });
 
-  setMessage('');
-  setError('');
-  setShowKomunikasiForm(true);
-};
-
-const resetKomunikasiForm = () => {
-  setEditingKomunikasiId(null);
-  setKomunikasiForm(
-    emptyRencanaKomunikasiForm
-  );
-  setShowKomunikasiForm(false);
-};
-
-const handleSubmitKomunikasi = async (
-  event: FormEvent
-) => {
-  event.preventDefault();
-
-  try {
-    setSavingKomunikasi(true);
     setMessage('');
     setError('');
+    setShowKomunikasiForm(true);
+  };
 
-    const token = sessionStorage.getItem('token');
+  const resetKomunikasiForm = () => {
+    setEditingKomunikasiId(null);
+    setKomunikasiFormError('');
+    setKomunikasiForm(
+      emptyRencanaKomunikasiForm
+    );
+    setShowKomunikasiForm(false);
+  };
 
-    const payload: Record<
-      string,
-      string | number | null
-    > = {
-      informasi_disampaikan:
-        komunikasiForm.informasi_disampaikan.trim(),
-      kategori_komunikasi:
-        komunikasiForm.kategori_komunikasi.trim(),
-      pengirim:
-        komunikasiForm.pengirim.trim(),
-      penerima:
-        komunikasiForm.penerima.trim(),
-      media_komunikasi:
-        komunikasiForm.media_komunikasi.trim(),
-      waktu_frekuensi:
-        komunikasiForm.waktu_frekuensi.trim() ||
-        null,
-      aktivitas:
-        komunikasiForm.aktivitas.trim() ||
-        null,
-      tujuan:
-        komunikasiForm.tujuan.trim() ||
-        null,
-    };
+  const handleSubmitKomunikasi = async (event: FormEvent) => {
+    event.preventDefault();
+    setKomunikasiFormError('');
 
-    if (!editingKomunikasiId) {
-      payload.layanan_prioritas_id = Number(
-        komunikasiForm.layanan_prioritas_id
-      );
+    if (!komunikasiForm.mkb_layanan_prioritas_id) {
+      setKomunikasiFormError('ID Layanan Prioritas wajib dipilih.');
+      return;
     }
 
-    const response = await fetch(
-      editingKomunikasiId
-        ? `http://localhost:5000/api/bcp/rencana-komunikasi/${editingKomunikasiId}`
-        : 'http://localhost:5000/api/bcp/rencana-komunikasi',
-      {
-        method: editingKomunikasiId
-          ? 'PUT'
-          : 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+    if (!komunikasiForm.informasi_disampaikan.trim()) {
+      setKomunikasiFormError('Informasi yang Disampaikan wajib diisi.');
+      return;
+    }
+
+    if (!komunikasiForm.kategori_komunikasi.trim()) {
+      setKomunikasiFormError('Kategori Komunikasi wajib diisi.');
+      return;
+    }
+
+    if (!komunikasiForm.media_komunikasi.trim()) {
+      setKomunikasiFormError('Media Komunikasi wajib diisi.');
+      return;
+    }
+
+    try {
+      setSavingKomunikasi(true);
+      setKomunikasiFormError('');
+      setMessage('');
+      setError('');
+
+      const token = sessionStorage.getItem('token');
+
+      const payload = {
+        mkb_layanan_prioritas_id: Number(
+          komunikasiForm.mkb_layanan_prioritas_id
+        ),
+        informasi_disampaikan: komunikasiForm.informasi_disampaikan.trim(),
+        kategori_komunikasi: komunikasiForm.kategori_komunikasi.trim(),
+        pengirim: komunikasiForm.pengirim.trim(),
+        penerima: komunikasiForm.penerima.trim(),
+        media_komunikasi: komunikasiForm.media_komunikasi.trim(),
+        waktu_frekuensi: komunikasiForm.waktu_frekuensi.trim() || null,
+        aktivitas: komunikasiForm.aktivitas.trim() || null,
+        tujuan: komunikasiForm.tujuan.trim() || null,
+      };
+
+      const response = await fetch(
+        editingKomunikasiId
+          ? `http://localhost:5000/api/bcp/rencana-komunikasi/${editingKomunikasiId}`
+          : 'http://localhost:5000/api/bcp/rencana-komunikasi',
+        {
+          method: editingKomunikasiId ? 'PUT' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Gagal menyimpan rencana komunikasi.');
       }
-    );
 
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        result.message ||
-          'Gagal menyimpan rencana komunikasi.'
+      setMessage(result.message || 'Rencana komunikasi berhasil disimpan.');
+      resetKomunikasiForm();
+      await fetchRencanaKomunikasi();
+    } catch (err) {
+      setKomunikasiFormError(
+        err instanceof Error ? err.message : 'Gagal menyimpan rencana komunikasi.'
       );
+    } finally {
+      setSavingKomunikasi(false);
     }
-
-    setMessage(
-      result.message ||
-        'Rencana komunikasi berhasil disimpan.'
-    );
-
-    resetKomunikasiForm();
-    await fetchRencanaKomunikasi();
-  } catch (err) {
-    setError(
-      err instanceof Error
-        ? err.message
-        : 'Terjadi kesalahan saat menyimpan rencana komunikasi.'
-    );
-  } finally {
-    setSavingKomunikasi(false);
-  }
-};
+  };
 
 const handleDeleteKomunikasi = async (
     item: RencanaKomunikasiItem
@@ -2567,6 +2685,7 @@ const handleDeleteKomunikasi = async (
 
   const handleTambahKontak = () => {
   setEditingKontakId(null);
+  setKontakFormError('');
   setKontakForm(emptyDaftarKontakForm);
   setMessage('');
   setError('');
@@ -2577,11 +2696,10 @@ const handleEditKontak = (
   item: DaftarKontakItem
 ) => {
   setEditingKontakId(item.id);
+  setKontakFormError('');
 
   setKontakForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
-    ),
+    mkb_layanan_prioritas_id: String(item.mkb_layanan_prioritas_id),
     nama: item.nama,
     jabatan: item.jabatan || '',
     organisasi: item.organisasi || '',
@@ -2597,25 +2715,55 @@ const handleEditKontak = (
 
 const resetKontakForm = () => {
   setEditingKontakId(null);
+  setKontakFormError('');
   setKontakForm(emptyDaftarKontakForm);
   setShowKontakForm(false);
 };
 
-const handleSubmitKontak = async (
-  event: FormEvent
-) => {
+const handleSubmitKontak = async (event: FormEvent) => {
   event.preventDefault();
+  setKontakFormError('');
 
-  if (
-    !editingKontakId &&
-    !kontakForm.layanan_prioritas_id
-  ) {
-    setError('Layanan prioritas wajib dipilih.');
+  if (!kontakForm.mkb_layanan_prioritas_id) {
+    setKontakFormError('ID Layanan Prioritas wajib dipilih.');
     return;
   }
 
   if (!kontakForm.nama.trim()) {
-    setError('Nama wajib diisi.');
+    setKontakFormError('Nama Kontak wajib diisi.');
+    return;
+  }
+
+  if (kontakForm.nama.trim().length > 200) {
+    setKontakFormError('Nama Kontak maksimal 200 karakter.');
+    return;
+  }
+
+  if (kontakForm.jabatan.trim().length > 200) {
+    setKontakFormError('Jabatan maksimal 200 karakter.');
+    return;
+  }
+
+  if (kontakForm.organisasi.trim().length > 200) {
+    setKontakFormError('Organisasi maksimal 200 karakter.');
+    return;
+  }
+
+  if (kontakForm.telepon.trim().length > 100) {
+    setKontakFormError('Nomor Telepon maksimal 100 karakter.');
+    return;
+  }
+
+  if (kontakForm.email.trim().length > 200) {
+    setKontakFormError('Email maksimal 200 karakter.');
+    return;
+  }
+
+  if (
+    kontakForm.email.trim() &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(kontakForm.email.trim())
+  ) {
+    setKontakFormError('Format Email tidak valid.');
     return;
   }
 
@@ -2626,37 +2774,24 @@ const handleSubmitKontak = async (
 
     const token = sessionStorage.getItem('token');
 
-    const payload: Record<
-      string,
-      string | number | null
-    > = {
+    const payload = {
+      mkb_layanan_prioritas_id: Number(
+        kontakForm.mkb_layanan_prioritas_id
+      ),
       nama: kontakForm.nama.trim(),
-      jabatan:
-        kontakForm.jabatan.trim() || null,
-      organisasi:
-        kontakForm.organisasi.trim() || null,
-      alamat:
-        kontakForm.alamat.trim() || null,
-      telepon:
-        kontakForm.telepon.trim() || null,
-      email:
-        kontakForm.email.trim() || null,
+      jabatan: kontakForm.jabatan.trim() || null,
+      organisasi: kontakForm.organisasi.trim() || null,
+      alamat: kontakForm.alamat.trim() || null,
+      telepon: kontakForm.telepon.trim() || null,
+      email: kontakForm.email.trim() || null,
     };
-
-    if (!editingKontakId) {
-      payload.layanan_prioritas_id = Number(
-        kontakForm.layanan_prioritas_id
-      );
-    }
 
     const response = await fetch(
       editingKontakId
         ? `http://localhost:5000/api/bcp/daftar-kontak/${editingKontakId}`
         : 'http://localhost:5000/api/bcp/daftar-kontak',
       {
-        method: editingKontakId
-          ? 'PUT'
-          : 'POST',
+        method: editingKontakId ? 'PUT' : 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -2669,20 +2804,18 @@ const handleSubmitKontak = async (
 
     if (!response.ok) {
       throw new Error(
-        result.message ||
-          'Gagal menyimpan daftar kontak.'
+        result.message || 'Gagal menyimpan daftar kontak.'
       );
     }
 
     setMessage(
-      result.message ||
-        'Daftar kontak berhasil disimpan.'
+      result.message || 'Daftar kontak berhasil disimpan.'
     );
 
     resetKontakForm();
     await fetchDaftarKontak();
   } catch (err) {
-    setError(
+    setKontakFormError(
       err instanceof Error
         ? err.message
         : 'Terjadi kesalahan saat menyimpan daftar kontak.'
@@ -2743,6 +2876,7 @@ const handleDeleteKontak = async (
   };
 
   const handleTambahSdm = () => {
+  setForm8Error('');
   setEditingSdmId(null);
   setSdmForm(emptySumberDayaManusiaForm);
   setMessage('');
@@ -2753,11 +2887,12 @@ const handleDeleteKontak = async (
 const handleEditSdm = (
   item: SumberDayaManusiaItem
 ) => {
+  setForm8Error('');
   setEditingSdmId(item.id);
 
   setSdmForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
+    mkb_layanan_prioritas_id: String(
+      item.mkb_layanan_prioritas_id
     ),
     kebutuhan_personel: item.kebutuhan_personel,
     jumlah_minimum:
@@ -2787,24 +2922,24 @@ const handleSubmitSdm = async (
   event: FormEvent
 ) => {
   event.preventDefault();
+  setForm8Error('');
 
   if (
-    !editingSdmId &&
-    !sdmForm.layanan_prioritas_id
+    !sdmForm.mkb_layanan_prioritas_id
   ) {
-    setError('Layanan prioritas wajib dipilih.');
+    setForm8Error('Layanan prioritas wajib dipilih.');
     return;
   }
 
   if (!sdmForm.kebutuhan_personel.trim()) {
-    setError('Kebutuhan personel wajib diisi.');
+    setForm8Error('Kebutuhan personel wajib diisi.');
     return;
   }
 
   try {
     setSavingSdm(true);
     setMessage('');
-    setError('');
+    setForm8Error('');
 
     const token = sessionStorage.getItem('token');
 
@@ -2828,11 +2963,9 @@ const handleSubmitSdm = async (
         sdmForm.keterangan.trim() || null,
     };
 
-    if (!editingSdmId) {
-      payload.layanan_prioritas_id = Number(
-        sdmForm.layanan_prioritas_id
+    payload.mkb_layanan_prioritas_id = Number(
+        sdmForm.mkb_layanan_prioritas_id
       );
-    }
 
     const response = await fetch(
       editingSdmId
@@ -2865,7 +2998,7 @@ const handleSubmitSdm = async (
     resetSdmForm();
     await fetchSumberDayaManusia();
   } catch (err) {
-    setError(
+    setForm8Error(
       err instanceof Error
         ? err.message
         : 'Terjadi kesalahan saat menyimpan sumber daya manusia.'
@@ -2928,6 +3061,7 @@ const handleDeleteSdm = async (
 };
 
 const handleTambahFasilitas = () => {
+  setForm8Error('');
   setEditingFasilitasId(null);
   setFasilitasForm(
     emptyFasilitasOperasionalForm
@@ -2940,11 +3074,12 @@ const handleTambahFasilitas = () => {
 const handleEditFasilitas = (
   item: FasilitasOperasionalItem
 ) => {
+  setForm8Error('');
   setEditingFasilitasId(item.id);
 
   setFasilitasForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
+    mkb_layanan_prioritas_id: String(
+      item.mkb_layanan_prioritas_id
     ),
     nama_fasilitas: item.nama_fasilitas,
     jenis_fasilitas: item.jenis_fasilitas || '',
@@ -2975,24 +3110,24 @@ const handleSubmitFasilitas = async (
   event: FormEvent
 ) => {
   event.preventDefault();
+  setForm8Error('');
 
   if (
-    !editingFasilitasId &&
-    !fasilitasForm.layanan_prioritas_id
+    !fasilitasForm.mkb_layanan_prioritas_id
   ) {
-    setError('Layanan prioritas wajib dipilih.');
+    setForm8Error('Layanan prioritas wajib dipilih.');
     return;
   }
 
   if (!fasilitasForm.nama_fasilitas.trim()) {
-    setError('Nama fasilitas wajib diisi.');
+    setForm8Error('Nama fasilitas wajib diisi.');
     return;
   }
 
   try {
     setSavingFasilitas(true);
     setMessage('');
-    setError('');
+    setForm8Error('');
 
     const token = sessionStorage.getItem('token');
 
@@ -3018,11 +3153,9 @@ const handleSubmitFasilitas = async (
         fasilitasForm.keterangan.trim() || null,
     };
 
-    if (!editingFasilitasId) {
-      payload.layanan_prioritas_id = Number(
-        fasilitasForm.layanan_prioritas_id
+    payload.mkb_layanan_prioritas_id = Number(
+        fasilitasForm.mkb_layanan_prioritas_id
       );
-    }
 
     const response = await fetch(
       editingFasilitasId
@@ -3057,7 +3190,7 @@ const handleSubmitFasilitas = async (
     resetFasilitasForm();
     await fetchFasilitasOperasional();
   } catch (err) {
-    setError(
+    setForm8Error(
       err instanceof Error
         ? err.message
         : 'Terjadi kesalahan saat menyimpan fasilitas operasional.'
@@ -3117,6 +3250,7 @@ const handleDeleteFasilitas = async (
 };
 
 const handleTambahTik = () => {
+  setForm8Error('');
   setEditingTikId(null);
   setTikForm(emptySumberDayaTikForm);
   setMessage('');
@@ -3127,11 +3261,12 @@ const handleTambahTik = () => {
 const handleEditTik = (
   item: SumberDayaTikItem
 ) => {
+  setForm8Error('');
   setEditingTikId(item.id);
 
   setTikForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
+    mkb_layanan_prioritas_id: String(
+      item.mkb_layanan_prioritas_id
     ),
     jenis_sumber_daya: item.jenis_sumber_daya,
     nama_sumber_daya: item.nama_sumber_daya,
@@ -3161,12 +3296,12 @@ const handleSubmitTik = async (
   event: FormEvent
 ) => {
   event.preventDefault();
+  setForm8Error('');
 
   if (
-    !editingTikId &&
-    !tikForm.layanan_prioritas_id
+    !tikForm.mkb_layanan_prioritas_id
   ) {
-    setError('Layanan prioritas wajib dipilih.');
+    setForm8Error('Layanan prioritas wajib dipilih.');
     return;
   }
 
@@ -3174,7 +3309,7 @@ const handleSubmitTik = async (
     !tikForm.jenis_sumber_daya ||
     !tikForm.nama_sumber_daya.trim()
   ) {
-    setError(
+    setForm8Error(
       'Jenis dan nama sumber daya TIK wajib diisi.'
     );
     return;
@@ -3183,7 +3318,7 @@ const handleSubmitTik = async (
   try {
     setSavingTik(true);
     setMessage('');
-    setError('');
+    setForm8Error('');
 
     const token = sessionStorage.getItem('token');
 
@@ -3209,11 +3344,9 @@ const handleSubmitTik = async (
         tikForm.keterangan.trim() || null,
     };
 
-    if (!editingTikId) {
-      payload.layanan_prioritas_id = Number(
-        tikForm.layanan_prioritas_id
+    payload.mkb_layanan_prioritas_id = Number(
+        tikForm.mkb_layanan_prioritas_id
       );
-    }
 
     const response = await fetch(
       editingTikId
@@ -3246,7 +3379,7 @@ const handleSubmitTik = async (
     resetTikForm();
     await fetchSumberDayaTik();
   } catch (err) {
-    setError(
+    setForm8Error(
       err instanceof Error
         ? err.message
         : 'Terjadi kesalahan saat menyimpan sumber daya TIK.'
@@ -3306,6 +3439,7 @@ const handleDeleteTik = async (
 };
 
 const handleTambahAkses = () => {
+  setForm8Error('');
   setEditingAksesId(null);
   setAksesForm(emptyAksesSistemTikForm);
   setMessage('');
@@ -3316,11 +3450,12 @@ const handleTambahAkses = () => {
 const handleEditAkses = (
   item: AksesSistemTikItem
 ) => {
+  setForm8Error('');
   setEditingAksesId(item.id);
 
   setAksesForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
+    mkb_layanan_prioritas_id: String(
+      item.mkb_layanan_prioritas_id
     ),
     nama_sistem: item.nama_sistem,
     jenis_sistem: item.jenis_sistem || '',
@@ -3349,12 +3484,12 @@ const handleSubmitAkses = async (
   event: FormEvent
 ) => {
   event.preventDefault();
+  setForm8Error('');
 
   if (
-    !editingAksesId &&
-    !aksesForm.layanan_prioritas_id
+    !aksesForm.mkb_layanan_prioritas_id
   ) {
-    setError('Layanan prioritas wajib dipilih.');
+    setForm8Error('Layanan prioritas wajib dipilih.');
     return;
   }
 
@@ -3362,7 +3497,7 @@ const handleSubmitAkses = async (
     !aksesForm.nama_sistem.trim() ||
     !aksesForm.jenis_akses.trim()
   ) {
-    setError(
+    setForm8Error(
       'Nama sistem dan jenis akses wajib diisi.'
     );
     return;
@@ -3371,7 +3506,7 @@ const handleSubmitAkses = async (
   try {
     setSavingAkses(true);
     setMessage('');
-    setError('');
+    setForm8Error('');
 
     const token = sessionStorage.getItem('token');
 
@@ -3398,11 +3533,9 @@ const handleSubmitAkses = async (
         aksesForm.keterangan.trim() || null,
     };
 
-    if (!editingAksesId) {
-      payload.layanan_prioritas_id = Number(
-        aksesForm.layanan_prioritas_id
+    payload.mkb_layanan_prioritas_id = Number(
+        aksesForm.mkb_layanan_prioritas_id
       );
-    }
 
     const response = await fetch(
       editingAksesId
@@ -3435,7 +3568,7 @@ const handleSubmitAkses = async (
     resetAksesForm();
     await fetchAksesSistemTik();
   } catch (err) {
-    setError(
+    setForm8Error(
       err instanceof Error
         ? err.message
         : 'Terjadi kesalahan saat menyimpan akses sistem TIK.'
@@ -3495,6 +3628,7 @@ const handleDeleteAkses = async (
 };
 
 const handleTambahEksternalTik = () => {
+  setForm8Error('');
   setEditingEksternalTikId(null);
   setEksternalTikForm(
     emptySumberDayaEksternalTikForm
@@ -3507,11 +3641,12 @@ const handleTambahEksternalTik = () => {
 const handleEditEksternalTik = (
   item: SumberDayaEksternalTikItem
 ) => {
+  setForm8Error('');
   setEditingEksternalTikId(item.id);
 
   setEksternalTikForm({
-    layanan_prioritas_id: String(
-      item.layanan_prioritas_id
+    mkb_layanan_prioritas_id: String(
+      item.mkb_layanan_prioritas_id
     ),
     nama_vendor_mitra: item.nama_vendor_mitra,
     jenis_sumber_daya: item.jenis_sumber_daya,
@@ -3543,12 +3678,12 @@ const handleSubmitEksternalTik = async (
   event: FormEvent
 ) => {
   event.preventDefault();
+  setForm8Error('');
 
   if (
-    !editingEksternalTikId &&
-    !eksternalTikForm.layanan_prioritas_id
+    !eksternalTikForm.mkb_layanan_prioritas_id
   ) {
-    setError('Layanan prioritas wajib dipilih.');
+    setForm8Error('Layanan prioritas wajib dipilih.');
     return;
   }
 
@@ -3556,7 +3691,7 @@ const handleSubmitEksternalTik = async (
     !eksternalTikForm.nama_vendor_mitra.trim() ||
     !eksternalTikForm.jenis_sumber_daya
   ) {
-    setError(
+    setForm8Error(
       'Nama vendor atau mitra dan jenis sumber daya wajib diisi.'
     );
     return;
@@ -3565,7 +3700,7 @@ const handleSubmitEksternalTik = async (
   try {
     setSavingEksternalTik(true);
     setMessage('');
-    setError('');
+    setForm8Error('');
 
     const token = sessionStorage.getItem('token');
 
@@ -3594,11 +3729,9 @@ const handleSubmitEksternalTik = async (
         null,
     };
 
-    if (!editingEksternalTikId) {
-      payload.layanan_prioritas_id = Number(
-        eksternalTikForm.layanan_prioritas_id
+    payload.mkb_layanan_prioritas_id = Number(
+        eksternalTikForm.mkb_layanan_prioritas_id
       );
-    }
 
     const response = await fetch(
       editingEksternalTikId
@@ -3633,7 +3766,7 @@ const handleSubmitEksternalTik = async (
     resetEksternalTikForm();
     await fetchSumberDayaEksternalTik();
   } catch (err) {
-    setError(
+    setForm8Error(
       err instanceof Error
         ? err.message
         : 'Terjadi kesalahan saat menyimpan sumber daya eksternal TIK.'
@@ -3691,6 +3824,39 @@ const handleDeleteEksternalTik = async (
     );
   }
 };
+
+  const form8Rows = [
+    ...sumberDayaManusia.map((item) => ({
+      key: `sdm-${item.id}`, instansi: item.nama_instansi, kode: item.kode_prioritas,
+      layanan: item.nama_layanan, kategori: '8.1 - Sumber Daya Manusia', ringkasan: item.kebutuhan_personel,
+      fields: Object.entries({ 'Kebutuhan Personel': item.kebutuhan_personel, 'Jumlah Minimum': item.jumlah_minimum, 'Kompetensi': item.kompetensi, 'Sumber Penyedia': item.sumber_penyedia_sdm, 'Personel Pengganti': item.personel_pengganti, 'Keterangan': item.keterangan }),
+      edit: () => handleEditSdm(item), hapus: () => handleDeleteSdm(item)
+    })),
+    ...fasilitasOperasional.map((item) => ({
+      key: `fasilitas-${item.id}`, instansi: item.nama_instansi, kode: item.kode_prioritas,
+      layanan: item.nama_layanan, kategori: '8.2 - Fasilitas Operasional', ringkasan: item.nama_fasilitas,
+      fields: Object.entries({ 'Nama Fasilitas': item.nama_fasilitas, 'Jenis Fasilitas': item.jenis_fasilitas, 'Jumlah Minimum': item.jumlah_minimum, 'Lokasi': item.lokasi, 'Fungsi': item.fungsi, 'Alternatif': item.alternatif, 'Keterangan': item.keterangan }),
+      edit: () => handleEditFasilitas(item), hapus: () => handleDeleteFasilitas(item)
+    })),
+    ...sumberDayaTik.map((item) => ({
+      key: `tik-${item.id}`, instansi: item.nama_instansi, kode: item.kode_prioritas,
+      layanan: item.nama_layanan, kategori: '8.3 - Sumber Daya TIK', ringkasan: item.nama_sumber_daya,
+      fields: Object.entries({ 'Jenis Sumber Daya': item.jenis_sumber_daya, 'Nama Sumber Daya': item.nama_sumber_daya, 'Jumlah Minimum': item.jumlah_minimum, 'Spesifikasi': item.spesifikasi, 'Lokasi': item.lokasi, 'Sumber Cadangan': item.sumber_cadangan, 'Keterangan': item.keterangan }),
+      edit: () => handleEditTik(item), hapus: () => handleDeleteTik(item)
+    })),
+    ...aksesSistemTik.map((item) => ({
+      key: `akses-${item.id}`, instansi: item.nama_instansi, kode: item.kode_prioritas,
+      layanan: item.nama_layanan, kategori: '8.4 - Akses Sistem TIK', ringkasan: item.nama_sistem,
+      fields: Object.entries({ 'Nama Sistem': item.nama_sistem, 'Jenis Sistem': item.jenis_sistem, 'Jenis Akses': item.jenis_akses, 'Personel Berwenang': item.personel_berwenang, 'Mekanisme Akses': item.mekanisme_akses, 'Akses Darurat': item.akses_darurat, 'Keterangan': item.keterangan }),
+      edit: () => handleEditAkses(item), hapus: () => handleDeleteAkses(item)
+    })),
+    ...sumberDayaEksternalTik.map((item) => ({
+      key: `eksternal-${item.id}`, instansi: item.nama_instansi, kode: item.kode_prioritas,
+      layanan: item.nama_layanan, kategori: '8.5 - Sumber Daya Eksternal TIK', ringkasan: item.nama_vendor_mitra,
+      fields: Object.entries({ 'Vendor/Mitra': item.nama_vendor_mitra, 'Jenis Sumber Daya': item.jenis_sumber_daya, 'Deskripsi': item.deskripsi_sumber_daya, 'Kontak Dukungan': item.kontak_dukungan, 'Mekanisme Aktivasi': item.mekanisme_aktivasi, 'Alternatif Penyedia': item.alternatif_penyedia, 'Keterangan': item.keterangan }),
+      edit: () => handleEditEksternalTik(item), hapus: () => handleDeleteEksternalTik(item)
+    }))
+  ];
 
   return (
     <div className="p-6">
@@ -3784,13 +3950,15 @@ const handleDeleteEksternalTik = async (
             </p>
           </div>
 
-          <button
+          {canCreate && (
+            <button
             type="button"
             onClick={handleTambah}
             className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
           >
             Tambah Data
           </button>
+          )}
         </div>
 
         <div className="border-b border-slate-200 p-5">
@@ -3807,48 +3975,48 @@ const handleDeleteEksternalTik = async (
           />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1200px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+        <div className="overflow-x-auto p-5">
+          <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   No
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Instansi
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   ID Layanan
                   Prioritas
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Nama Layanan
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Jenis Layanan
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Kategori
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Pengguna Utama
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Jumlah Pengguna
                 </th>
 
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 font-semibold">
                   Ekosistem
                 </th>
 
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
+                <th className="px-4 py-3 text-center font-semibold">
                   Aksi
                 </th>
               </tr>
@@ -3894,9 +4062,7 @@ const handleDeleteEksternalTik = async (
                       </td>
 
                       <td className="px-4 py-3 text-sm font-medium text-slate-700">
-                        {
-                          item.kode_prioritas
-                        }
+                        {item.kode_prioritas || '-'}
                       </td>
 
                       <td className="px-4 py-3 text-sm text-slate-700">
@@ -3942,34 +4108,38 @@ const handleDeleteEksternalTik = async (
                                 item
                               )
                             }
-                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                           >
                             Detail
                           </button>
 
-                          <button
+                          {canUpdate && (
+                            <button
                             type="button"
                             onClick={() =>
                               handleEdit(
                                 item
                               )
                             }
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                           >
                             Edit
                           </button>
+                          )}
 
-                          <button
+                          {canDelete && (
+                            <button
                             type="button"
                             onClick={() =>
                               handleDelete(
                                 item
                               )
                             }
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                           >
                             Hapus
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -3985,555 +4155,101 @@ const handleDeleteEksternalTik = async (
         <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 2 - Struktur Tim Manajemen Keberlangsungan
+              Formulir 2–5 - Struktur Tim Manajemen Keberlangsungan
             </h2>
-
             <p className="mt-1 text-sm text-slate-500">
-              Penetapan struktur, peran, dan tanggung jawab Tim Manajemen Keberlangsungan.
+              Daftar anggota dari empat jenis tim Manajemen Keberlangsungan.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleTambahTim}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            Tambah Anggota
-          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={handleTambahStrukturTimMkb}
+              className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            >
+              Tambah Anggota Tim
+            </button>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  No
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Layanan Prioritas
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Nama Pegawai
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Jabatan
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Unit Kerja
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Peran MKB
-                </th>
-
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Urutan
-                </th>
-
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
-                  Aksi
-                </th>
+        <div className="overflow-x-auto p-5">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                {[
+                  'No',
+                  'ID Layanan Prioritas',
+                  'Nama Layanan',
+                  'Jenis Tim',
+                  'Nama Pegawai',
+                  'Peran Tim',
+                  'Aksi'
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className={`px-4 py-3 font-semibold ${
+                      heading === 'Aksi' ? 'text-center' : 'text-left'
+                    }`}
+                  >
+                    {heading}
+                  </th>
+                ))}
               </tr>
             </thead>
-
             <tbody>
-              {timManajemen.length === 0 ? (
+              {strukturTimMkb.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-slate-500"
                   >
-                    Belum ada struktur Tim Manajemen Keberlangsungan.
+                    Belum ada anggota tim Manajemen Keberlangsungan.
                   </td>
                 </tr>
               ) : (
-                timManajemen.map(
-                  (item, index) => (
-                    <tr
-                      key={item.id}
-                      className="border-b border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {index + 1}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        <div className="font-medium">
-                          {item.kode_prioritas}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {item.nama_layanan}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        <div className="font-medium">
-                          {item.nama_pegawai}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {item.nip || '-'}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.jabatan || '-'}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.nama_unit}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.peran_mkb}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.urutan ?? '-'}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleEditTim(item)
-                            }
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeleteTim(item)
-                            }
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 3 - Pelaksana Tanggap Insiden
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Penetapan anggota, peran, dan tanggung jawab pelaksana tanggap insiden.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahTanggapInsiden}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            Tambah Pelaksana
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  No
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Layanan Prioritas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Nama Pegawai
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Jabatan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Unit Kerja
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Peran Tanggap Insiden
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Urutan
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {timTanggapInsiden.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada pelaksana tanggap insiden.
-                  </td>
-                </tr>
-              ) : (
-                timTanggapInsiden.map(
-                  (item, index) => (
-                    <tr
-                      key={item.id}
-                      className="border-b border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {index + 1}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        <div className="font-medium">
-                          {item.kode_prioritas}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {item.nama_layanan}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        <div className="font-medium">
-                          {item.nama_pegawai}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {item.nip || '-'}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.jabatan || '-'}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.nama_unit}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.peran_tanggap_insiden}
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.urutan ?? '-'}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleEditTanggapInsiden(
-                                item
-                              )
-                            }
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeleteTanggapInsiden(
-                                item
-                              )
-                            }
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 4 - Pelaksana Pemulihan Layanan Digital
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Penetapan anggota, peran, dan tanggung jawab pelaksana pemulihan layanan digital.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahPemulihanLayanan}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            Tambah Pelaksana
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  No
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Layanan Prioritas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Nama Pegawai
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Jabatan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Unit Kerja
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Peran Pemulihan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Urutan
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {timPemulihanLayanan.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada pelaksana pemulihan layanan digital.
-                  </td>
-                </tr>
-              ) : (
-                timPemulihanLayanan.map((item, index) => (
+                strukturTimMkb.map((item, index) => (
                   <tr
                     key={item.id}
                     className="border-b border-slate-100 hover:bg-slate-50"
                   >
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {index + 1}
+                    <td className="px-4 py-3">{index + 1}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {item.kode_layanan}
                     </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <div className="font-medium">
-                        {item.nama_pegawai}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nip || '-'}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.jabatan || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.nama_unit}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.peran_pemulihan}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.urutan ?? '-'}
-                    </td>
-
+                    <td className="px-4 py-3">{item.nama_layanan}</td>
+                    <td className="px-4 py-3">{item.jenis_tim}</td>
+                    <td className="px-4 py-3">{item.nama_pegawai}</td>
+                    <td className="px-4 py-3">{item.peran_tim}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center gap-2">
                         <button
                           type="button"
-                          onClick={() =>
-                            handleEditPemulihanLayanan(item)
-                          }
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                          onClick={() => setSelectedStrukturTimMkb(item)}
+                          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                         >
-                          Edit
+                          Detail
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeletePemulihanLayanan(item)
-                          }
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        {canUpdate && (
+                          <button
+                            type="button"
+                            onClick={() => handleEditStrukturTimMkb(item)}
+                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            Edit
+                          </button>
+                        )}
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 5 - Pelaksana Operasional
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Penetapan anggota, peran, dan tanggung jawab pelaksana operasional layanan.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahOperasional}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
-          >
-            Tambah Pelaksana
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  No
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Layanan Prioritas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Nama Pegawai
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Jabatan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Unit Kerja
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Peran Operasional
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Urutan
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {timOperasional.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada pelaksana operasional.
-                  </td>
-                </tr>
-              ) : (
-                timOperasional.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-slate-100 hover:bg-slate-50"
-                  >
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {index + 1}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <div className="font-medium">
-                        {item.nama_pegawai}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nip || '-'}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.jabatan || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.nama_unit}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.peran_operasional}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.urutan ?? '-'}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleEditOperasional(item)
-                          }
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteOperasional(item)
-                          }
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                        >
-                          Hapus
-                        </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStrukturTimMkb(item)}
+                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                          >
+                            Hapus
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -4556,46 +4272,42 @@ const handleDeleteEksternalTik = async (
             </p>
           </div>
 
-          <button
+          {canCreate && (
+            <button
             type="button"
             onClick={handleTambahKomunikasi}
             className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
           >
             Tambah Komunikasi
           </button>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1500px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  No
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Layanan Prioritas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Informasi
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Kategori
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Pengirim
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Penerima
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Media
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Waktu/Frekuensi
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
-                  Aksi
-                </th>
+        <div className="overflow-x-auto p-5">
+         <table className="w-full min-w-[1250px] border-collapse text-left text-sm">
+            <thead>     
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                {[
+                  'No',
+                  'Instansi',
+                  'ID Layanan Prioritas',
+                  'Nama Layanan',
+                  'Informasi',
+                  'Kategori',
+                  'Pengirim',
+                  'Penerima',
+                  'Media',
+                  'Aksi'
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className={`px-4 py-3 font-semibold ${
+                      heading === 'Aksi' ? 'text-center' : 'text-left'
+                    }`}
+                  >
+                    {heading}
+                  </th>
+                ))}
               </tr>
             </thead>
 
@@ -4603,82 +4315,89 @@ const handleDeleteEksternalTik = async (
               {rencanaKomunikasi.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
+                    colSpan={10}
+                    className="px-4 py-10 text-center text-slate-500"
                   >
                     Belum ada rencana komunikasi.
                   </td>
                 </tr>
               ) : (
-                rencanaKomunikasi.map(
-                  (item, index) => (
-                    <tr
-                      key={item.id}
-                      className="border-b border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {index + 1}
-                      </td>
+                rencanaKomunikasi.map((item, index) => (
+                  <tr
+                    key={item.id}
+                    className="border-b border-slate-100 hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 text-slate-600">
+                      {index + 1}
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-700">
-                        <div className="font-medium">
-                          {item.kode_prioritas}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {item.nama_layanan}
-                        </div>
-                      </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {item.nama_instansi || '-'}
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.informasi_disampaikan}
-                      </td>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {item.kode_layanan || '-'}
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.kategori_komunikasi}
-                      </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {item.nama_layanan || '-'}
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.pengirim}
-                      </td>
+                    <td className="max-w-[260px] px-4 py-3 text-slate-600">
+                      <p className="line-clamp-2">
+                        {item.informasi_disampaikan || '-'}
+                      </p>
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.penerima}
-                      </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {item.kategori_komunikasi || '-'}
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.media_komunikasi}
-                      </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {item.pengirim || '-'}
+                    </td>
 
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {item.waktu_frekuensi || '-'}
-                      </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {item.penerima || '-'}
+                    </td>
 
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center gap-2">
+                    <td className="px-4 py-3 text-slate-600">
+                      {item.media_komunikasi || '-'}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedKomunikasi(item)}
+                          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          Detail
+                        </button>
+
+                        {canUpdate && (
                           <button
                             type="button"
-                            onClick={() =>
-                              handleEditKomunikasi(item)
-                            }
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                            onClick={() => handleEditKomunikasi(item)}
+                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                           >
                             Edit
                           </button>
+                        )}
 
+                        {canDelete && (
                           <button
                             type="button"
-                            onClick={() =>
-                              handleDeleteKomunikasi(item)
-                            }
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                            onClick={() => handleDeleteKomunikasi(item)}
+                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                           >
                             Hapus
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -4697,43 +4416,42 @@ const handleDeleteEksternalTik = async (
             </p>
           </div>
 
-          <button
+          {canCreate && (
+            <button
             type="button"
             onClick={handleTambahKontak}
             className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
           >
             Tambah Kontak
           </button>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[1300px] w-full">
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  No
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Layanan Prioritas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Nama
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Jabatan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Organisasi
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Telepon
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">
-                  Email
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-slate-600">
-                  Aksi
-                </th>
+        <div className="overflow-x-auto p-5">
+          <table className="w-full min-w-[1250px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                {[
+                  'No',
+                  'Instansi',
+                  'ID Layanan Prioritas',
+                  'Nama Layanan',
+                  'Nama Kontak',
+                  'Jabatan',
+                  'Organisasi',
+                  'Telepon',
+                  'Email',
+                  'Aksi',
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className={`px-4 py-3 font-semibold ${
+                      heading === 'Aksi' ? 'text-center' : 'text-left'
+                    }`}
+                  >
+                    {heading}
+                  </th>
+                ))}
               </tr>
             </thead>
 
@@ -4741,8 +4459,8 @@ const handleDeleteEksternalTik = async (
               {daftarKontak.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
+                    colSpan={10}
+                    className="px-4 py-10 text-center text-slate-500"
                   >
                     Belum ada daftar kontak.
                   </td>
@@ -4753,650 +4471,289 @@ const handleDeleteEksternalTik = async (
                     key={item.id}
                     className="border-b border-slate-100 hover:bg-slate-50"
                   >
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {index + 1}
+                    <td className="px-4 py-3">{index + 1}</td>
+                    <td className="px-4 py-3">{item.nama_instansi || '-'}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {item.kode_layanan || '-'}
                     </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-700">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-sm font-medium text-slate-700">
-                      {item.nama}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.jabatan || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.organisasi || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.telepon || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {item.email || '-'}
-                    </td>
+                    <td className="px-4 py-3">{item.nama_layanan || '-'}</td>
+                    <td className="px-4 py-3">{item.nama}</td>
+                    <td className="px-4 py-3">{item.jabatan || '-'}</td>
+                    <td className="px-4 py-3">{item.organisasi || '-'}</td>
+                    <td className="px-4 py-3">{item.telepon || '-'}</td>
+                    <td className="px-4 py-3">{item.email || '-'}</td>
 
                     <td className="px-4 py-3">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() =>
-                            handleEditKontak(item)
-                          }
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                          onClick={() => setSelectedKontak(item)}
+                          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                         >
-                          Edit
+                          Detail
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteKontak(item)
-                          }
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 8.1 - Sumber Daya Manusia
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Kebutuhan personel untuk keberlangsungan dan pemulihan layanan.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahSdm}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Tambah Sumber Daya
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                {[
-                  'No',
-                  'Layanan Prioritas',
-                  'Kebutuhan Personel',
-                  'Jumlah Minimum',
-                  'Kompetensi',
-                  'Sumber Penyedia',
-                  'Pengganti',
-                  'Aksi',
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600"
-                  >
-                    {head}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {sumberDayaManusia.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada data sumber daya manusia.
-                  </td>
-                </tr>
-              ) : (
-                sumberDayaManusia.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-4 py-3 text-sm">
-                      {index + 1}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3 text-sm">
-                      {item.kebutuhan_personel}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm">
-                      {item.jumlah_minimum ?? '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm">
-                      {item.kompetensi || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm">
-                      {item.sumber_penyedia_sdm || '-'}
-                    </td>
-
-                    <td className="px-4 py-3 text-sm">
-                      {item.personel_pengganti || '-'}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEditSdm(item)}
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSdm(item)}
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 8.2 - Fasilitas dan Pendukung Operasional
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Kebutuhan fasilitas minimum selama kondisi gangguan.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahFasilitas}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Tambah Fasilitas
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                {[
-                  'No',
-                  'Layanan Prioritas',
-                  'Nama Fasilitas',
-                  'Jenis',
-                  'Jumlah Minimum',
-                  'Lokasi',
-                  'Alternatif',
-                  'Aksi',
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600"
-                  >
-                    {head}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {fasilitasOperasional.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada fasilitas operasional.
-                  </td>
-                </tr>
-              ) : (
-                fasilitasOperasional.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-4 py-3 text-sm">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.nama_fasilitas}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.jenis_fasilitas || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.jumlah_minimum ?? '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.lokasi || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.alternatif || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleEditFasilitas(item)
-                          }
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteFasilitas(item)
-                          }
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 8.3 - Sumber Daya TIK
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Kebutuhan teknologi untuk keberlangsungan dan pemulihan layanan.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahTik}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Tambah Sumber Daya
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1050px] w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                {[
-                  'No',
-                  'Layanan Prioritas',
-                  'Jenis',
-                  'Nama Sumber Daya',
-                  'Jumlah',
-                  'Lokasi',
-                  'Sumber Cadangan',
-                  'Aksi',
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600"
-                  >
-                    {head}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {sumberDayaTik.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada sumber daya TIK.
-                  </td>
-                </tr>
-              ) : (
-                sumberDayaTik.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-4 py-3 text-sm">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.jenis_sumber_daya}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.nama_sumber_daya}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.jumlah_minimum ?? '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.lokasi || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.sumber_cadangan || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEditTik(item)}
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTik(item)}
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 8.4 - Akses ke Sistem TIK
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Kebutuhan hak akses sistem bagi personel yang berwenang.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahAkses}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Tambah Akses
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                {[
-                  'No',
-                  'Layanan Prioritas',
-                  'Nama Sistem',
-                  'Jenis Sistem',
-                  'Jenis Akses',
-                  'Personel Berwenang',
-                  'Akses Darurat',
-                  'Aksi',
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600"
-                  >
-                    {head}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {aksesSistemTik.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada akses sistem TIK.
-                  </td>
-                </tr>
-              ) : (
-                aksesSistemTik.map((item, index) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-slate-100"
-                  >
-                    <td className="px-4 py-3 text-sm">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <div className="font-medium">
-                        {item.kode_prioritas}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {item.nama_layanan}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.nama_sistem}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.jenis_sistem || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.jenis_akses}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.personel_berwenang || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.akses_darurat || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleEditAkses(item)
-                          }
-                          className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteAkses(item)
-                          }
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Formulir 8.5 - Sumber Daya Eksternal TIK
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Dukungan teknologi dari vendor atau mitra eksternal.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleTambahEksternalTik}
-            className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Tambah Sumber Daya
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                {[
-                  'No',
-                  'Layanan Prioritas',
-                  'Vendor / Mitra',
-                  'Jenis Sumber Daya',
-                  'Kontak Dukungan',
-                  'Mekanisme Aktivasi',
-                  'Alternatif Penyedia',
-                  'Aksi',
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600"
-                  >
-                    {head}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {sumberDayaEksternalTik.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    Belum ada sumber daya eksternal TIK.
-                  </td>
-                </tr>
-              ) : (
-                sumberDayaEksternalTik.map(
-                  (item, index) => (
-                    <tr
-                      key={item.id}
-                      className="border-t border-slate-100"
-                    >
-                      <td className="px-4 py-3 text-sm">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="font-medium">
-                          {item.kode_prioritas}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {item.nama_layanan}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {item.nama_vendor_mitra}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {item.jenis_sumber_daya}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {item.kontak_dukungan || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {item.mekanisme_aktivasi || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {item.alternatif_penyedia || '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
+                        {canUpdate && (
                           <button
                             type="button"
-                            onClick={() =>
-                              handleEditEksternalTik(item)
-                            }
-                            className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700"
+                            onClick={() => handleEditKontak(item)}
+                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                           >
                             Edit
                           </button>
+                        )}
+
+                        {canDelete && (
                           <button
                             type="button"
-                            onClick={() =>
-                              handleDeleteEksternalTik(item)
-                            }
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
+                            onClick={() => handleDeleteKontak(item)}
+                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                           >
                             Hapus
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">Formulir 8 - Kebutuhan Sumber Daya Manajemen Keberlangsungan</h2>
+            <p className="mt-1 text-sm text-slate-500">Kebutuhan sumber daya kategori 8.1 sampai 8.5 dalam satu tabel.</p>
+          </div>
+          {canCreate && (
+            <button type="button" onClick={handleTambahSdm} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Tambah Data</button>
+          )}
+        </div>
+        <div className="overflow-x-auto p-5">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+            <thead><tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+              {['No', 'Instansi', 'ID Layanan Prioritas', 'Nama Layanan', 'Jenis Sumber Daya', 'Ringkasan Kebutuhan', 'Aksi'].map((judul) => (
+                <th key={judul} className="px-4 py-3 font-semibold">{judul}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {form8Rows.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">Belum ada kebutuhan sumber daya.</td></tr>
+              ) : form8Rows.map((item, index) => (
+                <tr key={item.key} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="px-4 py-3">{index + 1}</td>
+                  <td className="px-4 py-3">{item.instansi || '-'}</td>
+                  <td className="px-4 py-3 font-medium">{item.kode || '-'}</td>
+                  <td className="px-4 py-3">{item.layanan || '-'}</td>
+                  <td className="px-4 py-3">{item.kategori}</td>
+                  <td className="px-4 py-3">{item.ringkasan || '-'}</td>
+                  <td className="px-4 py-3"><div className="flex gap-2 whitespace-nowrap">
+                    <button type="button" onClick={() => setForm8Detail({ title: item.kategori, fields: [['Instansi', item.instansi], ['ID Layanan Prioritas', item.kode], ['Nama Layanan', item.layanan], ...item.fields] })} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold">Detail</button>
+                    {canUpdate && <button type="button" onClick={item.edit} className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">Edit</button>}
+                    {canDelete && <button type="button" onClick={item.hapus} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600">Hapus</button>}
+                  </div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {form8Detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <div className="border-b border-slate-200 p-5"><h3 className="text-lg font-semibold">Detail {form8Detail.title}</h3></div>
+            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
+              {form8Detail.fields.map(([label, value]) => <DetailField key={label} label={label} value={value} />)}
+            </div>
+            <div className="flex justify-end border-t p-5"><button type="button" onClick={() => setForm8Detail(null)} className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Tutup</button></div>
+          </div>
+        </div>
+      )}
+
+      {showStrukturTimMkbForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <div className="border-b border-slate-200 p-5">
+              <h3 className="text-lg font-semibold text-slate-800">
+                {editingStrukturTimMkbId
+                  ? 'Edit Anggota Tim'
+                  : 'Tambah Anggota Tim'}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Formulir 2–5 - Struktur Tim Manajemen Keberlangsungan
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmitStrukturTimMkb}>
+              <div className="grid gap-4 p-5 md:grid-cols-2">
+                {strukturTimMkbError && (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
+                    {strukturTimMkbError}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>ID Layanan Prioritas *</label>
+                  <select
+                    value={strukturTimMkbForm.mkb_layanan_prioritas_id}
+                    onChange={(e) =>
+                      setStrukturTimMkbForm((prev) => ({
+                        ...prev,
+                        mkb_layanan_prioritas_id: e.target.value
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">Pilih layanan prioritas</option>
+                    {data
+                      .filter((item) => item.mkb_layanan_prioritas_id)
+                      .map((item) => (
+                        <option
+                          key={item.id}
+                          value={item.mkb_layanan_prioritas_id!}
+                        >
+                          {item.kode_prioritas} - {item.nama_layanan}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Jenis Tim *</label>
+                  <select
+                    value={strukturTimMkbForm.jenis_tim}
+                    onChange={(e) =>
+                      setStrukturTimMkbForm((prev) => ({
+                        ...prev,
+                        jenis_tim: e.target.value
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">Pilih jenis tim</option>
+                    {jenisTimMkbOptions.map((jenis) => (
+                      <option key={jenis} value={jenis}>
+                        {jenis}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {[
+                  ['nama_pegawai', 'Nama Pegawai *'],
+                  ['nip', 'NIP'],
+                  ['jabatan', 'Jabatan *'],
+                  ['unit_kerja', 'Unit Kerja *'],
+                  ['peran_tim', 'Peran Tim *']
+                ].map(([field, label]) => (
+                  <div key={field}>
+                    <label className={labelClass}>{label}</label>
+                    <input
+                      type="text"
+                      value={
+                        strukturTimMkbForm[
+                          field as keyof StrukturTimMkbForm
+                        ]
+                      }
+                      onChange={(e) =>
+                        setStrukturTimMkbForm((prev) => ({
+                          ...prev,
+                          [field]: e.target.value
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                ))}
+
+                <div className="md:col-span-2">
+                  <label className={labelClass}>Tanggung Jawab *</label>
+                  <textarea
+                    rows={3}
+                    value={strukturTimMkbForm.tanggung_jawab}
+                    onChange={(e) =>
+                      setStrukturTimMkbForm((prev) => ({
+                        ...prev,
+                        tanggung_jawab: e.target.value
+                      }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStrukturTimMkbForm(false);
+                    setStrukturTimMkbError('');
+                  }}
+                  disabled={savingStrukturTimMkb}
+                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingStrukturTimMkb}
+                  className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {savingStrukturTimMkb ? 'Menyimpan...' : 'Simpan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedStrukturTimMkb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+            <div className="border-b border-slate-200 p-5">
+              <h3 className="text-lg font-semibold text-slate-800">
+                Detail Anggota Tim
+              </h3>
+            </div>
+
+            <div className="space-y-3 p-5 text-sm">
+              {[
+                ['ID Layanan', selectedStrukturTimMkb.kode_layanan],
+                ['Nama Layanan', selectedStrukturTimMkb.nama_layanan],
+                ['Instansi', selectedStrukturTimMkb.nama_instansi],
+                ['Jenis Tim', selectedStrukturTimMkb.jenis_tim],
+                ['Nama Pegawai', selectedStrukturTimMkb.nama_pegawai],
+                ['NIP', selectedStrukturTimMkb.nip || '-'],
+                ['Jabatan', selectedStrukturTimMkb.jabatan],
+                ['Unit Kerja', selectedStrukturTimMkb.unit_kerja],
+                ['Peran Tim', selectedStrukturTimMkb.peran_tim],
+                ['Tanggung Jawab', selectedStrukturTimMkb.tanggung_jawab]
+              ].map(([label, value]) => (
+                <div key={label} className="grid grid-cols-3 gap-3">
+                  <span className="font-semibold text-slate-600">{label}</span>
+                  <span className="col-span-2 whitespace-pre-wrap text-slate-800">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-200 p-5">
+              <button
+                type="button"
+                onClick={() => setSelectedStrukturTimMkb(null)}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -5428,7 +4785,26 @@ const handleDeleteEksternalTik = async (
               onSubmit={handleSubmit}
               className="p-6"
             >
+
+            {ruangLingkupFormError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {ruangLingkupFormError}
+              </div>
+            )}
+
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                  <label className={labelClass}>ID Layanan Prioritas *</label>
+                  <input type="text" maxLength={60} value={formData.kode_layanan_mkb}
+                    onChange={(e) => setFormData(prev => ({...prev, kode_layanan_mkb: e.target.value.toUpperCase()}))}
+                    placeholder="Contoh: MKB-DUKCAPIL-001" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Jenis Layanan *</label>
+                  <input type="text" maxLength={100} value={formData.jenis_layanan_mkb}
+                    onChange={(e) => setFormData(prev => ({...prev, jenis_layanan_mkb: e.target.value}))}
+                    placeholder="Contoh: Layanan Pemerintahan" className={inputClass} />
+                </div>
                 <div className="md:col-span-2">
                   <label
                     className={
@@ -5438,169 +4814,19 @@ const handleDeleteEksternalTik = async (
                     Layanan Prioritas
                   </label>
 
-                  <select
-                    value={
-                      formData.layanan_prioritas_id
-                    }
-                    disabled={
-                      editingId !== null
-                    }
-                    required={!editingId}
-                    onChange={(event) => {
-                      const value = event.target.value;
-
+                  <input
+                    type="text"
+                    maxLength={200}
+                    value={formData.nama_layanan_prioritas}
+                    onChange={(event) =>
                       setFormData((prev) => ({
                         ...prev,
-                        layanan_prioritas_id: value,
-                      }));
-
-                      fetchLayananPrioritasDetail(value);
-                    }}
-                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-500`}
-                  >
-                    <option value="">
-                      Pilih layanan
-                      prioritas
-                    </option>
-
-                    {editingId && (
-                      <option
-                        value={
-                          formData.layanan_prioritas_id
-                        }
-                      >
-                        {(() => {
-                          const current =
-                            data.find(
-                              (
-                                item
-                              ) =>
-                                item.id ===
-                                editingId
-                            );
-
-                          if (
-                            !current
-                          ) {
-                            return formData.layanan_prioritas_id;
-                          }
-
-                          return `${current.kode_prioritas} - ${current.nama_layanan}`;
-                        })()}
-                      </option>
-                    )}
-
-                    {!editingId &&
-                      availableLayananOptions.map(
-                        (
-                          option
-                        ) => (
-                          <option
-                            key={
-                              option.id
-                            }
-                            value={
-                              option.id
-                            }
-                          >
-                            {
-                              option.kode_prioritas
-                            }{' '}
-                            -{' '}
-                            {
-                              option.nama_layanan
-                            }
-                          </option>
-                        )
-                      )}
-                  </select>
-
-                  {loadingLayananDetail && (
-                    <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                      Memuat detail layanan prioritas...
-                    </div>
-                  )}
-
-                  {layananDetail && !loadingLayananDetail && (
-                    <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-5">
-                      <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-slate-800">
-                          Data Layanan Prioritas
-                        </h3>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          Data berikut diambil otomatis dari master layanan.
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                          <label className={labelClass}>
-                            Nama Instansi
-                          </label>
-
-                          <input
-                            type="text"
-                            value={layananDetail.nama_instansi || ''}
-                            readOnly
-                            className={`${inputClass} bg-slate-100`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={labelClass}>
-                            ID Layanan Prioritas
-                          </label>
-
-                          <input
-                            type="text"
-                            value={layananDetail.kode_prioritas || ''}
-                            readOnly
-                            className={`${inputClass} bg-slate-100`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={labelClass}>
-                            Nama Layanan Prioritas
-                          </label>
-
-                          <input
-                            type="text"
-                            value={layananDetail.nama_layanan || ''}
-                            readOnly
-                            className={`${inputClass} bg-slate-100`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className={labelClass}>
-                            Jenis Layanan
-                          </label>
-
-                          <input
-                            type="text"
-                            value={layananDetail.jenis_layanan || ''}
-                            readOnly
-                            className={`${inputClass} bg-slate-100`}
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <label className={labelClass}>
-                            Deskripsi Layanan
-                          </label>
-
-                          <textarea
-                            rows={3}
-                            value={layananDetail.deskripsi_layanan || ''}
-                            readOnly
-                            className={`${inputClass} bg-slate-100`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                        nama_layanan_prioritas: event.target.value,
+                      }))
+                    }
+                    placeholder="Ketik nama layanan prioritas"
+                    className={inputClass}
+                  />
                 </div>
 
                 <div className="md:col-span-2">
@@ -5747,7 +4973,7 @@ const handleDeleteEksternalTik = async (
                       labelClass
                     }
                   >
-                    Target OLA
+                    Target OLA (Operational Level Agreement)
                   </label>
 
                   <input
@@ -7164,6 +6390,69 @@ const handleDeleteEksternalTik = async (
         </div>
       )}
 
+      {selectedKomunikasi && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Detail Rencana Komunikasi
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Formulir 6 Manajemen Keberlangsungan
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedKomunikasi(null)}
+                className="text-xl text-slate-400 hover:text-slate-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6 text-sm">
+              {[
+                ['Instansi', selectedKomunikasi.nama_instansi],
+                ['ID Layanan Prioritas', selectedKomunikasi.kode_layanan],
+                ['Nama Layanan', selectedKomunikasi.nama_layanan],
+                ['Informasi yang Disampaikan', selectedKomunikasi.informasi_disampaikan],
+                ['Kategori Komunikasi', selectedKomunikasi.kategori_komunikasi],
+                ['Media Komunikasi', selectedKomunikasi.media_komunikasi],
+                ['Pengirim', selectedKomunikasi.pengirim],
+                ['Penerima', selectedKomunikasi.penerima],
+                ['Waktu / Frekuensi', selectedKomunikasi.waktu_frekuensi],
+                ['Aktivitas', selectedKomunikasi.aktivitas],
+                ['Tujuan', selectedKomunikasi.tujuan]
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="grid grid-cols-1 gap-1 border-b border-slate-100 pb-3 sm:grid-cols-3 sm:gap-4"
+                >
+                  <span className="font-semibold text-slate-600">
+                    {label}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words text-slate-800 sm:col-span-2">
+                    {value || '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setSelectedKomunikasi(null)}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showKomunikasiForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-xl">
@@ -7193,6 +6482,13 @@ const handleDeleteEksternalTik = async (
               onSubmit={handleSubmitKomunikasi}
               className="p-6"
             >
+
+            {komunikasiFormError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {komunikasiFormError}
+              </div>
+            )}
+
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
@@ -7200,53 +6496,23 @@ const handleDeleteEksternalTik = async (
                   </label>
 
                   <select
-                    value={
-                      komunikasiForm.layanan_prioritas_id
-                    }
-                    disabled={editingKomunikasiId !== null}
-                    required={!editingKomunikasiId}
-                    onChange={(event) =>
+                    value={komunikasiForm.mkb_layanan_prioritas_id}
+                    onChange={(event) => {
                       setKomunikasiForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
-                          event.target.value,
-                      }))
-                    }
-                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-500`}
+                        mkb_layanan_prioritas_id: event.target.value
+                      }));
+                      setKomunikasiFormError('');
+                    }}
+                    className={inputClass}
                   >
-                    <option value="">
-                      Pilih layanan prioritas
-                    </option>
-
-                    {editingKomunikasiId && (
-                      <option
-                        value={
-                          komunikasiForm.layanan_prioritas_id
-                        }
-                      >
-                        {(() => {
-                          const current =
-                            rencanaKomunikasi.find(
-                              (item) =>
-                                item.id ===
-                                editingKomunikasiId
-                            );
-
-                          if (!current) {
-                            return komunikasiForm
-                              .layanan_prioritas_id;
-                          }
-
-                          return `${current.kode_prioritas} - ${current.nama_layanan}`;
-                        })()}
-                      </option>
-                    )}
-
-                    {!editingKomunikasiId &&
-                      data.map((item) => (
+                    <option value="">Pilih layanan prioritas</option>
+                    {data
+                      .filter((item) => item.mkb_layanan_prioritas_id != null)
+                      .map((item) => (
                         <option
-                          key={item.layanan_prioritas_id}
-                          value={item.layanan_prioritas_id}
+                          key={item.mkb_layanan_prioritas_id}
+                          value={String(item.mkb_layanan_prioritas_id)}
                         >
                           {item.kode_prioritas} - {item.nama_layanan}
                         </option>
@@ -7446,6 +6712,67 @@ const handleDeleteEksternalTik = async (
         </div>
       )}
 
+      {selectedKontak && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Detail Daftar Kontak
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Formulir 7 Manajemen Keberlangsungan
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedKontak(null)}
+                className="text-xl text-slate-400 hover:text-slate-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6 text-sm">
+              {[
+                ['Instansi', selectedKontak.nama_instansi],
+                ['ID Layanan Prioritas', selectedKontak.kode_layanan],
+                ['Nama Layanan', selectedKontak.nama_layanan],
+                ['Nama Kontak', selectedKontak.nama],
+                ['Jabatan', selectedKontak.jabatan],
+                ['Organisasi', selectedKontak.organisasi],
+                ['Alamat', selectedKontak.alamat],
+                ['Telepon', selectedKontak.telepon],
+                ['Email', selectedKontak.email],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="grid grid-cols-1 gap-1 border-b border-slate-100 pb-3 sm:grid-cols-3 sm:gap-4"
+                >
+                  <span className="font-semibold text-slate-600">
+                    {label}
+                  </span>
+                  <span className="whitespace-pre-wrap break-words text-slate-800 sm:col-span-2">
+                    {value || '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setSelectedKontak(null)}
+                className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showKontakForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-xl">
@@ -7475,57 +6802,36 @@ const handleDeleteEksternalTik = async (
               onSubmit={handleSubmitKontak}
               className="p-6"
             >
+
+            {kontakFormError && (
+              <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {kontakFormError}
+              </div>
+            )}
+
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
-                    Layanan Prioritas
+                    ID Layanan Prioritas *
                   </label>
 
                   <select
-                    value={kontakForm.layanan_prioritas_id}
-                    disabled={editingKontakId !== null}
-                    required={!editingKontakId}
+                    value={kontakForm.mkb_layanan_prioritas_id}
                     onChange={(event) =>
                       setKontakForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
-                          event.target.value,
+                        mkb_layanan_prioritas_id: event.target.value,
                       }))
                     }
-                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-500`}
+                    className={inputClass}
                   >
-                    <option value="">
-                      Pilih layanan prioritas
-                    </option>
-
-                    {editingKontakId && (
-                      <option
-                        value={
-                          kontakForm.layanan_prioritas_id
-                        }
-                      >
-                        {(() => {
-                          const current =
-                            daftarKontak.find(
-                              (item) =>
-                                item.id === editingKontakId
-                            );
-
-                          if (!current) {
-                            return kontakForm
-                              .layanan_prioritas_id;
-                          }
-
-                          return `${current.kode_prioritas} - ${current.nama_layanan}`;
-                        })()}
-                      </option>
-                    )}
-
-                    {!editingKontakId &&
-                      data.map((item) => (
+                    <option value="">Pilih layanan prioritas</option>
+                    {data
+                      .filter((item) => item.mkb_layanan_prioritas_id)
+                      .map((item) => (
                         <option
-                          key={item.layanan_prioritas_id}
-                          value={item.layanan_prioritas_id}
+                          key={item.mkb_layanan_prioritas_id}
+                          value={String(item.mkb_layanan_prioritas_id)}
                         >
                           {item.kode_prioritas} - {item.nama_layanan}
                         </option>
@@ -7540,7 +6846,6 @@ const handleDeleteEksternalTik = async (
 
                   <input
                     type="text"
-                    required
                     value={kontakForm.nama}
                     onChange={(event) =>
                       setKontakForm((prev) => ({
@@ -7695,21 +7000,49 @@ const handleDeleteEksternalTik = async (
 
             <form
               onSubmit={handleSubmitSdm}
+              noValidate
               className="p-6"
             >
+              {form8Error && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{form8Error}</div>
+              )}
+              <div className="mb-5">
+                <label className={labelClass}>Jenis Sumber Daya *</label>
+                <select
+                  value="8.1"
+                  disabled={editingSdmId !== null}
+                  onChange={(event) => {
+                    setShowSdmForm(false);
+                    setShowFasilitasForm(false);
+                    setShowTikForm(false);
+                    setShowAksesForm(false);
+                    setShowEksternalTikForm(false);
+                      if (event.target.value === '8.1') handleTambahSdm();
+                      if (event.target.value === '8.2') handleTambahFasilitas();
+                      if (event.target.value === '8.3') handleTambahTik();
+                      if (event.target.value === '8.4') handleTambahAkses();
+                      if (event.target.value === '8.5') handleTambahEksternalTik();
+                  }}
+                  className={`${inputClass} disabled:bg-slate-100`}
+                >
+                    <option value="8.1">8.1 - Sumber Daya Manusia</option>
+                    <option value="8.2">8.2 - Fasilitas Operasional</option>
+                    <option value="8.3">8.3 - Sumber Daya TIK</option>
+                    <option value="8.4">8.4 - Akses Sistem TIK</option>
+                    <option value="8.5">8.5 - Sumber Daya Eksternal TIK</option>
+                </select>
+              </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
                     Layanan Prioritas
                   </label>
                   <select
-                    value={sdmForm.layanan_prioritas_id}
-                    disabled={editingSdmId !== null}
-                    required={!editingSdmId}
+                    value={sdmForm.mkb_layanan_prioritas_id}
                     onChange={(event) =>
                       setSdmForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
+                        mkb_layanan_prioritas_id:
                           event.target.value,
                       }))
                     }
@@ -7718,10 +7051,10 @@ const handleDeleteEksternalTik = async (
                     <option value="">
                       Pilih layanan prioritas
                     </option>
-                    {data.map((item) => (
+                    {data.filter((item) => item.mkb_layanan_prioritas_id != null).map((item) => (
                       <option
-                        key={item.layanan_prioritas_id}
-                        value={item.layanan_prioritas_id}
+                        key={item.mkb_layanan_prioritas_id}
+                        value={String(item.mkb_layanan_prioritas_id)}
                       >
                         {item.kode_prioritas} - {item.nama_layanan}
                       </option>
@@ -7888,21 +7221,49 @@ const handleDeleteEksternalTik = async (
 
             <form
               onSubmit={handleSubmitFasilitas}
+              noValidate
               className="p-6"
             >
+              {form8Error && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{form8Error}</div>
+              )}
+              <div className="mb-5">
+                <label className={labelClass}>Jenis Sumber Daya *</label>
+                <select
+                  value="8.2"
+                  disabled={editingFasilitasId !== null}
+                  onChange={(event) => {
+                    setShowSdmForm(false);
+                    setShowFasilitasForm(false);
+                    setShowTikForm(false);
+                    setShowAksesForm(false);
+                    setShowEksternalTikForm(false);
+                      if (event.target.value === '8.1') handleTambahSdm();
+                      if (event.target.value === '8.2') handleTambahFasilitas();
+                      if (event.target.value === '8.3') handleTambahTik();
+                      if (event.target.value === '8.4') handleTambahAkses();
+                      if (event.target.value === '8.5') handleTambahEksternalTik();
+                  }}
+                  className={`${inputClass} disabled:bg-slate-100`}
+                >
+                    <option value="8.1">8.1 - Sumber Daya Manusia</option>
+                    <option value="8.2">8.2 - Fasilitas Operasional</option>
+                    <option value="8.3">8.3 - Sumber Daya TIK</option>
+                    <option value="8.4">8.4 - Akses Sistem TIK</option>
+                    <option value="8.5">8.5 - Sumber Daya Eksternal TIK</option>
+                </select>
+              </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
                     Layanan Prioritas
                   </label>
                   <select
-                    value={fasilitasForm.layanan_prioritas_id}
-                    disabled={editingFasilitasId !== null}
-                    required={!editingFasilitasId}
+                    value={fasilitasForm.mkb_layanan_prioritas_id}
                     onChange={(event) =>
                       setFasilitasForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
+                        mkb_layanan_prioritas_id:
                           event.target.value,
                       }))
                     }
@@ -7911,10 +7272,10 @@ const handleDeleteEksternalTik = async (
                     <option value="">
                       Pilih layanan prioritas
                     </option>
-                    {data.map((item) => (
+                    {data.filter((item) => item.mkb_layanan_prioritas_id != null).map((item) => (
                       <option
-                        key={item.layanan_prioritas_id}
-                        value={item.layanan_prioritas_id}
+                        key={item.mkb_layanan_prioritas_id}
+                        value={String(item.mkb_layanan_prioritas_id)}
                       >
                         {item.kode_prioritas} - {item.nama_layanan}
                       </option>
@@ -8073,21 +7434,49 @@ const handleDeleteEksternalTik = async (
 
             <form
               onSubmit={handleSubmitTik}
+              noValidate
               className="p-6"
             >
+              {form8Error && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{form8Error}</div>
+              )}
+              <div className="mb-5">
+                <label className={labelClass}>Jenis Sumber Daya *</label>
+                <select
+                  value="8.3"
+                  disabled={editingTikId !== null}
+                  onChange={(event) => {
+                    setShowSdmForm(false);
+                    setShowFasilitasForm(false);
+                    setShowTikForm(false);
+                    setShowAksesForm(false);
+                    setShowEksternalTikForm(false);
+                      if (event.target.value === '8.1') handleTambahSdm();
+                      if (event.target.value === '8.2') handleTambahFasilitas();
+                      if (event.target.value === '8.3') handleTambahTik();
+                      if (event.target.value === '8.4') handleTambahAkses();
+                      if (event.target.value === '8.5') handleTambahEksternalTik();
+                  }}
+                  className={`${inputClass} disabled:bg-slate-100`}
+                >
+                    <option value="8.1">8.1 - Sumber Daya Manusia</option>
+                    <option value="8.2">8.2 - Fasilitas Operasional</option>
+                    <option value="8.3">8.3 - Sumber Daya TIK</option>
+                    <option value="8.4">8.4 - Akses Sistem TIK</option>
+                    <option value="8.5">8.5 - Sumber Daya Eksternal TIK</option>
+                </select>
+              </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
                     Layanan Prioritas
                   </label>
                   <select
-                    value={tikForm.layanan_prioritas_id}
-                    disabled={editingTikId !== null}
-                    required={!editingTikId}
+                    value={tikForm.mkb_layanan_prioritas_id}
                     onChange={(event) =>
                       setTikForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
+                        mkb_layanan_prioritas_id:
                           event.target.value,
                       }))
                     }
@@ -8096,10 +7485,10 @@ const handleDeleteEksternalTik = async (
                     <option value="">
                       Pilih layanan prioritas
                     </option>
-                    {data.map((item) => (
+                    {data.filter((item) => item.mkb_layanan_prioritas_id != null).map((item) => (
                       <option
-                        key={item.layanan_prioritas_id}
-                        value={item.layanan_prioritas_id}
+                        key={item.mkb_layanan_prioritas_id}
+                        value={String(item.mkb_layanan_prioritas_id)}
                       >
                         {item.kode_prioritas} - {item.nama_layanan}
                       </option>
@@ -8306,21 +7695,49 @@ const handleDeleteEksternalTik = async (
 
             <form
               onSubmit={handleSubmitAkses}
+              noValidate
               className="p-6"
             >
+              {form8Error && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{form8Error}</div>
+              )}
+              <div className="mb-5">
+                <label className={labelClass}>Jenis Sumber Daya *</label>
+                <select
+                  value="8.4"
+                  disabled={editingAksesId !== null}
+                  onChange={(event) => {
+                    setShowSdmForm(false);
+                    setShowFasilitasForm(false);
+                    setShowTikForm(false);
+                    setShowAksesForm(false);
+                    setShowEksternalTikForm(false);
+                      if (event.target.value === '8.1') handleTambahSdm();
+                      if (event.target.value === '8.2') handleTambahFasilitas();
+                      if (event.target.value === '8.3') handleTambahTik();
+                      if (event.target.value === '8.4') handleTambahAkses();
+                      if (event.target.value === '8.5') handleTambahEksternalTik();
+                  }}
+                  className={`${inputClass} disabled:bg-slate-100`}
+                >
+                    <option value="8.1">8.1 - Sumber Daya Manusia</option>
+                    <option value="8.2">8.2 - Fasilitas Operasional</option>
+                    <option value="8.3">8.3 - Sumber Daya TIK</option>
+                    <option value="8.4">8.4 - Akses Sistem TIK</option>
+                    <option value="8.5">8.5 - Sumber Daya Eksternal TIK</option>
+                </select>
+              </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
                     Layanan Prioritas
                   </label>
                   <select
-                    value={aksesForm.layanan_prioritas_id}
-                    disabled={editingAksesId !== null}
-                    required={!editingAksesId}
+                    value={aksesForm.mkb_layanan_prioritas_id}
                     onChange={(event) =>
                       setAksesForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
+                        mkb_layanan_prioritas_id:
                           event.target.value,
                       }))
                     }
@@ -8329,10 +7746,10 @@ const handleDeleteEksternalTik = async (
                     <option value="">
                       Pilih layanan prioritas
                     </option>
-                    {data.map((item) => (
+                    {data.filter((item) => item.mkb_layanan_prioritas_id != null).map((item) => (
                       <option
-                        key={item.layanan_prioritas_id}
-                        value={item.layanan_prioritas_id}
+                        key={item.mkb_layanan_prioritas_id}
+                        value={String(item.mkb_layanan_prioritas_id)}
                       >
                         {item.kode_prioritas} - {item.nama_layanan}
                       </option>
@@ -8511,8 +7928,38 @@ const handleDeleteEksternalTik = async (
 
             <form
               onSubmit={handleSubmitEksternalTik}
+              noValidate
               className="p-6"
             >
+              {form8Error && (
+                <div className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{form8Error}</div>
+              )}
+              <div className="mb-5">
+                <label className={labelClass}>Jenis Sumber Daya *</label>
+                <select
+                  value="8.5"
+                  disabled={editingEksternalTikId !== null}
+                  onChange={(event) => {
+                    setShowSdmForm(false);
+                    setShowFasilitasForm(false);
+                    setShowTikForm(false);
+                    setShowAksesForm(false);
+                    setShowEksternalTikForm(false);
+                      if (event.target.value === '8.1') handleTambahSdm();
+                      if (event.target.value === '8.2') handleTambahFasilitas();
+                      if (event.target.value === '8.3') handleTambahTik();
+                      if (event.target.value === '8.4') handleTambahAkses();
+                      if (event.target.value === '8.5') handleTambahEksternalTik();
+                  }}
+                  className={`${inputClass} disabled:bg-slate-100`}
+                >
+                    <option value="8.1">8.1 - Sumber Daya Manusia</option>
+                    <option value="8.2">8.2 - Fasilitas Operasional</option>
+                    <option value="8.3">8.3 - Sumber Daya TIK</option>
+                    <option value="8.4">8.4 - Akses Sistem TIK</option>
+                    <option value="8.5">8.5 - Sumber Daya Eksternal TIK</option>
+                </select>
+              </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className={labelClass}>
@@ -8520,7 +7967,7 @@ const handleDeleteEksternalTik = async (
                   </label>
                   <select
                     value={
-                      eksternalTikForm.layanan_prioritas_id
+                      eksternalTikForm.mkb_layanan_prioritas_id
                     }
                     disabled={
                       editingEksternalTikId !== null
@@ -8529,7 +7976,7 @@ const handleDeleteEksternalTik = async (
                     onChange={(event) =>
                       setEksternalTikForm((prev) => ({
                         ...prev,
-                        layanan_prioritas_id:
+                        mkb_layanan_prioritas_id:
                           event.target.value,
                       }))
                     }
@@ -8538,10 +7985,10 @@ const handleDeleteEksternalTik = async (
                     <option value="">
                       Pilih layanan prioritas
                     </option>
-                    {data.map((item) => (
+                    {data.filter((item) => item.mkb_layanan_prioritas_id != null).map((item) => (
                       <option
-                        key={item.layanan_prioritas_id}
-                        value={item.layanan_prioritas_id}
+                        key={item.mkb_layanan_prioritas_id}
+                        value={String(item.mkb_layanan_prioritas_id)}
                       >
                         {item.kode_prioritas} - {item.nama_layanan}
                       </option>
@@ -8754,7 +8201,7 @@ const DetailField = ({
           : ''
       }
     >
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <div className="text-xs font-medium tracking-wide text-slate-500">
         {label}
       </div>
 

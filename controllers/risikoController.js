@@ -8,8 +8,6 @@ const {notifyPimpinanRiskSubmitted, resolveRiskApprovalNotifications, notifyRisk
 // 1. Tambah Data Risiko (Form 1.0)
 exports.createRisiko = async (req, res) => {
     const {
-        konteks_id,
-
         // a. identifikasi risiko
         sasaran_pembangunan_nasional,
         sasaran_upr,
@@ -36,12 +34,13 @@ exports.createRisiko = async (req, res) => {
         level_dampak_residual,
 
         // e. kolom tambahan
-        layanan_id,
-        layanan_prioritas_id,
+        nama_layanan_pendukung,
+        nama_layanan_prioritas,
         pemilik_layanan,
         strategis_operasional,
         lintas_sektor,
         membutuhkan_perubahan,
+        ippd_terkait_text,
 
         ippd_ids,
     } = req.body;
@@ -74,83 +73,95 @@ exports.createRisiko = async (req, res) => {
 
             try {
                 const query = `
-                    INSERT INTO mr_risiko (
-                        konteks_id,
-                        sasaran_pembangunan_nasional,
-                        sasaran_upr,
-                        indikator_kinerja,
-                        kode_risiko,
-                        peristiwa_risiko,
-                        kategori_risiko,
-                        penyebab,
-                        dampak,
-                        area_dampak,
-                        kemungkinan,
-                        nilai_dampak,
-                        prioritas_risiko,
-                        keputusan_perlakuan,
-                        deskripsi_detail_perlakuan,
-                        waktu_rencana_perlakuan,
-                        penanggung_jawab_id,
-                        level_kemungkinan_residual,
-                        level_dampak_residual,
-                        layanan_id,
-                        layanan_prioritas_id,
-                        pemilik_layanan,
-                        strategis_operasional,
-                        lintas_sektor,
-                        membutuhkan_perubahan,
-                        created_by
-                    )
-                    VALUES (
-                        ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?,
-                        ?, ?,
-                        ?, ?, ?, ?, ?, ?,
-                        ?
-                    )
-                `;
+                  INSERT INTO mr_risiko (
+                      konteks_id,
+                      sasaran_pembangunan_nasional,
+                      sasaran_upr,
+                      indikator_kinerja,
+                      kode_risiko,
+                      peristiwa_risiko,
 
-                [result] = await db.query(query, [
-                    konteks_id || null,
+                      kategori_risiko,
+                      penyebab,
+                      dampak,
+                      area_dampak,
+                      kemungkinan,
+                      nilai_dampak,
+                      prioritas_risiko,
 
-                    // a. identifikasi risiko
-                    sasaran_pembangunan_nasional || null,
-                    sasaran_upr || null,
-                    indikator_kinerja || null,
-                    kodeRisiko,
-                    peristiwa_risiko,
+                      keputusan_perlakuan,
+                      deskripsi_detail_perlakuan,
+                      waktu_rencana_perlakuan,
+                      penanggung_jawab_id,
 
-                    // b. analisis dan evaluasi risiko
-                    kategori_risiko || null,
-                    penyebab || null,
-                    dampak || null,
-                    area_dampak || null,
-                    kemungkinan || null,
-                    nilai_dampak || null,
-                    prioritas_risiko || null,
+                      level_kemungkinan_residual,
+                      level_dampak_residual,
 
-                    // c. perlakuan risiko
-                    keputusan_perlakuan || null,
-                    deskripsi_detail_perlakuan || null,
-                    waktu_rencana_perlakuan || null,
-                    penanggung_jawab_id || null,
+                      layanan_id,
+                      nama_layanan_pendukung,
 
-                    // d. risiko residual
-                    level_kemungkinan_residual || null,
-                    level_dampak_residual || null,
+                      layanan_prioritas_id,
+                      nama_layanan_prioritas,
 
-                    // e. kolom tambahan
-                    layanan_id || null,
-                    layanan_prioritas_id || null,
-                    pemilik_layanan || null,
-                    strategis_operasional || null,
-                    lintas_sektor ? 1 : 0,
-                    membutuhkan_perubahan ? 1 : 0,
+                      pemilik_layanan,
+                      strategis_operasional,
+                      lintas_sektor,
+                      membutuhkan_perubahan,
+                      ippd_terkait_text,
 
-                    created_by,
-                ]);
+                      created_by
+                  )
+                  VALUES (
+                      NULL,
+                      ?, ?, ?, ?, ?,
+                      ?, ?, ?, ?, ?, ?, ?,
+                      ?, ?, ?, ?,
+                      ?, ?,
+                      NULL, ?,
+                      NULL, ?,
+                      ?, ?, ?, ?, ?,
+                      ?
+                  )
+              `;
+
+              [result] = await db.query(query, [
+                  // a. identifikasi risiko
+                  sasaran_pembangunan_nasional || null,
+                  sasaran_upr || null,
+                  indikator_kinerja || null,
+                  kodeRisiko,
+                  peristiwa_risiko,
+
+                  // b. analisis dan evaluasi
+                  kategori_risiko || null,
+                  penyebab || null,
+                  dampak || null,
+                  area_dampak || null,
+                  kemungkinan || null,
+                  nilai_dampak || null,
+                  prioritas_risiko || null,
+
+                  // c. perlakuan
+                  keputusan_perlakuan || null,
+                  deskripsi_detail_perlakuan || null,
+                  waktu_rencana_perlakuan || null,
+                  penanggung_jawab_id || null,
+
+                  // d. residual
+                  level_kemungkinan_residual || null,
+                  level_dampak_residual || null,
+
+                  // e. kolom tambahan
+                  nama_layanan_pendukung?.trim() || null,
+                  nama_layanan_prioritas?.trim() || null,
+                  pemilik_layanan || null,
+                  strategis_operasional || null,
+                  lintas_sektor ? 1 : 0,
+                  membutuhkan_perubahan ? 1 : 0,
+                  ippd_terkait_text?.trim() || null,
+
+                  created_by,
+              ]);
 
                 break;
             } catch (error) {
@@ -173,29 +184,6 @@ exports.createRisiko = async (req, res) => {
         }
 
         const risikoId = result.insertId;
-
-        if (
-            Array.isArray(ippd_ids) &&
-            ippd_ids.length > 0
-        ) {
-            const values = ippd_ids.map(
-                (instansiId) => [
-                    risikoId,
-                    instansiId,
-                ]
-            );
-
-            await db.query(
-                `
-                    INSERT INTO mr_risiko_ippd (
-                        risiko_id,
-                        instansi_id
-                    )
-                    VALUES ?
-                `,
-                [values]
-            );
-        }
 
         return res.status(201).json({
             message: 'Data Risiko berhasil ditambahkan!',
@@ -224,48 +212,126 @@ exports.createRisiko = async (req, res) => {
 
 // 2. Ambil Semua Data Risiko
 exports.getAllRisiko = async (req, res) => {
-    try {
-        const [rows] = await db.query(`
-            SELECT r.*, u.nama AS pembuat,
-            k.nama_upr AS konteks_nama_upr,
-            k.tahun_pelaksanaan AS konteks_tahun
-            FROM mr_risiko r 
-            LEFT JOIN users u 
-              ON r.created_by = u.id 
-            LEFT JOIN mr_konteks k
-              ON r.konteks_id = k.id
-            ORDER BY r.created_at DESC
-        `);
-        res.json(rows);
-    } catch (error) {
-        console.error('ERROR DATABASE:', error);
-        res.status(500).json({ error: error.message });
+  try {
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    let query = `
+      SELECT
+        r.*,
+        u.nama AS pembuat
+      FROM mr_risiko r
+      LEFT JOIN users u
+        ON r.created_by = u.id
+    `;
+
+    const params = [];
+
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
+        });
+      }
+
+      query += `
+        WHERE LOWER(TRIM(u.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
     }
+
+    query += `
+      ORDER BY r.created_at DESC
+    `;
+
+    const [rows] = await db.query(
+      query,
+      params
+    );
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error(
+      'ERROR GET RISIKO:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message,
+    });
+  }
 };
 
 // 3. ambil penanggung jawab di step 3
 exports.getPenanggungJawabOptions = async (req, res) => {
-    try {
-        const [rows] = await db.query (`
-            SELECT 
-                u.id,
-                u.nama,
-                u.upr_instansi,
-                r.nama_role
-            FROM users u
-            LEFT JOIN roles r ON r.id = u.role_id
-            ORDER BY u.nama ASC
-        `);
-        
-        res.json(rows);
-    } catch (error) {
-        console.error('ERROR DATABASE:', error);
+  try {
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
 
-        res.status(500).json({
-            error : error.message
+    const isAdmin = role === 'admin';
+
+    let query = `
+      SELECT
+        u.id,
+        u.nama,
+        u.upr_instansi,
+        u.nama_instansi,
+        u.nama_unit,
+        u.jabatan,
+        r.nama_role
+
+      FROM users u
+
+      LEFT JOIN roles r
+        ON r.id = u.role_id
+    `;
+
+    const params = [];
+
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
         });
+      }
+
+      query += `
+        WHERE LOWER(TRIM(u.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
     }
-}
+
+    query += `
+      ORDER BY u.nama ASC
+    `;
+
+    const [rows] = await db.query(
+      query,
+      params
+    );
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error(
+      'ERROR GET PENANGGUNG JAWAB:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
+};
 
 // 4. mengambil daftar layanan pendukung
 exports.getLayananOptions = async (req, res) => {
@@ -351,9 +417,7 @@ exports.getRisikoById = async (req, res) => {
                 pj.nama AS nama_penanggung_jawab,
                 ld.kode_layanan,
                 ld.nama_layanan,
-                lp.kode_prioritas,
-                k.nama_upr AS konteks_nama_upr,
-                k.tahun_pelaksanaan AS konteks_tahun
+                lp.kode_prioritas
             FROM mr_risiko r
 
             LEFT JOIN users pembuat
@@ -368,9 +432,6 @@ exports.getRisikoById = async (req, res) => {
             LEFT JOIN layanan_prioritas lp
                 ON lp.id = r.layanan_prioritas_id
 
-            LEFT JOIN mr_konteks k
-                ON k.id = r.konteks_id
-
             WHERE r.id = ?
             LIMIT 1
         `, [id]);
@@ -382,19 +443,6 @@ exports.getRisikoById = async (req, res) => {
         }
 
         const risiko = rows[0];
-        const [ippdRows] = await db.query(`
-            SELECT 
-                i.id,
-                i.kode_instansi,
-                i.nama_instansi
-            FROM mr_risiko_ippd mri
-            JOIN instansi i
-                ON i.id = mri.instansi_id
-            WHERE mri.risiko_id = ?
-            ORDER BY i.nama_instansi ASC
-        `, [id]);
-
-        risiko.ippd_terkait = ippdRows;
 
         res.json(risiko);
     
@@ -434,14 +482,14 @@ exports.updateRisiko = async (req, res) => {
     level_kemungkinan_residual,
     level_dampak_residual,
 
-    layanan_id,
-    layanan_prioritas_id,
+    nama_layanan_pendukung,
+    nama_layanan_prioritas,
     pemilik_layanan,
     strategis_operasional,
     lintas_sektor,
     membutuhkan_perubahan,
-
-    ippd_ids,
+    ippd_terkait_text,
+    
   } = req.body;
 
   try {
@@ -492,12 +540,17 @@ exports.updateRisiko = async (req, res) => {
         level_kemungkinan_residual = ?,
         level_dampak_residual = ?,
 
-        layanan_id = ?,
-        layanan_prioritas_id = ?,
+        layanan_id = NULL,
+        nama_layanan_pendukung = ?,
+
+        layanan_prioritas_id = NULL,
+        nama_layanan_prioritas = ?,
+
         pemilik_layanan = ?,
         strategis_operasional = ?,
         lintas_sektor = ?,
-        membutuhkan_perubahan = ?
+        membutuhkan_perubahan = ?,
+        ippd_terkait_text = ?
 
       WHERE id = ?
       `,
@@ -524,40 +577,19 @@ exports.updateRisiko = async (req, res) => {
         level_kemungkinan_residual,
         level_dampak_residual,
 
-        layanan_id,
-        layanan_prioritas_id,
-        pemilik_layanan,
-        strategis_operasional,
-        lintas_sektor,
-        membutuhkan_perubahan,
+        nama_layanan_pendukung?.trim() || null,
+        nama_layanan_prioritas?.trim() || null,
+        pemilik_layanan || null,
+        strategis_operasional || null,
+        lintas_sektor ? 1 : 0,
+        membutuhkan_perubahan ? 1 : 0,
+        ippd_terkait_text?.trim() || null,
 
         id,
       ]
     );
 
-    // Hapus relasi IPPD lama
-    await db.query(
-      'DELETE FROM mr_risiko_ippd WHERE risiko_id = ?',
-      [id]
-    );
-
-    // Simpan kembali IPPD hasil edit
-    if (Array.isArray(ippd_ids) && ippd_ids.length > 0) {
-      const values = ippd_ids.map((instansiId) => [
-        id,
-        instansiId,
-      ]);
-
-      await db.query(
-        `
-        INSERT INTO mr_risiko_ippd
-          (risiko_id, instansi_id)
-        VALUES ?
-        `,
-        [values]
-      );
-    }
-
+    // Hapus relasi IPPD lam
     res.json({
       message: 'Data risiko berhasil diperbarui.',
     });
@@ -900,53 +932,81 @@ exports.rejectRisiko =
   
 // Form 2.0 - Daftar Layanan Digital Prioritas
 exports.getForm2Risiko = async (req, res) => {
-    try {
-        const [rows] = await db.query(`
-            SELECT
-                r.id AS risiko_id,
-                r.kode_risiko,
-                r.besaran_risiko,
+  try {
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
 
-                lp.id AS layanan_prioritas_id,
-                lp.kode_prioritas,
-                ld.nama_layanan AS layanan_prioritas,
+    const isAdmin = role === 'admin';
 
-                f2.membutuhkan_mkb,
-                f2.pic_id,
-                pic.nama AS nama_pic,
-                f2.target_penyusunan
+    let query = `
+      SELECT
+        r.id AS risiko_id,
+        r.kode_risiko,
+        r.besaran_risiko,
 
-            FROM mr_risiko r
+        r.nama_layanan_prioritas AS layanan_prioritas,
 
-            INNER JOIN layanan_prioritas lp
-                ON lp.id = r.layanan_prioritas_id
+        f2.membutuhkan_mkb,
+        f2.pic_id,
+        pic.nama AS nama_pic,
+        f2.target_penyusunan
 
-            LEFT JOIN layanan_digital ld
-                ON ld.id = lp.layanan_id
+      FROM mr_risiko r
 
-            LEFT JOIN mr_form2_prioritas f2
-                ON f2.risiko_id = r.id
+      LEFT JOIN mr_form2_prioritas f2
+        ON f2.risiko_id = r.id
 
-            LEFT JOIN users pic
-                ON pic.id = f2.pic_id
+      LEFT JOIN users pic
+        ON pic.id = f2.pic_id
 
-            WHERE r.keputusan_perlakuan IN (
-                'Mengurangi Risiko',
-                'Membagi Risiko'
-            )
+      LEFT JOIN users pembuat
+        ON pembuat.id = r.created_by
 
-            ORDER BY r.created_at DESC
-        `);
+      WHERE r.keputusan_perlakuan IN (
+        'Mengurangi Risiko',
+        'Membagi Risiko'
+      )
+    `;
 
-        res.json(rows);
+    const params = [];
 
-    } catch (error) {
-        console.error('ERROR GET FORM 2.0:', error);
-
-        res.status(500).json({
-            error: error.message
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
         });
+      }
+
+      query += `
+        AND LOWER(TRIM(pembuat.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
     }
+
+    query += `
+      ORDER BY r.created_at DESC
+    `;
+
+    const [rows] = await db.query(
+      query,
+      params
+    );
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error(
+      'ERROR GET FORM 2.0:',
+      error
+    );
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
 };
 
 // Form 2.0 - Simpan / Update data manual
@@ -1026,24 +1086,61 @@ exports.saveForm2Risiko = async (req, res) => {
 // Form 3.0 peta risiko
 exports.getPetaRisiko = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    let query = `
       SELECT
-        id,
-        kode_risiko,
-        peristiwa_risiko,
-        kemungkinan,
-        nilai_dampak,
-        besaran_risiko,
-        status_risiko
-      FROM mr_risiko
-      WHERE kemungkinan IS NOT NULL
-        AND nilai_dampak IS NOT NULL
-      ORDER BY kode_risiko ASC
-    `);
+        r.id,
+        r.kode_risiko,
+        r.peristiwa_risiko,
+        r.kemungkinan,
+        r.nilai_dampak,
+        r.besaran_risiko,
+        r.status_risiko
+
+      FROM mr_risiko r
+
+      LEFT JOIN users pembuat
+        ON pembuat.id = r.created_by
+
+      WHERE r.kemungkinan IS NOT NULL
+        AND r.nilai_dampak IS NOT NULL
+    `;
+
+    const params = [];
+
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
+        });
+      }
+
+      query += `
+        AND LOWER(TRIM(pembuat.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
+    }
+
+    query += `
+      ORDER BY r.kode_risiko ASC
+    `;
+
+    const [rows] = await db.query(query, params);
 
     res.json(rows);
+
   } catch (error) {
-    console.error('ERROR GET PETA RISIKO', error);
+    console.error(
+      'ERROR GET PETA RISIKO',
+      error
+    );
 
     res.status(500).json({
       error: error.message
@@ -1056,8 +1153,13 @@ exports.getMonitoringSemester1 = async (req, res) => {
     const tahun =
       req.query.tahun || new Date().getFullYear();
 
-    const [rows] = await db.query(
-      `
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    let query = `
       SELECT
         r.id AS risiko_id,
         r.kode_risiko,
@@ -1086,9 +1188,34 @@ exports.getMonitoringSemester1 = async (req, res) => {
       LEFT JOIN users u
         ON u.id = m.penanggung_jawab_id
 
+      LEFT JOIN users pembuat
+        ON pembuat.id = r.created_by
+    `;
+
+    const params = [tahun];
+
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
+        });
+      }
+
+      query += `
+        WHERE LOWER(TRIM(pembuat.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
+    }
+
+    query += `
       ORDER BY r.kode_risiko ASC
-      `,
-      [tahun]
+    `;
+
+    const [rows] = await db.query(
+      query,
+      params
     );
 
     for (const item of rows) {
@@ -1399,8 +1526,13 @@ exports.getMonitoringSemester2 = async (req, res) => {
     const tahun =
       req.query.tahun || new Date().getFullYear();
 
-    const [rows] = await db.query(
-      `
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    let query = `
       SELECT
         r.id AS risiko_id,
         r.kode_risiko,
@@ -1429,9 +1561,34 @@ exports.getMonitoringSemester2 = async (req, res) => {
       LEFT JOIN users u
         ON u.id = m.penanggung_jawab_id
 
+      LEFT JOIN users pembuat
+        ON pembuat.id = r.created_by
+    `;
+
+    const params = [tahun];
+
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
+        });
+      }
+
+      query += `
+        WHERE LOWER(TRIM(pembuat.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
+    }
+
+    query += `
       ORDER BY r.kode_risiko ASC
-      `,
-      [tahun]
+    `;
+
+    const [rows] = await db.query(
+      query,
+      params
     );
 
     for (const item of rows) {
@@ -1464,7 +1621,7 @@ exports.getMonitoringSemester2 = async (req, res) => {
 
   } catch (error) {
     console.error(
-      'ERROR GET MONITORING SEMESTER I:',
+      'ERROR GET MONITORING SEMESTER II:',
       error
     );
 
@@ -1563,8 +1720,13 @@ exports.getMonitoringTahunan = async (req, res) => {
     const tahun =
       req.query.tahun || new Date().getFullYear();
 
-    const [rows] = await db.query(
-      `
+    const role = String(req.user?.role || '')
+      .trim()
+      .toLowerCase();
+
+    const isAdmin = role === 'admin';
+
+    let query = `
       SELECT
         r.id AS risiko_id,
         r.kode_risiko,
@@ -1586,12 +1748,38 @@ exports.getMonitoringTahunan = async (req, res) => {
         AND m.tahun = ?
         AND m.periode = 'Tahunan'
 
+      LEFT JOIN users pembuat
+        ON pembuat.id = r.created_by
+    `;
+
+    const params = [tahun];
+
+    if (!isAdmin) {
+      if (!req.user?.nama_instansi) {
+        return res.status(403).json({
+          message: 'Instansi akun belum ditentukan.',
+        });
+      }
+
+      query += `
+        WHERE LOWER(TRIM(pembuat.nama_instansi))
+          = LOWER(TRIM(?))
+      `;
+
+      params.push(req.user.nama_instansi);
+    }
+
+    query += `
       ORDER BY r.kode_risiko ASC
-      `,
-      [tahun]
+    `;
+
+    const [rows] = await db.query(
+      query,
+      params
     );
 
     res.json(rows);
+
   } catch (error) {
     console.error(
       'ERROR GET MONITORING TAHUNAN:',

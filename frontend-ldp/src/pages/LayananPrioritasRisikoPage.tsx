@@ -293,7 +293,7 @@ const LayananPrioritasRisikoPage: React.FC = () => {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="p-5">
+        <div className="border-b border-slate-200 p-5">
           <h2 className="text-lg font-semibold text-slate-800">
             Formulir 2.0 - Layanan Digital Prioritas
           </h2>
@@ -302,7 +302,7 @@ const LayananPrioritasRisikoPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="p-5">
+        <div className="border-b border-slate-200 p-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase text-slate-600">
@@ -346,138 +346,139 @@ const LayananPrioritasRisikoPage: React.FC = () => {
               />
             </div>
           </div>
-
         </div>
 
-        <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] border-collapse text-left">
-              <thead className="bg-slate-50">
-                <tr className="border-b border-slate-200">
-                  <th className="px-4 py-3 text-center">
-                    No
-                  </th>
+          <div className="p-5">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                    <th className="px-4 py-3 font-semibold">
+                      No
+                    </th>
 
-                  <th className="w-[240px] px-4 py-3">
-                    Layanan Prioritas
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      Layanan Prioritas
+                    </th>
 
-                  <th className="w-[120px] px-4 py-3 text-center">
-                    Kode Risiko
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      Kode Risiko
+                    </th>
 
-                  <th className="w-[130px] px-4 py-3 text-center">
-                    Besaran Risiko
-                  </th>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Besaran Risiko
+                    </th>
 
-                  <th className="w-[120px] px-4 py-3 text-center">
-                    Perlu MKB?
-                  </th>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Perlu MKB?
+                    </th>
 
-                  <th className="w-[180px] px-4 py-3">
-                    PIC
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      PIC
+                    </th>
 
-                  <th className="w-[180px] px-4 py-3">
-                    Target Penyusunan
-                  </th>
+                    <th className="px-4 py-3 font-semibold">
+                      Target Penyusunan
+                    </th>
 
-                  <th className="w-[150px] px-4 py-3 text-center">
-                    Status
-                  </th>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Status
+                    </th>
 
-                  <th className="w-[120px] px-4 py-3 text-center">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="text-sm text-slate-700">
-                {filteredData.length > 0 ? (
-                  filteredData.map((item, index) => {
-                    const isComplete =
-                      item.membutuhkan_mkb !== null &&
-                      item.pic_id !== null &&
-                      item.target_penyusunan !== null;
-
-                    return (
-                      <tr
-                        key={item.risiko_id}
-                        className="hover:bg-slate-50"
-                      >
-                        <td className="px-4 py-3 text-center">
-                          {index + 1}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          {item.layanan_prioritas || '-'}
-                        </td>
-
-                        <td className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-900">
-                          {item.kode_risiko || '-'}
-                        </td>
-
-                        <td className="px-4 py-3 text-center font-semibold text-slate-900">
-                          {item.besaran_risiko ?? '-'}
-                        </td>
-
-                        <td className="px-4 py-3 text-center">
-                          {item.membutuhkan_mkb === null
-                            ? '-'
-                            : item.membutuhkan_mkb === 1
-                              ? 'Ya'
-                              : 'Tidak'}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          {item.nama_pic || '-'}
-                        </td>
-
-                        <td className="px-4 py-3">
-                          {item.target_penyusunan
-                            ? new Date(
-                                item.target_penyusunan
-                              ).toLocaleDateString('id-ID')
-                            : '-'}
-                        </td>
-
-                        <td className="px-4 py-3 text-center">
-                          {isComplete ? (
-                            <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                              Lengkap
-                            </span>
-                          ) : (
-                            <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                              Belum Lengkap
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-3 text-center">
-                          {canUpdate && (
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(item)}
-                              className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                            >
-                              {isComplete ? 'Edit' : 'Lengkapi'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-8 text-center text-sm text-slate-400"
-                    >
-                      Tidak ada data layanan prioritas yang sesuai.
-                    </td>
+                    <th className="px-4 py-3 text-center font-semibold">
+                      Aksi
+                    </th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody>
+                  {filteredData.length > 0 ? (
+                    filteredData.map((item, index) => {
+                      const isComplete =
+                        item.membutuhkan_mkb !== null &&
+                        item.pic_id !== null &&
+                        item.target_penyusunan !== null;
+
+                      return (
+                        <tr
+                          key={item.risiko_id}
+                          className="border-b border-slate-100 hover:bg-slate-50"
+                        >
+                          <td className="px-4 py-3 text-slate-600">
+                            {index + 1}
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            {item.layanan_prioritas || '-'}
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
+                            {item.kode_risiko || '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-center text-slate-800">
+                            {item.besaran_risiko ?? '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-center text-slate-700">
+                            {item.membutuhkan_mkb === null
+                              ? '-'
+                              : item.membutuhkan_mkb === 1
+                                ? 'Ya'
+                                : 'Tidak'}
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            {item.nama_pic || '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-700">
+                            {item.target_penyusunan
+                              ? new Date(
+                                  item.target_penyusunan
+                                ).toLocaleDateString('id-ID')
+                              : '-'}
+                          </td>
+
+                          <td className="px-4 py-3 text-center">
+                            {isComplete ? (
+                              <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                Lengkap
+                              </span>
+                            ) : (
+                              <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                Belum Lengkap
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(item)}
+                                className="rounded-md border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-50"
+                              >
+                                {isComplete ? 'Edit' : 'Lengkapi'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="px-4 py-10 text-center text-sm text-slate-500"
+                      >
+                        Tidak ada data layanan prioritas yang sesuai.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
       </div>
 

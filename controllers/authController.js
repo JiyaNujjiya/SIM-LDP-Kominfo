@@ -33,22 +33,34 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
     const { email, password } = req.body;
 
+    if (!email?.trim() || !password) {
+        return res.status(400).json({
+            message: 'Email dan password wajib diisi.'
+        });
+    }
+
     try {
-        // Ambil user sekaligus role dari tabel roles
-        const [users] = await db.query(`
+        const [users] = await db.query(
+            `
             SELECT
                 u.id,
                 u.nama,
                 u.email,
                 u.password,
-                u.upr_instansi,
+                u.role,
                 u.role_id,
+                u.nama_instansi,
+                u.nama_unit,
+                u.jabatan,
                 r.nama_role
             FROM users u
-            LEFT JOIN roles r ON r.id = u.role_id
-            WHERE u.email = ?
+            LEFT JOIN roles r
+                ON r.id = u.role_id
+            WHERE LOWER(u.email) = LOWER(?)
             LIMIT 1
-        `, [email]);
+            `,
+            [email.trim()]
+        );
 
         if (users.length === 0) {
             return res.status(400).json({
@@ -58,8 +70,10 @@ exports.login = async (req, res) => {
 
         const user = users[0];
 
-        // Cek password
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(
+            password,
+            user.password
+        );
 
         if (!isMatch) {
             return res.status(400).json({
@@ -67,8 +81,42 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Ambil seluruh permission berdasarkan role user
-        const [permissionRows] = await db.query(`
+        if (!user.role_id) {
+            return res.status(403).json({
+                message: 'Akun belum memiliki role yang valid.'
+            });
+        }
+
+        const roleName = String(
+            user.nama_role || user.role || ''
+        )
+            .trim()
+            .toLowerCase();
+
+        const allowedRoles = [
+            'admin',
+            'pengelola',
+            'pimpinan'
+        ];
+
+        if (!allowedRoles.includes(roleName)) {
+            return res.status(403).json({
+                message: 'Role akun tidak diizinkan mengakses sistem.'
+            });
+        }
+
+        if (
+            roleName !== 'admin' &&
+            !user.nama_instansi?.trim()
+        ) {
+            return res.status(403).json({
+                message:
+                    'Akun belum memiliki instansi. Hubungi administrator.'
+            });
+        }
+
+        const [permissionRows] = await db.query(
+            `
             SELECT
                 p.kode_permission
             FROM role_permissions rp
@@ -76,42 +124,62 @@ exports.login = async (req, res) => {
                 ON p.id = rp.permission_id
             WHERE rp.role_id = ?
             ORDER BY p.kode_permission
-        `, [user.role_id]);
+            `,
+            [user.role_id]
+        );
 
         const permissions = permissionRows.map(
             item => item.kode_permission
         );
 
-        // Buat JWT Token
         const token = jwt.sign(
             {
                 id: user.id,
                 role_id: user.role_id,
-                role: user.nama_role,
-                nama: user.nama
+                role: roleName,
+                nama: user.nama,
+                nama_instansi:
+                    user.nama_instansi || null,
+                nama_unit:
+                    user.nama_unit || null,
+                jabatan:
+                    user.jabatan || null
             },
             process.env.JWT_SECRET,
-            { expiresIn: '1d' }
+            {
+                expiresIn: '1d'
+            }
         );
 
-        res.json({
+        return res.json({
             message: 'Login berhasil!',
             token,
             user: {
                 id: user.id,
                 nama: user.nama,
+                email: user.email,
                 role_id: user.role_id,
-                role: user.nama_role,
-                upr_instansi: user.upr_instansi,
-                permissions: permissions
+                role: roleName,
+                nama_instansi:
+                    user.nama_instansi || null,
+                nama_unit:
+                    user.nama_unit || null,
+                jabatan:
+                    user.jabatan || null,
+                permissions
             }
         });
-
     } catch (error) {
-        console.error('Login error:', error);
+        console.error(
+            'Login error:',
+            error
+        );
 
-        res.status(500).json({
-            error: error.message
+        return res.status(500).json({
+            message:
+                'Terjadi kesalahan saat login.',
+            error:
+                error.message
         });
     }
 };

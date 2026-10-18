@@ -516,7 +516,7 @@ export default function EvaluasiPerubahanPage() {
         </div>
       )}
 
-      {error && (
+      {error && !showForm && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
@@ -524,113 +524,69 @@ export default function EvaluasiPerubahanPage() {
 
       {!selectedPerubahan ? (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-slate-200 p-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-800">
-                Daftar Perubahan
-              </h2>
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-lg font-semibold text-slate-900">Daftar Perubahan</h2>
+            <p className="mt-1 text-sm text-slate-500">Pilih perubahan yang akan dilakukan evaluasi pasca implementasi.</p>
+          </div>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Pilih perubahan yang akan dilakukan
-                evaluasi pasca implementasi.
-              </p>
-            </div>
-
+          <div className="p-5">
             <input
               type="text"
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Cari perubahan..."
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:w-72"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari ID perubahan, layanan, detail, lingkup, klasifikasi, atau status..."
+              className="mb-5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:max-w-md"
             />
-          </div>
 
-          {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              Memuat data perubahan...
-            </div>
-          ) : filteredPerubahan.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              Tidak ada perubahan yang dapat
-              dievaluasi.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full table-fixed text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
-                    <th className="w-[17%] px-4 py-3 font-semibold">
-                      ID Perubahan
-                    </th>
-                    <th className="w-[20%] px-4 py-3 font-semibold">
-                      Layanan
-                    </th>
-                    <th className="w-[29%] px-4 py-3 font-semibold">
-                      Detail Perubahan
-                    </th>
-                    <th className="w-[13%] px-4 py-3 font-semibold">
-                      Klasifikasi
-                    </th>
-                    <th className="w-[11%] px-4 py-3 font-semibold">
-                      Status
-                    </th>
-                    <th className="w-[10%] px-4 py-3 text-center font-semibold">
-                      Aksi
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-200">
-                  {filteredPerubahan.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="align-top hover:bg-slate-50"
-                    >
-                      <td className="break-words px-4 py-4 font-medium text-slate-800">
-                        {item.kode_perubahan}
-                      </td>
-
-                      <td className="break-words px-4 py-4 text-slate-600">
-                        {item.nama_layanan || '-'}
-                      </td>
-
-                      <td className="break-words px-4 py-4 text-slate-600">
-                        {item.detail_perubahan}
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-600">
-                        {item.klasifikasi}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
-                            item.status
-                          )}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openDetail(item)
-                          }
-                          className="rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
-                        >
-                          Buka
-                        </button>
-                      </td>
+            {loading ? (
+              <div className="py-8 text-center text-sm text-slate-500">Memuat data perubahan...</div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <table className="w-full min-w-[900px] table-fixed text-sm">
+                  <thead className="bg-slate-50 text-left font-semibold text-slate-700">
+                    <tr>
+                      <th className="w-[13%] px-4 py-3 font-semibold">ID Perubahan</th>
+                      <th className="w-[19%] px-4 py-3 font-semibold">Layanan Digital</th>
+                      <th className="w-[27%] px-4 py-3 font-semibold">Detail Perubahan</th>
+                      <th className="w-[11%] px-4 py-3 font-semibold">Klasifikasi</th>
+                      <th className="w-[10%] px-4 py-3 font-semibold">Lingkup</th>
+                      <th className="w-[10%] px-4 py-3 text-center font-semibold">Status</th>
+                      <th className="w-[10%] px-4 py-3 text-center font-semibold">Aksi</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {filteredPerubahan.length === 0 ? (
+                      <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Tidak ada perubahan yang dapat dievaluasi.</td></tr>
+                    ) : (
+                      filteredPerubahan.map((item) => (
+                        <tr key={item.id} className="align-top hover:bg-slate-50">
+                          <td className="break-words px-4 py-4 font-semibold text-slate-800">{item.kode_perubahan}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.nama_layanan || "-"}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.detail_perubahan}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.klasifikasi}</td>
+                          <td className="break-words px-4 py-4 text-slate-700">{item.lingkup || "-"}</td>
+                          <td className="px-4 py-4 text-center">
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(item.status)}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => openDetail(item)}
+                              className="whitespace-nowrap rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Evaluasi
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div>
@@ -816,98 +772,66 @@ export default function EvaluasiPerubahanPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-200">
-                    {evaluasi.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="p-5"
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Evaluasi {index + 1}
-                            </p>
-
-                            <h4 className="mt-1 text-base font-semibold text-slate-800">
-                              {formatDate(
-                                item.tanggal_evaluasi
-                              )}
-                            </h4>
-
-                            {item.dibuat_oleh && (
-                              <p className="mt-1 text-xs text-slate-500">
-                                Dibuat oleh{' '}
-                                {item.dibuat_oleh}
-                              </p>
-                            )}
-                          </div>
-
-                          {(canUpdate ||
-                            canDelete) && (
-                            <div className="flex gap-2">
-                              {canUpdate && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openEditForm(
-                                      item
-                                    )
-                                  }
-                                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                                >
-                                  Edit
-                                </button>
-                              )}
-
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDelete(
-                                      item
-                                    )
-                                  }
-                                  className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                                >
-                                  Hapus
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-5 grid gap-5 lg:grid-cols-2">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Ringkasan Tinjauan
-                            </p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                              {item.ringkasan_tinjauan}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Isu Perbaikan
-                            </p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                              {item.isu_perbaikan ||
-                                'Tidak ada isu perbaikan yang dicatat.'}
-                            </p>
-                          </div>
-
-                          <div className="lg:col-span-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Pembelajaran / Lesson
-                              Learned
-                            </p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                              {item.pembelajaran}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto p-5">
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <table className="w-full min-w-[950px] table-fixed text-sm">
+                        <thead className="bg-slate-50 text-left text-slate-700">
+                          <tr>
+                            <th className="w-[15%] px-4 py-3 font-semibold">Tanggal Evaluasi</th>
+                            <th className="w-[25%] px-4 py-3 font-semibold">Ringkasan Tinjauan</th>
+                            <th className="w-[21%] px-4 py-3 font-semibold">Isu Perbaikan</th>
+                            <th className="w-[25%] px-4 py-3 font-semibold">Pembelajaran</th>
+                            <th className="w-[14%] px-4 py-3 text-center font-semibold">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {evaluasi.map((item) => (
+                            <tr key={item.id} className="align-top hover:bg-slate-50">
+                              <td className="break-words px-4 py-4 font-medium text-slate-800">
+                                {formatDate(item.tanggal_evaluasi)}
+                                {item.dibuat_oleh && (
+                                  <p className="mt-1 text-xs font-normal text-slate-500">
+                                    {item.dibuat_oleh}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="whitespace-pre-wrap break-words px-4 py-4 text-slate-700">
+                                {item.ringkasan_tinjauan}
+                              </td>
+                              <td className="whitespace-pre-wrap break-words px-4 py-4 text-slate-700">
+                                {item.isu_perbaikan || '-'}
+                              </td>
+                              <td className="whitespace-pre-wrap break-words px-4 py-4 text-slate-700">
+                                {item.pembelajaran}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex flex-wrap justify-center gap-2">
+                                  {canUpdate && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditForm(item)}
+                                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDelete(item)}
+                                      className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                    >
+                                      Hapus
+                                    </button>
+                                  )}
+                                  {!canUpdate && !canDelete && <span className="text-slate-400">-</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -932,14 +856,23 @@ export default function EvaluasiPerubahanPage() {
             </div>
 
             <div className="space-y-5 p-6">
+              {error && (
+                <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              <p className="text-xs text-slate-500">
+                Kolom bertanda <span className="font-semibold text-red-600">*</span> wajib diisi.
+              </p>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Tanggal Evaluasi
+                  Tanggal Evaluasi <span className="text-red-600">*</span>
                 </label>
 
                 <input
                   type="date"
                   value={form.tanggal_evaluasi}
+                  required
                   onChange={(event) =>
                     setForm((prev) => ({
                       ...prev,
@@ -953,12 +886,13 @@ export default function EvaluasiPerubahanPage() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Ringkasan Tinjauan
+                  Ringkasan Tinjauan <span className="text-red-600">*</span>
                 </label>
 
                 <textarea
                   rows={5}
                   value={form.ringkasan_tinjauan}
+                  required
                   onChange={(event) =>
                     setForm((prev) => ({
                       ...prev,
@@ -991,18 +925,19 @@ export default function EvaluasiPerubahanPage() {
                 />
 
                 <p className="mt-1 text-xs text-slate-400">
-                  Opsional.
+                  Opsional, isi jika ada masalah yang perlu ditindaklanjuti.
                 </p>
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Pembelajaran / Lesson Learned
+                  Pembelajaran / Lesson Learned <span className="text-red-600">*</span>
                 </label>
 
                 <textarea
                   rows={5}
                   value={form.pembelajaran}
+                  required
                   onChange={(event) =>
                     setForm((prev) => ({
                       ...prev,
@@ -1023,6 +958,7 @@ export default function EvaluasiPerubahanPage() {
                 onClick={() => {
                   setShowForm(false);
                   resetForm();
+                  clearNotification();
                 }}
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >

@@ -22,18 +22,25 @@ type IndikatorItem = {
   updated_at?: string;
 };
 
+
 type RencanaDokumentasiItem = {
   id: number;
   perencanaan_id: number;
   pengetahuan_id: number;
   kode_pengetahuan: string;
+  nama_layanan: string | null;
   nama_pengetahuan: string;
+  jenis_pengetahuan: string;
+  sudah_terdokumentasi: number;
+  aspek_pemdi: string | null;
+  indikator_pemdi: string | null;
   ditargetkan_tahun_ini: number;
-  penanggung_jawab_id: number;
+  penanggung_jawab_id: number | null;
   penanggung_jawab: string | null;
   target_waktu_dokumentasi: string | null;
   tipe_dokumentasi: string[];
 };
+
 
 type InstansiOption = {
   id: number;
@@ -62,13 +69,14 @@ type UserOption = {
   email: string;
   role: string;
   role_id?: number | null;
+  instansi_id: number | null;
 };
 
 type PengetahuanOption = {
   id: number;
   kode_pengetahuan: string;
   nama_pengetahuan: string;
-  layanan_id: number;
+  layanan_id: number | null;
   nama_layanan: string;
   jenis_pengetahuan: string;
   sudah_terdokumentasi: number;
@@ -124,6 +132,8 @@ export default function PerencanaanPengetahuanPage() {
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [indikatorError, setIndikatorError] = useState('');
+  const [rencanaError, setRencanaError] = useState('');
   const [search, setSearch] = useState('');
 
   const [showPerencanaanForm, setShowPerencanaanForm] =
@@ -147,9 +157,8 @@ export default function PerencanaanPengetahuanPage() {
     useState(false);
 
   const [perencanaanForm, setPerencanaanForm] = useState({
-    instansi_id: '',
+    nama_instansi: '',
     tahun_perencanaan: String(new Date().getFullYear()),
-    status: 'Draft',
   });
 
   const [indikatorForm, setIndikatorForm] = useState({
@@ -158,17 +167,26 @@ export default function PerencanaanPengetahuanPage() {
     nilai_target: '',
   });
 
+  
   const [rencanaForm, setRencanaForm] = useState({
     pengetahuan_id: '',
+    kode_pengetahuan: '',
+    nama_layanan: '',
+    nama_pengetahuan: '',
+    jenis_pengetahuan: 'Eksplisit',
+    sudah_terdokumentasi: '0',
+    aspek_pemdi: '',
+    indikator_pemdi: '',
     ditargetkan_tahun_ini: '1',
     penanggung_jawab_id: '',
     target_waktu_dokumentasi: '',
     tipe_dokumentasi: [] as string[],
   });
 
+
   const [pengetahuanForm, setPengetahuanForm] = useState({
     kode_pengetahuan: '',
-    layanan_id: '',
+    nama_layanan: '',
     nama_pengetahuan: '',
     jenis_pengetahuan: 'Eksplisit',
     sudah_terdokumentasi: '0',
@@ -371,7 +389,6 @@ export default function PerencanaanPengetahuanPage() {
       [
         item.nama_instansi,
         String(item.tahun_perencanaan),
-        item.status,
         item.pembuat,
       ]
         .filter(Boolean)
@@ -383,9 +400,8 @@ export default function PerencanaanPengetahuanPage() {
 
   const resetPerencanaanForm = () => {
     setPerencanaanForm({
-      instansi_id: '',
+      nama_instansi: '',
       tahun_perencanaan: String(new Date().getFullYear()),
-      status: 'Draft',
     });
 
     setEditingPerencanaan(null);
@@ -405,9 +421,8 @@ export default function PerencanaanPengetahuanPage() {
     setEditingPerencanaan(item);
 
     setPerencanaanForm({
-      instansi_id: String(item.instansi_id),
+      nama_instansi: item.nama_instansi,
       tahun_perencanaan: String(item.tahun_perencanaan),
-      status: item.status,
     });
 
     setShowPerencanaanForm(true);
@@ -417,8 +432,8 @@ export default function PerencanaanPengetahuanPage() {
     try {
       clearNotification();
 
-      if (!perencanaanForm.instansi_id) {
-        setError('Instansi wajib dipilih.');
+      if (!perencanaanForm.nama_instansi.trim()) {
+        setError('Nama instansi wajib diisi.');
         return;
       }
 
@@ -440,12 +455,24 @@ export default function PerencanaanPengetahuanPage() {
         return;
       }
 
+      const instansiDipilih = instansiOptions.find(
+        (item) =>
+          item.nama_instansi.trim().toLowerCase() ===
+          perencanaanForm.nama_instansi.trim().toLowerCase()
+      );
+
+      if (!instansiDipilih) {
+        setError(
+          'Nama instansi tidak ditemukan pada data instansi.'
+        );
+        return;
+      }
+
       setSaving(true);
 
       const payload = {
-        instansi_id: Number(perencanaanForm.instansi_id),
+        instansi_id: instansiDipilih.id,
         tahun_perencanaan: tahun,
-        status: perencanaanForm.status,
       };
 
       const url = editingPerencanaan
@@ -543,6 +570,7 @@ export default function PerencanaanPengetahuanPage() {
 
   const handleTambahIndikator = () => {
     clearNotification();
+    setIndikatorError('');
     resetIndikatorForm();
 
     const tersedia = [
@@ -573,7 +601,7 @@ export default function PerencanaanPengetahuanPage() {
 
   const handleEditIndikator = (item: IndikatorItem) => {
     clearNotification();
-
+    setIndikatorError('');
     setEditingIndikator(item);
 
     setIndikatorForm({
@@ -585,72 +613,63 @@ export default function PerencanaanPengetahuanPage() {
     setShowIndikatorForm(true);
   };
 
+  
   const handleSaveIndikator = async () => {
     if (!selectedPerencanaan) return;
 
-    try {
-      clearNotification();
+    setIndikatorError('');
+    clearNotification();
 
+    if (
+      indikatorForm.nilai_saat_ini === '' ||
+      indikatorForm.nilai_target === ''
+    ) {
+      setIndikatorError(
+        'Kondisi saat ini dan kondisi target wajib diisi.'
+      );
+      return;
+    }
+
+    const nilaiSaatIni = Number(indikatorForm.nilai_saat_ini);
+    const nilaiTarget = Number(indikatorForm.nilai_target);
+
+    if (
+      !Number.isFinite(nilaiSaatIni) ||
+      !Number.isFinite(nilaiTarget)
+    ) {
+      setIndikatorError('Nilai indikator harus berupa angka.');
+      return;
+    }
+
+    if (indikatorForm.kode_indikator === 'CAKUPAN_DOKUMENTASI') {
       if (
-        indikatorForm.nilai_saat_ini === '' ||
-        indikatorForm.nilai_target === ''
+        nilaiSaatIni < 0 ||
+        nilaiSaatIni > 100 ||
+        nilaiTarget < 0 ||
+        nilaiTarget > 100
       ) {
-        setError(
-          'Kondisi saat ini dan kondisi target wajib diisi.'
+        setIndikatorError(
+          'Nilai cakupan dokumentasi harus antara 0 sampai 100.'
         );
         return;
       }
+    }
 
-      const nilaiSaatIni = Number(
-        indikatorForm.nilai_saat_ini
-      );
-
-      const nilaiTarget = Number(
-        indikatorForm.nilai_target
-      );
-
+    if (indikatorForm.kode_indikator === 'KESESUAIAN_PENGGUNA') {
       if (
-        !Number.isFinite(nilaiSaatIni) ||
-        !Number.isFinite(nilaiTarget)
+        nilaiSaatIni < 1 ||
+        nilaiSaatIni > 5 ||
+        nilaiTarget < 1 ||
+        nilaiTarget > 5
       ) {
-        setError('Nilai indikator harus berupa angka.');
+        setIndikatorError(
+          'Nilai kesesuaian pengguna harus antara 1 sampai 5.'
+        );
         return;
       }
+    }
 
-      if (
-        indikatorForm.kode_indikator ===
-        'CAKUPAN_DOKUMENTASI'
-      ) {
-        if (
-          nilaiSaatIni < 0 ||
-          nilaiSaatIni > 100 ||
-          nilaiTarget < 0 ||
-          nilaiTarget > 100
-        ) {
-          setError(
-            'Nilai cakupan dokumentasi harus antara 0 sampai 100.'
-          );
-          return;
-        }
-      }
-
-      if (
-        indikatorForm.kode_indikator ===
-        'KESESUAIAN_PENGGUNA'
-      ) {
-        if (
-          nilaiSaatIni < 1 ||
-          nilaiSaatIni > 5 ||
-          nilaiTarget < 1 ||
-          nilaiTarget > 5
-        ) {
-          setError(
-            'Nilai kesesuaian pengguna harus antara 1 sampai 5.'
-          );
-          return;
-        }
-      }
-
+    try {
       setSaving(true);
 
       const payload = {
@@ -670,15 +689,16 @@ export default function PerencanaanPengetahuanPage() {
 
       setMessage(
         result?.message ||
-          'Indikator perencanaan berhasil disimpan.'
+        'Indikator perencanaan berhasil disimpan.'
       );
 
       setShowIndikatorForm(false);
+      setIndikatorError('');
       resetIndikatorForm();
 
       await fetchIndikator(selectedPerencanaan.id);
     } catch (err) {
-      setError(
+      setIndikatorError(
         err instanceof Error
           ? err.message
           : 'Gagal menyimpan indikator.'
@@ -687,6 +707,7 @@ export default function PerencanaanPengetahuanPage() {
       setSaving(false);
     }
   };
+
 
   const handleDeleteIndikator = async (
     item: IndikatorItem
@@ -724,33 +745,54 @@ export default function PerencanaanPengetahuanPage() {
     }
   };
 
+  
   const resetRencanaForm = () => {
     setRencanaForm({
       pengetahuan_id: '',
+      kode_pengetahuan: '',
+      nama_layanan: '',
+      nama_pengetahuan: '',
+      jenis_pengetahuan: 'Eksplisit',
+      sudah_terdokumentasi: '0',
+      aspek_pemdi: '',
+      indikator_pemdi: '',
       ditargetkan_tahun_ini: '1',
       penanggung_jawab_id: '',
       target_waktu_dokumentasi: '',
       tipe_dokumentasi: [],
     });
 
+    setRencanaError('');
     setEditingRencana(null);
   };
 
+
   const handleTambahRencana = () => {
     clearNotification();
+    setRencanaError('');
     resetRencanaForm();
     setShowRencanaForm(true);
   };
 
+  
   const handleEditRencana = (
     item: RencanaDokumentasiItem
   ) => {
     clearNotification();
-
+    setRencanaError('');
     setEditingRencana(item);
 
     setRencanaForm({
       pengetahuan_id: String(item.pengetahuan_id),
+      kode_pengetahuan: item.kode_pengetahuan || '',
+      nama_layanan: item.nama_layanan || '',
+      nama_pengetahuan: item.nama_pengetahuan || '',
+      jenis_pengetahuan: item.jenis_pengetahuan || 'Eksplisit',
+      sudah_terdokumentasi: String(
+        item.sudah_terdokumentasi ?? 0
+      ),
+      aspek_pemdi: item.aspek_pemdi || '',
+      indikator_pemdi: item.indikator_pemdi || '',
       ditargetkan_tahun_ini: String(
         item.ditargetkan_tahun_ini
       ),
@@ -787,32 +829,32 @@ export default function PerencanaanPengetahuanPage() {
 
     try {
       clearNotification();
+      setRencanaError('');
 
-      if (!rencanaForm.pengetahuan_id) {
-        setError('Pengetahuan wajib dipilih.');
+      if (
+        !rencanaForm.kode_pengetahuan.trim() ||
+        !rencanaForm.nama_layanan.trim() ||
+        !rencanaForm.nama_pengetahuan.trim()
+      ) {
+        setRencanaError(
+          'ID Pengetahuan, Nama Layanan, dan Nama Pengetahuan wajib diisi.'
+        );
         return;
       }
 
       if (!rencanaForm.penanggung_jawab_id) {
-        setError(
-          'Penanggung jawab dokumentasi wajib dipilih.'
-        );
+        setRencanaError('Penanggung jawab dokumentasi wajib dipilih.');
         return;
       }
 
       if (rencanaForm.tipe_dokumentasi.length === 0) {
-        setError(
-          'Minimal satu tipe dokumentasi wajib dipilih.'
-        );
+        setRencanaError('Minimal satu tipe dokumentasi wajib dipilih.');
         return;
       }
 
       setSaving(true);
 
-      const payload = {
-        pengetahuan_id: Number(
-          rencanaForm.pengetahuan_id
-        ),
+      const payloadRencana = {
         ditargetkan_tahun_ini: Number(
           rencanaForm.ditargetkan_tahun_ini
         ),
@@ -821,29 +863,41 @@ export default function PerencanaanPengetahuanPage() {
         ),
         target_waktu_dokumentasi:
           rencanaForm.target_waktu_dokumentasi || null,
-        tipe_dokumentasi:
-          rencanaForm.tipe_dokumentasi,
+        tipe_dokumentasi: rencanaForm.tipe_dokumentasi,
+      };
+
+      const payload = {
+        ...payloadRencana,
+        kode_pengetahuan: rencanaForm.kode_pengetahuan.trim(),
+        nama_layanan: rencanaForm.nama_layanan.trim(),
+        nama_pengetahuan: rencanaForm.nama_pengetahuan.trim(),
+        jenis_pengetahuan: rencanaForm.jenis_pengetahuan,
+        sudah_terdokumentasi: Number(
+          rencanaForm.sudah_terdokumentasi
+        ),
+        aspek_pemdi: rencanaForm.aspek_pemdi.trim() || null,
+        indikator_pemdi: rencanaForm.indikator_pemdi.trim() || null,
       };
 
       const url = editingRencana
         ? `${API}/pengetahuan/rencana-dokumentasi/${editingRencana.id}`
-        : `${API}/pengetahuan/perencanaan/${selectedPerencanaan.id}/rencana-dokumentasi`;
+        : `${API}/pengetahuan/perencanaan/${selectedPerencanaan.id}/rencana-dokumentasi-gabungan`;
 
       const result = await request(url, {
         method: editingRencana ? 'PUT' : 'POST',
         body: JSON.stringify(payload),
       });
 
-      setMessage(
-        result?.message ||
-          'Rencana dokumentasi berhasil disimpan.'
-      );
-
       setShowRencanaForm(false);
       resetRencanaForm();
 
       await fetchRencanaDokumentasi(
         selectedPerencanaan.id
+      );
+
+      setMessage(
+        result?.message ||
+          'Rencana dokumentasi berhasil disimpan.'
       );
     } catch (err) {
       setError(
@@ -897,7 +951,7 @@ export default function PerencanaanPengetahuanPage() {
   const resetPengetahuanForm = () => {
     setPengetahuanForm({
       kode_pengetahuan: '',
-      layanan_id: '',
+      nama_layanan: '',
       nama_pengetahuan: '',
       jenis_pengetahuan: 'Eksplisit',
       sudah_terdokumentasi: '0',
@@ -926,8 +980,8 @@ export default function PerencanaanPengetahuanPage() {
         return;
       }
 
-      if (!pengetahuanForm.layanan_id) {
-        setError('Nama layanan wajib dipilih.');
+      if (!pengetahuanForm.nama_layanan.trim()) {
+        setError('Nama layanan wajib diisi.');
         return;
       }
 
@@ -941,9 +995,8 @@ export default function PerencanaanPengetahuanPage() {
       const payload = {
         kode_pengetahuan:
           pengetahuanForm.kode_pengetahuan.trim(),
-        layanan_id: Number(
-          pengetahuanForm.layanan_id
-        ),
+        nama_layanan: 
+          pengetahuanForm.nama_layanan.trim(),
         nama_pengetahuan:
           pengetahuanForm.nama_pengetahuan.trim(),
         jenis_pengetahuan:
@@ -1027,18 +1080,6 @@ export default function PerencanaanPengetahuanPage() {
     }
 
     return '';
-  };
-
-  const getStatusStyle = (status: string) => {
-    if (status === 'Selesai') {
-      return 'bg-green-100 text-green-700';
-    }
-
-    if (status === 'Aktif') {
-      return 'bg-blue-100 text-blue-700';
-    }
-
-    return 'bg-slate-100 text-slate-600';
   };
 
   const getPengetahuanDetail = (id: number) => {
@@ -1180,7 +1221,7 @@ export default function PerencanaanPengetahuanPage() {
                 onChange={(e) =>
                   setSearch(e.target.value)
                 }
-                placeholder="Cari instansi, tahun, status, atau pembuat..."
+                placeholder="Cari instansi, tahun, atau pembuat..."
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 md:max-w-md"
               />
             </div>
@@ -1202,10 +1243,6 @@ export default function PerencanaanPengetahuanPage() {
                     </th>
 
                     <th className="px-4 py-3 font-semibold">
-                      Status
-                    </th>
-
-                    <th className="px-4 py-3 font-semibold">
                       Dibuat Oleh
                     </th>
 
@@ -1219,7 +1256,7 @@ export default function PerencanaanPengetahuanPage() {
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         className="px-4 py-8 text-center text-slate-500"
                       >
                         Memuat data...
@@ -1229,7 +1266,7 @@ export default function PerencanaanPengetahuanPage() {
                     0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={5}
                         className="px-4 py-8 text-center text-slate-400"
                       >
                         Belum ada data perencanaan
@@ -1253,16 +1290,6 @@ export default function PerencanaanPengetahuanPage() {
 
                           <td className="px-4 py-3">
                             {item.tahun_perencanaan}
-                          </td>
-
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
-                                item.status
-                              )}`}
-                            >
-                              {item.status}
-                            </span>
                           </td>
 
                           <td className="px-4 py-3">
@@ -1348,12 +1375,11 @@ export default function PerencanaanPengetahuanPage() {
               </button>
             </div>
 
-            <div className="grid gap-4 p-5 md:grid-cols-4">
+            <div className="grid gap-4 p-5 md:grid-cols-3">
               <div>
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   Nama Instansi
                 </p>
-
                 <p className="mt-1 text-sm font-medium text-slate-800">
                   {selectedPerencanaan.nama_instansi}
                 </p>
@@ -1363,7 +1389,6 @@ export default function PerencanaanPengetahuanPage() {
                 <p className="text-xs font-semibold uppercase text-slate-500">
                   Tahun Perencanaan
                 </p>
-
                 <p className="mt-1 text-sm font-medium text-slate-800">
                   {selectedPerencanaan.tahun_perencanaan}
                 </p>
@@ -1371,23 +1396,8 @@ export default function PerencanaanPengetahuanPage() {
 
               <div>
                 <p className="text-xs font-semibold uppercase text-slate-500">
-                  Status
-                </p>
-
-                <span
-                  className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusStyle(
-                    selectedPerencanaan.status
-                  )}`}
-                >
-                  {selectedPerencanaan.status}
-                </span>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase text-slate-500">
                   Dibuat Oleh
                 </p>
-
                 <p className="mt-1 text-sm font-medium text-slate-800">
                   {selectedPerencanaan.pembuat}
                 </p>
@@ -1563,14 +1573,6 @@ export default function PerencanaanPengetahuanPage() {
 
               {canCreate && (
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={handleTambahPengetahuan}
-                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Tambah Pengetahuan
-                  </button>
-
                   <button
                     type="button"
                     onClick={handleTambahRencana}
@@ -1788,31 +1790,18 @@ export default function PerencanaanPengetahuanPage() {
                   Nama Instansi
                 </label>
 
-                <select
-                  value={perencanaanForm.instansi_id}
+                <input
+                  type="text"
+                  value={perencanaanForm.nama_instansi}
                   onChange={(e) =>
                     setPerencanaanForm({
                       ...perencanaanForm,
-                      instansi_id: e.target.value,
+                      nama_instansi: e.target.value,
                     })
                   }
-                  disabled={loadingOptions}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-                >
-                  <option value="">
-                    Pilih instansi
-                  </option>
-
-                  {instansiOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.kode_instansi} -{' '}
-                      {item.nama_instansi}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Masukkan nama instansi"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                />
               </div>
 
               <div>
@@ -1824,41 +1813,15 @@ export default function PerencanaanPengetahuanPage() {
                   type="number"
                   min="1901"
                   max="2155"
-                  value={
-                    perencanaanForm.tahun_perencanaan
-                  }
+                  value={perencanaanForm.tahun_perencanaan}
                   onChange={(e) =>
                     setPerencanaanForm({
                       ...perencanaanForm,
-                      tahun_perencanaan:
-                        e.target.value,
+                      tahun_perencanaan: e.target.value,
                     })
                   }
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                 />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Status
-                </label>
-
-                <select
-                  value={perencanaanForm.status}
-                  onChange={(e) =>
-                    setPerencanaanForm({
-                      ...perencanaanForm,
-                      status: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Aktif">Aktif</option>
-                  <option value="Selesai">
-                    Selesai
-                  </option>
-                </select>
               </div>
             </div>
 
@@ -1901,10 +1864,16 @@ export default function PerencanaanPengetahuanPage() {
               </h3>
             </div>
 
+            {indikatorError && (
+              <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {indikatorError}
+              </div>
+            )}
+
             <div className="space-y-4 p-5">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Indikator
+                  Indikator *
                 </label>
 
                 <select
@@ -1912,8 +1881,7 @@ export default function PerencanaanPengetahuanPage() {
                   onChange={(e) =>
                     setIndikatorForm({
                       ...indikatorForm,
-                      kode_indikator:
-                        e.target.value,
+                      kode_indikator: e.target.value,
                       nilai_saat_ini: '',
                       nilai_target: '',
                     })
@@ -1923,78 +1891,129 @@ export default function PerencanaanPengetahuanPage() {
                   <option value="CAKUPAN_DOKUMENTASI">
                     Cakupan Dokumentasi Pengetahuan
                   </option>
-
                   <option value="KESESUAIAN_PENGGUNA">
-                    Kesesuaian dengan Kebutuhan
-                    Pengguna
+                    Kesesuaian dengan Kebutuhan Pengguna
                   </option>
                 </select>
               </div>
 
+              {/* Petunjuk otomatis sesuai indikator */}
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="mb-1 text-sm font-semibold text-blue-900">
+                  Petunjuk Pengisian
+                </p>
+
+                {indikatorForm.kode_indikator ===
+                'CAKUPAN_DOKUMENTASI' ? (
+                  <p className="text-sm text-blue-800">
+                    Isi kondisi saat ini dan kondisi target dengan
+                    persentase layanan yang sudah memiliki pengetahuan
+                    terdokumentasi. Gunakan angka 0 sampai 100 (%).
+                  </p>
+                ) : (
+                  <p className="text-sm text-blue-800">
+                    Isi kondisi saat ini dan kondisi target dengan
+                    nilai rata-rata rating pengguna terhadap
+                    pengetahuan yang tersedia. Gunakan skala 1 sampai 5.
+                  </p>
+                )}
+              </div>
+
+              {/* Kondisi Saat Ini */}
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
                   Kondisi Saat Ini (As-Is)
+                  {indikatorForm.kode_indikator ===
+                  'CAKUPAN_DOKUMENTASI'
+                    ? ' - Persentase (%)'
+                    : ' - Rating (1-5)'}
                 </label>
 
                 <input
                   type="number"
                   step="0.01"
+                  required
                   min={
                     indikatorForm.kode_indikator ===
-                    'CAKUPAN_DOKUMENTASI'
-                      ? 0
-                      : 1
+                    'CAKUPAN_DOKUMENTASI' ? 0 : 1
                   }
                   max={
                     indikatorForm.kode_indikator ===
+                    'CAKUPAN_DOKUMENTASI' ? 100 : 5
+                  }
+                  placeholder={
+                    indikatorForm.kode_indikator ===
                     'CAKUPAN_DOKUMENTASI'
-                      ? 100
-                      : 5
+                      ? 'Contoh: 60'
+                      : 'Contoh: 3'
                   }
-                  value={
-                    indikatorForm.nilai_saat_ini
-                  }
-                  onChange={(e) =>
+                  value={indikatorForm.nilai_saat_ini}
+                  onChange={(e) => {
+                    setIndikatorError('');
                     setIndikatorForm({
                       ...indikatorForm,
                       nilai_saat_ini: e.target.value,
-                    })
-                  }
+                    });
+                  }}
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 />
+
+                <p className="mt-1 text-xs text-slate-500">
+                  {indikatorForm.kode_indikator ===
+                  'CAKUPAN_DOKUMENTASI'
+                    ? 'Persentase layanan dengan pengetahuan terdokumentasi saat ini (0-100%).'
+                    : 'Rata-rata rating pengguna saat ini (skala 1-5).'}
+                </p>
               </div>
 
+              {/* Kondisi Target */}
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
                   Kondisi Target (To-Be)
+                  {indikatorForm.kode_indikator ===
+                  'CAKUPAN_DOKUMENTASI'
+                    ? ' - Persentase (%)'
+                    : ' - Rating (1-5)'}
                 </label>
 
                 <input
                   type="number"
                   step="0.01"
+                  required
                   min={
                     indikatorForm.kode_indikator ===
-                    'CAKUPAN_DOKUMENTASI'
-                      ? 0
-                      : 1
+                    'CAKUPAN_DOKUMENTASI' ? 0 : 1
                   }
                   max={
                     indikatorForm.kode_indikator ===
+                    'CAKUPAN_DOKUMENTASI' ? 100 : 5
+                  }
+                  placeholder={
+                    indikatorForm.kode_indikator ===
                     'CAKUPAN_DOKUMENTASI'
-                      ? 100
-                      : 5
+                      ? 'Contoh: 90'
+                      : 'Contoh: 5'
                   }
                   value={indikatorForm.nilai_target}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setIndikatorError('');
                     setIndikatorForm({
                       ...indikatorForm,
                       nilai_target: e.target.value,
-                    })
-                  }
+                    });
+                  }}
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 />
+
+                <p className="mt-1 text-xs text-slate-500">
+                  {indikatorForm.kode_indikator ===
+                  'CAKUPAN_DOKUMENTASI'
+                    ? 'Target persentase layanan dengan pengetahuan terdokumentasi (0-100%).'
+                    : 'Target rata-rata rating pengguna (skala 1-5).'}
+                </p>
               </div>
             </div>
+
 
             <div className="flex justify-end gap-3 border-t border-slate-200 p-5">
               <button
@@ -2026,157 +2045,239 @@ export default function PerencanaanPengetahuanPage() {
 
       {showRencanaForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="my-6 w-full max-w-2xl rounded-lg bg-white shadow-xl">
+          <div className="my-6 w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="border-b border-slate-200 p-5">
               <h3 className="text-lg font-semibold text-slate-800">
                 {editingRencana
                   ? 'Edit Rencana Dokumentasi'
                   : 'Tambah Rencana Dokumentasi'}
               </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Formulir 1.2 - Perencanaan Dokumentasi Pengetahuan
+              </p>
             </div>
-
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Pengetahuan
-                </label>
-
-                <select
-                  value={rencanaForm.pengetahuan_id}
-                  onChange={(e) =>
-                    setRencanaForm({
-                      ...rencanaForm,
-                      pengetahuan_id:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    Pilih pengetahuan
-                  </option>
-
-                  {pengetahuanOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.kode_pengetahuan} -{' '}
-                      {item.nama_pengetahuan}
-                    </option>
-                  ))}
-                </select>
+            
+            {rencanaError && (
+              <div className="mx-5 mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {rencanaError}
               </div>
+            )}
 
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Ditargetkan Tahun Ini?
-                </label>
-
-                <select
-                  value={
-                    rencanaForm.ditargetkan_tahun_ini
-                  }
-                  onChange={(e) =>
-                    setRencanaForm({
-                      ...rencanaForm,
-                      ditargetkan_tahun_ini:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="1">Ya</option>
-                  <option value="0">Tidak</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Tipe Dokumentasi
-                </label>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {[
-                    'Teks',
-                    'Gambar',
-                    'Audio',
-                    'Video',
-                  ].map((tipe) => (
-                    <label
-                      key={tipe}
-                      className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={rencanaForm.tipe_dokumentasi.includes(
-                          tipe
-                        )}
-                        onChange={() =>
-                          toggleTipeDokumentasi(
-                            tipe
-                          )
-                        }
-                      />
-
-                      {tipe}
-                    </label>
-                  ))}
+            <div className="max-h-[65vh] space-y-5 overflow-y-auto p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Nama Layanan *
+                  </label>
+                  <input
+                    type="text"
+                    value={rencanaForm.nama_layanan}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        nama_layanan: e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan nama layanan digital"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
                 </div>
-              </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Penanggung Jawab Dokumentasi
-                </label>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    ID Pengetahuan *
+                  </label>
+                  <input
+                    type="text"
+                    value={rencanaForm.kode_pengetahuan}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        kode_pengetahuan: e.target.value,
+                      })
+                    }
+                    placeholder="Contoh: KNW-DUKCAPIL-002"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
 
-                <select
-                  value={
-                    rencanaForm.penanggung_jawab_id
-                  }
-                  onChange={(e) =>
-                    setRencanaForm({
-                      ...rencanaForm,
-                      penanggung_jawab_id:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    Pilih penanggung jawab
-                  </option>
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Nama Pengetahuan *
+                  </label>
+                  <input
+                    type="text"
+                    value={rencanaForm.nama_pengetahuan}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        nama_pengetahuan: e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan nama pengetahuan"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
 
-                  {userOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.nama} - {item.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Sudah Terdokumentasi?
+                  </label>
+                  <select
+                    value={rencanaForm.sudah_terdokumentasi}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        sudah_terdokumentasi: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="0">Tidak</option>
+                    <option value="1">Ya</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Target Waktu Dokumentasi
-                </label>
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Jenis Pengetahuan
+                  </label>
+                  <select
+                    value={rencanaForm.jenis_pengetahuan}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        jenis_pengetahuan: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="Eksplisit">Eksplisit</option>
+                    <option value="Implisit">Implisit</option>
+                  </select>
+                </div>
 
-                <input
-                  type="date"
-                  value={
-                    rencanaForm.target_waktu_dokumentasi
-                  }
-                  onChange={(e) =>
-                    setRencanaForm({
-                      ...rencanaForm,
-                      target_waktu_dokumentasi:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Aspek PemDi
+                  </label>
+                  <input
+                    type="text"
+                    value={rencanaForm.aspek_pemdi}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        aspek_pemdi: e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan aspek PemDi"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Indikator PemDi
+                  </label>
+                  <input
+                    type="text"
+                    value={rencanaForm.indikator_pemdi}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        indikator_pemdi: e.target.value,
+                      })
+                    }
+                    placeholder="Masukkan indikator PemDi"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Ditargetkan Tahun Ini?
+                  </label>
+                  <select
+                    value={rencanaForm.ditargetkan_tahun_ini}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        ditargetkan_tahun_ini: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="1">Ya</option>
+                    <option value="0">Tidak</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Penanggung Jawab Dokumentasi *
+                  </label>
+                  <select
+                    value={rencanaForm.penanggung_jawab_id}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        penanggung_jawab_id: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Pilih penanggung jawab</option>
+                    {userOptions
+                    .filter(
+                      (item) =>
+                        Number(item.instansi_id) ===
+                        Number(selectedPerencanaan?.instansi_id)
+                    )
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.nama} - {item.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-slate-700">
+                    Target Waktu Dokumentasi
+                  </label>
+                  <input
+                    type="date"
+                    value={rencanaForm.target_waktu_dokumentasi}
+                    onChange={(e) =>
+                      setRencanaForm({
+                        ...rencanaForm,
+                        target_waktu_dokumentasi: e.target.value,
+                      })
+                    }
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Tipe Dokumentasi *
+                  </label>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    {['Teks', 'Gambar', 'Audio', 'Video'].map((tipe) => (
+                      <label
+                        key={tipe}
+                        className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={rencanaForm.tipe_dokumentasi.includes(tipe)}
+                          onChange={() => toggleTipeDokumentasi(tipe)}
+                        />
+                        {tipe}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2199,9 +2300,7 @@ export default function PerencanaanPengetahuanPage() {
                 disabled={saving}
                 className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
               >
-                {saving
-                  ? 'Menyimpan...'
-                  : 'Simpan'}
+                {saving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
           </div>
@@ -2250,30 +2349,18 @@ export default function PerencanaanPengetahuanPage() {
                   Nama Layanan
                 </label>
 
-                <select
-                  value={pengetahuanForm.layanan_id}
+                <input
+                  type="text"
+                  value={pengetahuanForm.nama_layanan}
                   onChange={(e) =>
                     setPengetahuanForm({
                       ...pengetahuanForm,
-                      layanan_id: e.target.value,
+                      nama_layanan: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    Pilih layanan
-                  </option>
-
-                  {layananOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.kode_layanan} -{' '}
-                      {item.nama_layanan}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Masukkan nama layanan digital"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
               </div>
 
               <div className="md:col-span-2">
@@ -2384,74 +2471,6 @@ export default function PerencanaanPengetahuanPage() {
                   }
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Pemilik Instansi
-                </label>
-
-                <select
-                  value={
-                    pengetahuanForm.pemilik_instansi_id
-                  }
-                  onChange={(e) =>
-                    setPengetahuanForm({
-                      ...pengetahuanForm,
-                      pemilik_instansi_id:
-                        e.target.value,
-                      pemilik_unit_kerja_id: '',
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    Pilih instansi
-                  </option>
-
-                  {instansiOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.nama_instansi}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Pemilik Unit Kerja
-                </label>
-
-                <select
-                  value={
-                    pengetahuanForm.pemilik_unit_kerja_id
-                  }
-                  onChange={(e) =>
-                    setPengetahuanForm({
-                      ...pengetahuanForm,
-                      pemilik_unit_kerja_id:
-                        e.target.value,
-                    })
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    Pilih unit kerja
-                  </option>
-
-                  {filteredUnitOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.kode_unit} -{' '}
-                      {item.nama_unit}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 

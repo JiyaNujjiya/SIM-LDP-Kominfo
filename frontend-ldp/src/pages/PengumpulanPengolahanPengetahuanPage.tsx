@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import DokumentasiPengetahuanSection from "../components/DokumentasiPengetahuanSection";
 
 type PengumpulanItem = {
   id: number;
@@ -66,6 +65,7 @@ export default function PengumpulanPengolahanPengetahuanPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
 
   const [showForm, setShowForm] = useState(false);
@@ -76,6 +76,7 @@ export default function PengumpulanPengolahanPengetahuanPage() {
     pengetahuan_id: "",
     tanggal_pengumpulan: "",
     unit_pengumpulan_id: "",
+    unit_pengumpulan: "",
     lokasi_penyimpanan: "",
     keterangan_lokasi_lainnya: "",
     status_publikasi_simpan: "",
@@ -219,6 +220,7 @@ export default function PengumpulanPengolahanPengetahuanPage() {
   const resetForm = () => {
     setForm({
       pengetahuan_id: "",
+      unit_pengumpulan: "",
       tanggal_pengumpulan: "",
       unit_pengumpulan_id: "",
       lokasi_penyimpanan: "",
@@ -234,6 +236,7 @@ export default function PengumpulanPengolahanPengetahuanPage() {
 
   const handleTambah = () => {
     clearNotification();
+    setFormError("");
     resetForm();
     setShowForm(true);
   };
@@ -244,12 +247,14 @@ export default function PengumpulanPengolahanPengetahuanPage() {
     setEditingItem(item);
 
     setForm({
-      pengetahuan_id: String(item.pengetahuan_id),
+      pengetahuan_id: String(item.pengetahuan_id),  
       tanggal_pengumpulan:
         item.tanggal_pengumpulan || "",
       unit_pengumpulan_id: String(
         item.unit_pengumpulan_id
-      ),
+      ),    
+      unit_pengumpulan: 
+        item.unit_pengumpulan || '',
       lokasi_penyimpanan:
         item.lokasi_penyimpanan || "",
       keterangan_lokasi_lainnya:
@@ -272,24 +277,30 @@ export default function PengumpulanPengolahanPengetahuanPage() {
   const handleSave = async () => {
     try {
       clearNotification();
+      setFormError("");
 
       if (!form.pengetahuan_id) {
-        setError("Pengetahuan wajib dipilih.");
+        setFormError("Pengetahuan wajib dipilih.");
         return;
       }
 
       if (!form.tanggal_pengumpulan) {
-        setError("Tanggal pengumpulan wajib diisi.");
+        setFormError("Tanggal pengumpulan wajib diisi.");
         return;
       }
 
-      if (!form.unit_pengumpulan_id) {
-        setError("Unit pengumpulan wajib dipilih.");
+      if (!form.unit_pengumpulan.trim()) {
+        setFormError("Unit Pengumpulan wajib diisi.");
+        return;
+      }
+
+      if (form.unit_pengumpulan.trim().length > 255) {
+        setFormError("Unit Pengumpulan maksimal 255 karakter.");
         return;
       }
 
       if (form.lokasi_penyimpanan.length > 255) {
-        setError(
+        setFormError(
           "Lokasi penyimpanan maksimal 255 karakter."
         );
         return;
@@ -298,14 +309,14 @@ export default function PengumpulanPengolahanPengetahuanPage() {
       if (
         form.status_publikasi_simpan.length > 100
       ) {
-        setError(
+        setFormError(
           "Status publikasi/simpan maksimal 100 karakter."
         );
         return;
       }
 
       if (form.metode_pengolahan.length > 150) {
-        setError(
+        setFormError(
           "Metode pengolahan maksimal 150 karakter."
         );
         return;
@@ -320,9 +331,8 @@ export default function PengumpulanPengolahanPengetahuanPage() {
         ),
         tanggal_pengumpulan:
           form.tanggal_pengumpulan,
-        unit_pengumpulan_id: Number(
-          form.unit_pengumpulan_id
-        ),
+        unit_pengumpulan: 
+          form.unit_pengumpulan.trim(),
         lokasi_penyimpanan:
           form.lokasi_penyimpanan.trim() || null,
         keterangan_lokasi_lainnya:
@@ -735,16 +745,6 @@ export default function PengumpulanPengolahanPengetahuanPage() {
         </div>
       </div>
 
-      <DokumentasiPengetahuanSection
-        pengumpulanItems={data.map((item) => ({
-            id: item.id,
-            pengetahuan_id: item.pengetahuan_id,
-            kode_pengetahuan: item.kode_pengetahuan,
-            nama_pengetahuan: item.nama_pengetahuan,
-            tanggal_pengumpulan: item.tanggal_pengumpulan,
-        }))}
-      />
-
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
           <div className="my-8 w-full max-w-4xl rounded-lg bg-white shadow-xl">
@@ -754,6 +754,12 @@ export default function PengumpulanPengolahanPengetahuanPage() {
                   ? "Edit Pengumpulan & Pengolahan"
                   : "Tambah Pengumpulan & Pengolahan"}
               </h3>
+
+              {formError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
 
               <p className="mt-1 text-sm text-slate-500">
                 Isi informasi proses pengumpulan dan
@@ -829,34 +835,19 @@ export default function PengumpulanPengolahanPengetahuanPage() {
                   Unit Pengumpulan
                 </label>
 
-                <select
-                  value={
-                    form.unit_pengumpulan_id
-                  }
+                <input
+                  type="text"
+                  value={form.unit_pengumpulan}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      unit_pengumpulan_id:
-                        e.target.value,
+                      unit_pengumpulan: e.target.value,
                     })
                   }
-                  disabled={loadingOptions}
+                  placeholder="Contoh: Bidang Pelayanan Pendaftaran Penduduk"
+                  maxLength={255}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-                >
-                  <option value="">
-                    Pilih unit kerja
-                  </option>
-
-                  {unitOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.kode_unit} -{" "}
-                      {item.nama_unit}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>

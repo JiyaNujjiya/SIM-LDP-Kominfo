@@ -94,6 +94,8 @@ export default function PemanfaatanAlihPengetahuanPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [alihFormError, setAlihFormError] = useState("");
+  const [pemanfaatanFormError, setPemanfaatanFormError] = useState("");
 
   const [searchPemanfaatan, setSearchPemanfaatan] = useState("");
   const [searchAlih, setSearchAlih] = useState("");
@@ -112,6 +114,7 @@ export default function PemanfaatanAlihPengetahuanPage() {
     tanggal_pemanfaatan: "",
     jenis_pengguna: "Internal" as "Publik" | "Internal",
     unit_pengguna_id: "",
+    unit_pengguna: "",
     tujuan_pemanfaatan: "",
     rating_pengetahuan: "",
   });
@@ -277,6 +280,7 @@ export default function PemanfaatanAlihPengetahuanPage() {
       tanggal_pemanfaatan: "",
       jenis_pengguna: "Internal",
       unit_pengguna_id: "",
+      unit_pengguna: "",
       tujuan_pemanfaatan: "",
       rating_pengetahuan: "",
     });
@@ -298,12 +302,14 @@ export default function PemanfaatanAlihPengetahuanPage() {
 
   const openTambahPemanfaatan = () => {
     clearNotification();
+    setPemanfaatanFormError("");
     resetPemanfaatanForm();
     setShowPemanfaatanForm(true);
   };
 
   const openEditPemanfaatan = (item: PemanfaatanItem) => {
     clearNotification();
+    setPemanfaatanFormError("");
 
     setEditingPemanfaatan(item);
 
@@ -312,8 +318,9 @@ export default function PemanfaatanAlihPengetahuanPage() {
       tanggal_pemanfaatan: item.tanggal_pemanfaatan,
       jenis_pengguna: item.jenis_pengguna,
       unit_pengguna_id: item.unit_pengguna_id
-        ? String(item.unit_pengguna_id)
-        : "",
+      ? String(item.unit_pengguna_id)
+      : "",
+      unit_pengguna: item.unit_pengguna || "",
       tujuan_pemanfaatan: item.tujuan_pemanfaatan,
       rating_pengetahuan: item.rating_pengetahuan
         ? String(item.rating_pengetahuan)
@@ -328,17 +335,17 @@ export default function PemanfaatanAlihPengetahuanPage() {
       clearNotification();
 
       if (!pemanfaatanForm.pengetahuan_id) {
-        setError("Pengetahuan wajib dipilih.");
+        setPemanfaatanFormError("Pengetahuan wajib dipilih.");
         return;
       }
 
       if (!pemanfaatanForm.tanggal_pemanfaatan) {
-        setError("Tanggal pemanfaatan wajib diisi.");
+        setPemanfaatanFormError("Tanggal pemanfaatan wajib diisi.");
         return;
       }
 
       if (!pemanfaatanForm.tujuan_pemanfaatan.trim()) {
-        setError("Tujuan pemanfaatan wajib diisi.");
+        setPemanfaatanFormError("Tujuan pemanfaatan wajib diisi.");
         return;
       }
 
@@ -347,7 +354,15 @@ export default function PemanfaatanAlihPengetahuanPage() {
         (Number(pemanfaatanForm.rating_pengetahuan) < 1 ||
           Number(pemanfaatanForm.rating_pengetahuan) > 5)
       ) {
-        setError("Rating pengetahuan harus bernilai 1 sampai 5.");
+        setPemanfaatanFormError("Rating pengetahuan harus bernilai 1 sampai 5.");
+        return;
+      }
+
+      if (
+        pemanfaatanForm.jenis_pengguna === "Internal" &&
+        !pemanfaatanForm.unit_pengguna.trim()
+      ) {
+        setPemanfaatanFormError("Unit Pengguna wajib diisi untuk pengguna internal.");
         return;
       }
 
@@ -361,9 +376,10 @@ export default function PemanfaatanAlihPengetahuanPage() {
           pemanfaatanForm.tanggal_pemanfaatan,
         jenis_pengguna:
           pemanfaatanForm.jenis_pengguna,
-        unit_pengguna_id:
-          pemanfaatanForm.unit_pengguna_id
-            ? Number(pemanfaatanForm.unit_pengguna_id)
+        unit_pengguna_id: null,
+        unit_pengguna:
+          pemanfaatanForm.jenis_pengguna === "Internal"
+            ? pemanfaatanForm.unit_pengguna.trim()
             : null,
         tujuan_pemanfaatan:
           pemanfaatanForm.tujuan_pemanfaatan.trim(),
@@ -392,7 +408,7 @@ export default function PemanfaatanAlihPengetahuanPage() {
 
       await fetchData();
     } catch (err) {
-      setError(
+      setPemanfaatanFormError(
         err instanceof Error
           ? err.message
           : "Gagal menyimpan data pemanfaatan."
@@ -438,13 +454,15 @@ export default function PemanfaatanAlihPengetahuanPage() {
 
   const openTambahAlih = () => {
     clearNotification();
+    setAlihFormError("");
     resetAlihForm();
     setShowAlihForm(true);
   };
 
   const openEditAlih = (item: AlihPengetahuanItem) => {
     clearNotification();
-
+    setAlihFormError("");
+    
     setEditingAlih(item);
 
     setAlihForm({
@@ -489,24 +507,25 @@ export default function PemanfaatanAlihPengetahuanPage() {
   const handleSaveAlih = async () => {
     try {
       clearNotification();
+      setAlihFormError("");
 
       if (!alihForm.pengetahuan_id) {
-        setError("Pengetahuan wajib dipilih.");
+        setAlihFormError("Pengetahuan wajib dipilih.");
         return;
       }
 
       if (!alihForm.tanggal_kegiatan) {
-        setError("Tanggal kegiatan wajib diisi.");
+        setAlihFormError("Tanggal kegiatan wajib diisi.");
         return;
       }
 
       if (!alihForm.penerima_pengetahuan.trim()) {
-        setError("Penerima pengetahuan wajib diisi.");
+        setAlihFormError("Penerima pengetahuan wajib diisi.");
         return;
       }
 
       if (alihForm.penerima_pengetahuan.trim().length > 255) {
-        setError(
+        setAlihFormError(
           "Penerima pengetahuan maksimal 255 karakter."
         );
         return;
@@ -516,9 +535,14 @@ export default function PemanfaatanAlihPengetahuanPage() {
         selectedMetode.includes("Lainnya") &&
         !keteranganLainnya.trim()
       ) {
-        setError(
+        setAlihFormError(
           "Keterangan metode lainnya wajib diisi."
         );
+        return;
+      }
+
+      if (selectedMetode.length === 0) {
+        setAlihFormError("Pilih minimal satu Metode Transfer.");
         return;
       }
 
@@ -562,7 +586,7 @@ export default function PemanfaatanAlihPengetahuanPage() {
 
       await fetchData();
     } catch (err) {
-      setError(
+      setAlihFormError(
         err instanceof Error
           ? err.message
           : "Gagal menyimpan data alih pengetahuan."
@@ -1072,6 +1096,12 @@ export default function PemanfaatanAlihPengetahuanPage() {
                   ? "Edit Pemanfaatan Pengetahuan"
                   : "Tambah Pemanfaatan Pengetahuan"}
               </h3>
+
+              {pemanfaatanFormError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {pemanfaatanFormError}
+                </div>
+              )}
             </div>
 
             <div className="grid gap-5 p-5 md:grid-cols-2">
@@ -1129,7 +1159,7 @@ export default function PemanfaatanAlihPengetahuanPage() {
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Akses Pengetahuan
+                  Jenis Pengguna (Publik/Internal)
                 </label>
 
                 <select
@@ -1139,8 +1169,12 @@ export default function PemanfaatanAlihPengetahuanPage() {
                   onChange={(e) =>
                     setPemanfaatanForm({
                       ...pemanfaatanForm,
-                      jenis_pengguna: e.target
-                        .value as "Publik" | "Internal",
+                      jenis_pengguna: e.target.value as "Publik" | "Internal",
+                      unit_pengguna:
+                        e.target.value === "Internal"
+                          ? pemanfaatanForm.unit_pengguna
+                          : "",
+                      unit_pengguna_id: "",
                     })
                   }
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
@@ -1159,32 +1193,24 @@ export default function PemanfaatanAlihPengetahuanPage() {
                   Unit Pengguna
                 </label>
 
-                <select
-                  value={
-                    pemanfaatanForm.unit_pengguna_id
-                  }
+                <input
+                  type="text"
+                  value={pemanfaatanForm.unit_pengguna}
                   onChange={(e) =>
                     setPemanfaatanForm({
                       ...pemanfaatanForm,
-                      unit_pengguna_id: e.target.value,
+                      unit_pengguna: e.target.value,
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">
-                    Tidak ada / tidak ditentukan
-                  </option>
-
-                  {unitOptions.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.kode_unit} -{" "}
-                      {item.nama_unit}
-                    </option>
-                  ))}
-                </select>
+                  disabled={pemanfaatanForm.jenis_pengguna !== "Internal"}
+                  placeholder={
+                    pemanfaatanForm.jenis_pengguna === "Internal"
+                      ? "Contoh: Bidang Pelayanan Kependudukan"
+                      : "Hanya diisi untuk pengguna internal"
+                  }
+                  maxLength={255}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                />
               </div>
 
               <div>
@@ -1273,6 +1299,12 @@ export default function PemanfaatanAlihPengetahuanPage() {
                   ? "Edit Alih Pengetahuan"
                   : "Tambah Alih Pengetahuan"}
               </h3>
+
+              {alihFormError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {alihFormError}
+                </div>
+              )}
             </div>
 
             <div className="space-y-5 p-5">
